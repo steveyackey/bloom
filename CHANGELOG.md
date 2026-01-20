@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.6](https://github.com/steveyackey/bloom/compare/bloom-v0.1.5...bloom-v0.1.6) (2026-01-20)
+
+
+### Features
+
+* add bloom enter command and improve refine ([facf061](https://github.com/steveyackey/bloom/commit/facf061b965660329242c8243f863bbbee0cf18a))
+* restructure workspace setup and add refine command ([678c029](https://github.com/steveyackey/bloom/commit/678c0298af5be2ddb78bf859f41445bcc77a85e5))
+
+
+### Documentation
+
+* clarify that repos are managed separately from projects ([e5af260](https://github.com/steveyackey/bloom/commit/e5af260309ab10b9fb4dacfa0cb5ec2efe51a21f))
+* fix README flow - workspace first, then repos, then projects ([caab689](https://github.com/steveyackey/bloom/commit/caab68920b6a96d542d6c4fc34dc9161c0ebddbf))
+* fix README flow to clarify project-first approach ([a5922d0](https://github.com/steveyackey/bloom/commit/a5922d0acc48e46360bfbc14d6c7d3f914557b20))
+* update CLAUDE.md and add tests for refine/enter commands ([646e830](https://github.com/steveyackey/bloom/commit/646e830942afc591fe315a891c6c941232c97cf8))
+
 ## [0.1.5](https://github.com/steveyackey/bloom/compare/bloom-v0.1.4...bloom-v0.1.5) (2026-01-20)
 
 
