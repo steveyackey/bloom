@@ -4,7 +4,9 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { EMBEDDED_PROMPTS } from "./prompts-embedded";
 
+// Try to resolve prompts directory, but it may not exist in bundled binaries
 const PROMPTS_DIR = resolve(import.meta.dirname ?? ".", "..", "prompts");
 
 export interface PromptVariables {
@@ -13,15 +15,22 @@ export interface PromptVariables {
 
 /**
  * Load a prompt from a markdown file and replace variables
+ * Falls back to embedded prompts when files aren't accessible (bundled binary)
  */
 export async function loadPrompt(name: string, variables: PromptVariables = {}): Promise<string> {
   const filePath = join(PROMPTS_DIR, `${name}.md`);
 
-  if (!existsSync(filePath)) {
-    throw new Error(`Prompt file not found: ${filePath}`);
-  }
+  let content: string;
 
-  let content = await Bun.file(filePath).text();
+  if (existsSync(filePath)) {
+    // Load from external file (development mode)
+    content = await Bun.file(filePath).text();
+  } else if (EMBEDDED_PROMPTS[name]) {
+    // Fall back to embedded prompt (bundled binary)
+    content = EMBEDDED_PROMPTS[name];
+  } else {
+    throw new Error(`Prompt not found: ${name} (checked: ${filePath})`);
+  }
 
   // Replace all {{VARIABLE}} placeholders
   for (const [key, value] of Object.entries(variables)) {
