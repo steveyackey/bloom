@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
 import { interjectSession } from "./agents";
@@ -621,8 +621,8 @@ async function main() {
     }
   }
 
-  const BLOOM_DIR = resolve(import.meta.dirname ?? ".");
   const tasksPath = resolve(tasksFile);
+  const projectDir = dirname(tasksPath);
 
   // Load agents from tasks file
   let agentConfigs: AgentConfig[] = [];
@@ -633,35 +633,42 @@ async function main() {
 
     // Create config for each agent
     for (const agentName of [...agents].sort()) {
-      const fileArg = tasksFile !== "tasks.yaml" ? `-f "${tasksPath}"` : "";
+      const cmd = ["bloom"];
+      if (tasksFile !== "tasks.yaml") cmd.push("-f", tasksPath);
+      cmd.push("agent", "run", agentName);
       agentConfigs.push({
         name: agentName,
-        command: ["bun", join(BLOOM_DIR, "index.ts"), fileArg, "agent", "run", agentName].filter(Boolean),
-        cwd: BLOOM_DIR,
+        command: cmd,
+        cwd: projectDir,
       });
     }
 
     // Add floating agent
-    const fileArg = tasksFile !== "tasks.yaml" ? `-f "${tasksPath}"` : "";
+    const floatingCmd = ["bloom"];
+    if (tasksFile !== "tasks.yaml") floatingCmd.push("-f", tasksPath);
+    floatingCmd.push("agent", "run", "floating");
     agentConfigs.push({
       name: "floating",
-      command: ["bun", join(BLOOM_DIR, "index.ts"), fileArg, "agent", "run", "floating"].filter(Boolean),
-      cwd: BLOOM_DIR,
+      command: floatingCmd,
+      cwd: projectDir,
     });
 
     // Add dashboard pane
+    const dashboardCmd = ["bloom"];
+    if (tasksFile !== "tasks.yaml") dashboardCmd.push("-f", tasksPath);
+    dashboardCmd.push("dashboard");
     agentConfigs.unshift({
       name: "dashboard",
-      command: ["bun", join(BLOOM_DIR, "task-cli.ts"), fileArg, "dashboard"].filter(Boolean),
-      cwd: BLOOM_DIR,
+      command: dashboardCmd,
+      cwd: projectDir,
     });
   } catch (_err) {
     console.log(`Note: Could not load ${tasksFile}, starting with dashboard only`);
     agentConfigs = [
       {
         name: "dashboard",
-        command: ["bun", join(BLOOM_DIR, "task-cli.ts"), "dashboard"],
-        cwd: BLOOM_DIR,
+        command: ["bloom", "dashboard"],
+        cwd: projectDir,
       },
     ];
   }

@@ -3,7 +3,8 @@
 // =============================================================================
 
 import { existsSync, type FSWatcher, mkdirSync, readdirSync, unlinkSync, watch } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { BLOOM_DIR } from "./commands/context";
 import { createLogger } from "./logger";
 
 const logger = createLogger("human-queue");
@@ -52,7 +53,6 @@ export interface Interjection {
 // Constants & Helpers
 // =============================================================================
 
-const BLOOM_DIR = resolve(import.meta.dirname ?? ".");
 const QUEUE_DIR = join(BLOOM_DIR, ".questions");
 const INTERJECT_DIR = join(BLOOM_DIR, ".interjections");
 

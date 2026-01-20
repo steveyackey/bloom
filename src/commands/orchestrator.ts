@@ -57,7 +57,7 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
   updateTaskStatus(tasksFile.tasks, task.id, "in_progress", agentName);
   await saveTasks(getTasksFile(), tasksFile);
 
-  const taskCli = `bun ${resolve(BLOOM_DIR, "src/index.ts")}${getTasksFile() !== DEFAULT_TASKS_FILE ? ` -f "${getTasksFile()}"` : ""}`;
+  const taskCli = `bloom${getTasksFile() !== DEFAULT_TASKS_FILE ? ` -f "${getTasksFile()}"` : ""}`;
 
   let prompt = `# Task: ${task.title}\n\n## Task ID: ${task.id}\n\n`;
 
@@ -217,18 +217,17 @@ export async function startOrchestrator(): Promise<void> {
 
 async function startTUI(agents: Set<string>): Promise<void> {
   const useCustomFile = getTasksFile() !== DEFAULT_TASKS_FILE;
-  const indexPath = resolve(BLOOM_DIR, "src/index.ts");
   const agentConfigs: AgentConfig[] = [];
 
   // Dashboard pane
-  const dashboardCmd = ["bun", indexPath];
+  const dashboardCmd = ["bloom"];
   if (useCustomFile) dashboardCmd.push("-f", getTasksFile());
   dashboardCmd.push("dashboard");
 
   agentConfigs.push({ name: "dashboard", command: dashboardCmd, cwd: BLOOM_DIR });
 
   // Human Questions pane
-  const questionsCmd = ["bun", indexPath];
+  const questionsCmd = ["bloom"];
   if (useCustomFile) questionsCmd.push("-f", getTasksFile());
   questionsCmd.push("questions-dashboard");
 
@@ -236,14 +235,14 @@ async function startTUI(agents: Set<string>): Promise<void> {
 
   // Agent panes
   for (const agentName of [...agents].sort()) {
-    const cmd = ["bun", indexPath];
+    const cmd = ["bloom"];
     if (useCustomFile) cmd.push("-f", getTasksFile());
     cmd.push("agent", "run", agentName);
     agentConfigs.push({ name: agentName, command: cmd, cwd: BLOOM_DIR });
   }
 
   // Floating agent
-  const floatingCmd = ["bun", indexPath];
+  const floatingCmd = ["bloom"];
   if (useCustomFile) floatingCmd.push("-f", getTasksFile());
   floatingCmd.push("agent", "run", FLOATING_AGENT);
   agentConfigs.push({ name: FLOATING_AGENT, command: floatingCmd, cwd: BLOOM_DIR });

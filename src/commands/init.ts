@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import * as YAML from "yaml";
-import { BLOOM_DIR } from "./context";
+import { BLOOM_DIR, isInGitRepo } from "./context";
 
 export interface InitResult {
   success: boolean;
@@ -21,9 +21,21 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
     skipped: [],
   };
 
+  const configFile = join(dir, "bloom.config.yaml");
   const reposDir = join(dir, "repos");
-  const reposFile = join(dir, "bloom.repos.yaml");
   const tasksFile = join(dir, "tasks.yaml");
+
+  // Create bloom.config.yaml (marks this as a bloom project)
+  if (existsSync(configFile)) {
+    result.skipped.push("bloom.config.yaml");
+  } else {
+    const config = {
+      version: 1,
+      repos: [],
+    };
+    await Bun.write(configFile, YAML.stringify(config, { indent: 2 }));
+    result.created.push("bloom.config.yaml");
+  }
 
   // Create repos directory
   if (existsSync(reposDir)) {
@@ -31,14 +43,6 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
   } else {
     mkdirSync(reposDir, { recursive: true });
     result.created.push("repos/");
-  }
-
-  // Create bloom.repos.yaml
-  if (existsSync(reposFile)) {
-    result.skipped.push("bloom.repos.yaml");
-  } else {
-    await Bun.write(reposFile, YAML.stringify({ repos: [] }, { indent: 2 }));
-    result.created.push("bloom.repos.yaml");
   }
 
   // Create tasks.yaml
@@ -53,7 +57,17 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
 }
 
 export async function cmdInit(): Promise<void> {
-  console.log("Initializing Bloom workspace...\n");
+  if (!isInGitRepo()) {
+    console.log("Not in a git repository.\n");
+    console.log("Bloom works best inside a git repo. Please run:");
+    console.log("  git init");
+    console.log("  git remote add origin <your-repo-url>");
+    console.log("  git push -u origin main\n");
+    console.log("Then run 'bloom init' again.");
+    process.exit(1);
+  }
+
+  console.log(`Initializing Bloom workspace in ${BLOOM_DIR}\n`);
 
   const result = await initWorkspace();
 

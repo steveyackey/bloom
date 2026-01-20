@@ -11,30 +11,64 @@
 
 A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel.
 
+## Install
+
+**Linux / macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/steveyackey/bloom/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 | iex
+```
+
 ## Quick Start
 
 ```bash
-# Install dependencies
-bun install
+# Create a new project
+mkdir my-project && cd my-project
+git init
 
-# Initialize workspace
+# Initialize bloom workspace (creates bloom.config.yaml, repos/, tasks.yaml)
 bloom init
 
-# Clone repos you want to work with
-bloom repo clone https://github.com/org/repo
-
-# Plan tasks (interactive Claude session)
+# Add context to your project (research, designs, notes)
+# Then plan your tasks with Claude
 bloom plan
 
 # Start the orchestrator
 bloom run
 ```
 
+## Project Setup
+
+Bloom works inside a git repository. Each project gets its own repo with bloom files at the root:
+
+```
+my-project/                 # Your git repo
+├── bloom.config.yaml       # Created by bloom init (marks this as a bloom project)
+├── tasks.yaml              # Created by bloom plan
+├── repos/                  # Created by bloom init (cloned repos for tasks)
+├── research/               # Your notes, research, context
+├── designs/                # Mockups, architecture diagrams
+└── reference/              # Example code, docs
+```
+
+**Before running `bloom plan`:**
+
+1. Create a git repo for your project (`git init` + set up remote)
+2. Run `bloom init` to set up the workspace
+3. Add context - research notes, design docs, reference materials
+4. Run `bloom plan` so Claude has full context when creating tasks
+
+The more context you provide upfront, the better your task breakdown will be.
+
 ## Workflow
 
 ```
-1. INIT      bloom init                # Create workspace (repos/, config files)
-2. REPOS     bloom repo clone <url>    # Add repositories
+1. INIT      bloom init                # Create bloom.config.yaml, repos/, tasks.yaml
+2. CONTEXT   Add research, designs     # Give Claude context for planning
 3. PLAN      bloom plan                # Break down your project into tasks
 4. VALIDATE  bloom validate            # Check for issues
 5. RUN       bloom run                 # Start agents
@@ -47,7 +81,7 @@ bloom run
 ### Setup
 
 ```bash
-bloom init                   # Initialize workspace (repos/, bloom.repos.yaml, tasks.yaml)
+bloom init                   # Initialize workspace (bloom.config.yaml, repos/, tasks.yaml)
 bloom setup                  # Sync repos according to config
 ```
 
@@ -153,23 +187,3 @@ tasks:
 - **Dependencies**: `depends_on` enforces task ordering
 - **Worktrees**: Git worktrees isolate parallel work (one agent per worktree)
 - **Priming**: Tasks auto-change from `todo` to `ready_for_agent` when deps complete
-
-## Files
-
-```
-bloom/
-├── src/
-│   ├── cli.ts                # Entry point
-│   ├── index.ts              # Main CLI router
-│   ├── task-schema.ts        # Zod schemas
-│   ├── tasks.ts              # Task I/O
-│   ├── repos.ts              # Repository management
-│   ├── plan-session.ts       # Planning with Claude
-│   ├── orchestrator-tui.ts   # Multi-pane TUI
-│   ├── human-queue.ts        # Question/answer system
-│   ├── agents/               # Agent providers
-│   └── commands/             # CLI command handlers
-├── tasks.yaml                # Your tasks
-├── bloom.repos.yaml          # Configured repositories
-└── repos/                    # Git repos for work
-```

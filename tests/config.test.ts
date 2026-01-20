@@ -94,6 +94,7 @@ describe("Project Repos (bloom.repos.yaml)", () => {
 
     test("repos file persists and loads correctly", async () => {
       await saveReposFile(TEST_DIR, {
+        version: 1,
         repos: [
           {
             name: "test-repo",
@@ -118,6 +119,7 @@ describe("Project Repos (bloom.repos.yaml)", () => {
 
     test("listRepos returns configured repos with existence status", async () => {
       await saveReposFile(TEST_DIR, {
+        version: 1,
         repos: [
           {
             name: "missing-repo",
@@ -138,6 +140,7 @@ describe("Project Repos (bloom.repos.yaml)", () => {
   describe("Repo Removal", () => {
     test("removeRepo removes repo from config", async () => {
       await saveReposFile(TEST_DIR, {
+        version: 1,
         repos: [
           {
             name: "to-remove",

@@ -10,7 +10,7 @@ import { z } from "zod";
 import { extractRepoName, loadUserConfig, normalizeGitUrl } from "./user-config";
 
 // =============================================================================
-// Schema for bloom.repos.yaml (project-level)
+// Schema for bloom.config.yaml (project-level)
 // =============================================================================
 
 const RepoEntrySchema = z.object({
@@ -20,19 +20,22 @@ const RepoEntrySchema = z.object({
   addedAt: z.string(), // ISO timestamp
 });
 
-const ReposFileSchema = z.object({
+const ConfigFileSchema = z.object({
+  version: z.number().default(1),
   repos: z.array(RepoEntrySchema).default([]),
 });
 
 export type RepoEntry = z.infer<typeof RepoEntrySchema>;
-export type ReposFile = z.infer<typeof ReposFileSchema>;
+export type ConfigFile = z.infer<typeof ConfigFileSchema>;
+// Backwards compat alias
+export type ReposFile = ConfigFile;
 
 // =============================================================================
 // Paths
 // =============================================================================
 
 export function getReposFilePath(bloomDir: string): string {
-  return join(bloomDir, "bloom.repos.yaml");
+  return join(bloomDir, "bloom.config.yaml");
 }
 
 export function getReposDir(bloomDir: string): string {
@@ -57,19 +60,19 @@ export function getWorktreePath(bloomDir: string, repoName: string, branch: stri
 // Repos File Operations
 // =============================================================================
 
-export async function loadReposFile(bloomDir: string): Promise<ReposFile> {
+export async function loadReposFile(bloomDir: string): Promise<ConfigFile> {
   const filePath = getReposFilePath(bloomDir);
 
   if (!existsSync(filePath)) {
-    return { repos: [] };
+    return { version: 1, repos: [] };
   }
 
   try {
     const content = await Bun.file(filePath).text();
     const parsed = YAML.parse(content) || {};
-    return ReposFileSchema.parse(parsed);
+    return ConfigFileSchema.parse(parsed);
   } catch {
-    return { repos: [] };
+    return { version: 1, repos: [] };
   }
 }
 
