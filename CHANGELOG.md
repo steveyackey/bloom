@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.4](https://github.com/steveyackey/bloom/compare/bloom-v0.1.3...bloom-v0.1.4) (2026-01-20)
+
+
+### Features
+
+* add version command ([373f0fa](https://github.com/steveyackey/bloom/commit/373f0fa12dc4fa0edca609613e2856c00212c37d))
+
+
+### Documentation
+
+* add header image to README ([c98a898](https://github.com/steveyackey/bloom/commit/c98a8985fd78b329b2741aee873858c6c025e36e))
+
 ## [0.1.3](https://github.com/steveyackey/bloom/compare/bloom-v0.1.2...bloom-v0.1.3) (2026-01-20)
 
 
