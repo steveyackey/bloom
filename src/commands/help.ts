@@ -13,9 +13,20 @@ Options:
   -v, --verbose             Enable debug logging
   -q, --quiet               Only show errors
 
+Workflow:
+  1. mkdir my-workspace && cd my-workspace && git init
+  2. bloom init                 # Create workspace with template/
+  3. bloom repo clone <url>     # Clone repos to work on
+  4. bloom create <name>        # Create project from templates
+  5. bloom refine               # Refine PRD, CLAUDE.md, etc.
+  6. bloom plan                 # Create plan.md
+  7. bloom refine               # Refine plan if needed
+  8. bloom generate             # Create tasks.yaml from plan
+  9. bloom run                  # Execute tasks (resumes if interrupted)
+
 Setup Commands:
-  create <name>             Create new project with PRD template
-  init                      Initialize workspace (creates repos/, config files)
+  init                      Initialize workspace (creates template/, repos/, config)
+  create <name>             Create new project from workspace templates
 
 Repository Commands:
   repo clone <url>          Clone a repo (bare + default branch worktree)
@@ -31,12 +42,14 @@ Configuration Commands:
   config set-protocol <ssh|https>  Set git URL preference
 
 Orchestrator Commands:
-  run                       Start the orchestrator TUI
+  run                       Start the orchestrator TUI (resumes where left off)
   setup                     Setup repos according to config
 
 Planning Commands:
+  refine                    Refine PRD, plan, tasks.yaml, or other project docs
   plan                      Create implementation plan (plan.md) with Claude
   generate                  Generate tasks.yaml from plan.md
+  enter                     Enter Claude Code in project context
 
 Task Commands:
   dashboard                 Live dashboard view (refreshes every 10s)
@@ -82,14 +95,15 @@ Other Commands:
   help                      Show this help message
 
 Examples:
-  bloom create my-app               Create new project with PRD template
-  cd my-app && bloom plan           Create implementation plan
+  mkdir my-project && cd my-project && git init
+  bloom init                        Initialize workspace
+  bloom repo clone https://github.com/org/repo
+  bloom create my-feature           Create new project
+  cd my-feature
+  bloom refine                      Refine PRD and docs
+  bloom plan                        Create implementation plan
   bloom generate                    Generate tasks.yaml from plan
-  bloom run                         Start TUI with all agents
-  bloom repo clone https://github.com/org/repo   Clone a repository
-  bloom -f project.yaml run         Use custom tasks file
-  bloom list in_progress            Show in-progress tasks
-  bloom done my-task-id             Mark task complete
+  bloom run                         Execute tasks
 
 TUI Controls:
   hjkl/arrows   Navigate panes

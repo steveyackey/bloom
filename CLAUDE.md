@@ -11,8 +11,9 @@ Always update README.md when adding new commands, changing CLI behavior, or modi
 
 ## Key Definitions
 
-- **Workspace**: A git repo initialized with `bloom init`. Contains repos and projects.
+- **Workspace**: A git repo initialized with `bloom init`. Contains template/, repos/, and projects.
 - **Repo**: A repository cloned into the workspace with `bloom repo clone`. Repos are shared across projects.
-- **Project**: Work to be done on one or more repos. Created with `bloom create`. Contains PRD.md, plan.md, tasks.yaml.
+- **Project**: Work to be done on one or more repos. Created with `bloom create`. Contains PRD.md, plan.md, CLAUDE.md, tasks.yaml.
+- **template/**: Folder created by `bloom init` containing PRD.md, plan.md, CLAUDE.template.md templates.
 
-Flow: init workspace → clone repos → create project → plan against repos
+Flow: init workspace → clone repos → create project → refine PRD → plan → refine plan → generate → run

@@ -21,7 +21,7 @@ iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 |
 ## Quick Start
 
 ```bash
-# 1. Initialize a planning workspace
+# 1. Create a new planning workspace
 mkdir my-workspace && cd my-workspace
 git init
 bloom init
@@ -34,10 +34,18 @@ bloom repo clone https://github.com/org/frontend
 bloom create my-feature
 cd my-feature
 
-# 4. Plan and execute
-bloom plan      # Creates plan.md from your context
-bloom generate  # Converts plan into tasks.yaml
-bloom run       # Starts agents to execute tasks
+# 4. Refine your PRD until you're happy with requirements
+bloom refine      # Interactively refine PRD.md, CLAUDE.md, etc.
+
+# 5. Create a plan
+bloom plan        # Creates plan.md from your PRD
+
+# 6. Refine the plan (optional - repeat until satisfied)
+bloom refine      # Refine plan.md, ask questions, iterate
+
+# 7. Generate tasks and execute
+bloom generate    # Converts plan.md into tasks.yaml
+bloom run         # Starts agents to execute tasks
 ```
 
 A **project** is work to be done on one or more repositories. You set up a workspace with repos first, then create projects that plan work against those repos.
@@ -49,6 +57,10 @@ A Bloom **workspace** is a git repository that contains your repos and projects:
 ```
 my-workspace/               # Planning workspace (bloom init)
 ├── bloom.config.yaml       # Workspace config
+├── template/               # Templates for new projects
+│   ├── PRD.md              # PRD template
+│   ├── plan.md             # Plan template
+│   └── CLAUDE.template.md  # CLAUDE.md template (renamed when copied)
 ├── repos/                  # Repos cloned here (shared across projects)
 │   ├── backend/
 │   └── frontend/
@@ -90,12 +102,13 @@ You can organize everything outside `repos/` however you like—create folders f
 1. INIT      bloom init                # Initialize workspace (once)
 2. CLONE     bloom repo clone <url>    # Add repos to workspace
 3. CREATE    bloom create <name>       # Create project against repos
-4. PLAN      bloom plan                # Create implementation plan (plan.md)
-5. GENERATE  bloom generate            # Generate tasks.yaml from plan
-6. VALIDATE  bloom validate            # Check for issues
-7. RUN       bloom run                 # Start agents
-8. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
-9. REVIEW    [CHECKPOINT] tasks        # Human reviews at phase boundaries
+4. REFINE    bloom refine              # Refine PRD, ask questions, iterate
+5. PLAN      bloom plan                # Create implementation plan (plan.md)
+6. REFINE    bloom refine              # Refine plan if needed
+7. GENERATE  bloom generate            # Generate tasks.yaml from plan
+8. RUN       bloom run                 # Start agents (resumes if interrupted)
+9. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
+10. REVIEW   [CHECKPOINT] tasks        # Human reviews at phase boundaries
 ```
 
 The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
@@ -122,6 +135,7 @@ bloom repo remove <name>     # Remove a repo and its worktrees
 
 ```bash
 bloom create <name>          # Create a new project against workspace repos
+bloom refine                 # Refine PRD, plan, or other project docs
 ```
 
 ### Worktree Management
@@ -151,7 +165,9 @@ bloom run                    # Start TUI with all agents
 
 ```bash
 bloom plan                   # Create implementation plan (plan.md) with Claude
+bloom refine                 # Refine PRD, plan, tasks.yaml, or other docs
 bloom generate               # Generate tasks.yaml from plan.md
+bloom enter                  # Enter Claude Code in project context
 ```
 
 ### Monitoring

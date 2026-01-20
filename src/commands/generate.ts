@@ -60,7 +60,6 @@ export async function cmdGenerate(): Promise<void> {
   console.log(`\n---`);
   console.log(`Tasks generated to: ${tasksFile}`);
   console.log(`\nNext steps:`);
-  console.log(`  Review tasks.yaml and make any adjustments`);
   console.log(`  bloom validate      # Check for issues`);
-  console.log(`  bloom run           # Start the orchestrator`);
+  console.log(`  bloom run           # Execute tasks`);
 }
