@@ -21,8 +21,7 @@ Launches the Terminal UI (TUI) and begins executing tasks with Claude Code agent
 
 - Must be in a project directory
 - `tasks.yaml` must exist with valid tasks
-- Claude Code CLI installed
-- `ANTHROPIC_API_KEY` environment variable set
+- Claude Code CLI installed and authenticated
 
 ## Terminal UI
 

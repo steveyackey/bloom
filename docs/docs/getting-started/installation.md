@@ -69,12 +69,6 @@ Bloom uses Claude Code as its default AI agent. Install it first:
 npm install -g @anthropic-ai/claude-code
 ```
 
-You'll need an Anthropic API key. Set it in your environment:
-
-```bash
-export ANTHROPIC_API_KEY=your-api-key
-```
-
 ### Git
 
 Bloom requires Git 2.20+ for worktree support:

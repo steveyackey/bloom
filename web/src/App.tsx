@@ -169,9 +169,6 @@ bloom run                   # Execute with parallel agents`}</code></pre>
                 <strong>Claude Code CLI</strong> — <code>npm install -g @anthropic-ai/claude-code</code>
               </li>
               <li>
-                <strong>Anthropic API Key</strong> — Set <code>ANTHROPIC_API_KEY</code> environment variable
-              </li>
-              <li>
                 <strong>Git 2.20+</strong> — For worktree support
               </li>
             </ul>

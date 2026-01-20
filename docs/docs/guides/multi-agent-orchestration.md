@@ -407,9 +407,8 @@ bloom validate
 ### Agent Not Starting
 
 Verify:
-1. Claude Code is installed: `claude --version`
-2. API key is set: `echo $ANTHROPIC_API_KEY`
-3. Task has `ready_for_agent` status
+1. Claude Code is installed and authenticated: `claude --version`
+2. Task has `ready_for_agent` status
 
 ### Worktree Conflicts
 

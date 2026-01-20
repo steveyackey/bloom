@@ -103,18 +103,6 @@ bloom config set-protocol ssh
 bloom config set-protocol https
 ```
 
-## Environment Variables
-
-### ANTHROPIC_API_KEY
-
-Required for Claude Code agents.
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Set in your shell profile (~/.bashrc, ~/.zshrc, etc.).
-
 ## Project Files
 
 ### PRD.md
