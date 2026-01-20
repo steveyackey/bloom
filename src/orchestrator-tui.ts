@@ -6,6 +6,7 @@ import { interjectSession } from "./agents";
 import { ansi, CSI, cellBgToAnsi, cellFgToAnsi, getBorderColor, semantic } from "./colors";
 import { createInterjection } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
+import { isBunPtyAvailable, requiresBunPty, spawnTerminal, type TerminalProcess } from "./terminal";
 
 // =============================================================================
 // Types
@@ -20,7 +21,7 @@ interface AgentConfig {
 
 interface Pane {
   id: number;
-  proc: ReturnType<typeof Bun.spawn> | null;
+  proc: TerminalProcess | null;
   config: AgentConfig;
   term: Terminal;
   status: "running" | "stopped" | "error";
@@ -51,7 +52,14 @@ export class OrchestratorTUI {
     }
   }
 
-  start() {
+  async start() {
+    // Check for bun-pty on Windows
+    if (requiresBunPty() && !(await isBunPtyAvailable())) {
+      console.error("Error: bun-pty is required on Windows but not installed.");
+      console.error("Install it with: bun add bun-pty");
+      process.exit(1);
+    }
+
     process.stdout.write(ansi.enterAltScreen + ansi.hideCursor + ansi.clearScreen);
 
     if (process.stdin.isTTY) {
@@ -108,7 +116,7 @@ export class OrchestratorTUI {
     // When focused, send all input to PTY
     if (this.focusedIndex !== null) {
       const pane = this.panes[this.focusedIndex];
-      pane?.proc?.terminal?.write(str);
+      pane?.proc?.write(str);
       return;
     }
 
@@ -258,9 +266,7 @@ export class OrchestratorTUI {
 
     this.panes.forEach((pane) => {
       pane.term.resize(cols, rows);
-      try {
-        pane.proc?.terminal?.resize(cols, rows);
-      } catch {}
+      pane.proc?.resize(cols, rows);
     });
   }
 
@@ -289,40 +295,32 @@ export class OrchestratorTUI {
     this.scheduleRender();
   }
 
-  private startPaneProcess(pane: Pane) {
+  private async startPaneProcess(pane: Pane) {
     const size = this.getPaneSize();
     const cols = Math.max(20, size.cols);
     const rows = Math.max(5, size.rows);
 
     try {
-      const proc = Bun.spawn(pane.config.command, {
+      const proc = await spawnTerminal(pane.config.command, {
         cwd: pane.config.cwd,
-        env: { ...process.env, ...pane.config.env } as Record<string, string>,
-        stdin: "pipe",
-        terminal: {
-          cols,
-          rows,
-          name: "xterm-256color",
-          data: (_t, data) => {
-            const text = new TextDecoder().decode(data);
-            pane.term.write(text, () => this.scheduleRender());
-          },
+        env: pane.config.env,
+        cols,
+        rows,
+        onData: (text) => {
+          pane.term.write(text, () => this.scheduleRender());
+        },
+        onExit: (code) => {
+          // Ignore if this process was replaced by a restart
+          if (pane.proc !== proc) return;
+
+          pane.status = code === 0 ? "stopped" : "error";
+          pane.term.write(`\r\n[Process exited with code ${code}]\r\n`);
+          this.scheduleRender();
         },
       });
 
       pane.proc = proc;
       pane.status = "running";
-
-      // Monitor process exit - but only update status if this is still the current process
-      const thisProc = proc;
-      proc.exited.then((code) => {
-        // Ignore if this process was replaced by a restart
-        if (pane.proc !== thisProc) return;
-
-        pane.status = code === 0 ? "stopped" : "error";
-        pane.term.write(`\r\n[Process exited with code ${code}]\r\n`);
-        this.scheduleRender();
-      });
     } catch (err) {
       pane.status = "error";
       pane.term.write(`Error starting process: ${err}\r\n`);
@@ -676,7 +674,7 @@ async function main() {
   }
 
   const tui = new OrchestratorTUI(agentConfigs);
-  tui.start();
+  await tui.start();
 }
 
 // Only run main() if this file is executed directly, not when imported

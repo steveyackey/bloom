@@ -250,5 +250,5 @@ async function startTUI(agents: Set<string>): Promise<void> {
 
   logger.orchestrator.info("Starting TUI...");
   const tui = new OrchestratorTUI(agentConfigs);
-  tui.start();
+  await tui.start();
 }
