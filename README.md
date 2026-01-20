@@ -20,64 +20,28 @@ iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 |
 
 ## Quick Start
 
-### New Users: Setting Up Your Planning Repo
+A **project** is work to be done on one or more repositories. You create a project first, add repos to it, then plan your work against those repos.
 
 ```bash
-# 1. Create a folder for your project planning and cd into it
-mkdir my-project-planning
-cd my-project-planning
-git init
+# 1. Create a new project
+bloom create my-feature
+cd my-feature
 
-# 2. Initialize bloom workspace
-bloom init
-
-# 3. Clone repos you'll be working on (they go into the repos/ folder)
+# 2. Add repos you'll be working on
 bloom repo clone https://github.com/org/backend
 bloom repo clone https://github.com/org/frontend
 
-# 4. Add your planning documents, notes, designs - organize however you like!
-# 5. Create plan and generate tasks
-bloom plan
-bloom generate
-bloom run
+# 3. Plan and execute
+bloom plan      # Creates plan.md from your context
+bloom generate  # Converts plan into tasks.yaml
+bloom run       # Starts agents to execute tasks
 ```
 
-The `repos/` folder keeps your cloned repositories separate from your planning documents. You can organize the rest of your planning repo however you like—add research notes, design docs, architecture diagrams, or anything else that provides context.
+That's it! `bloom create` launches Claude to help define requirements in PRD.md, then you add repos and start planning.
 
-### Creating a New Project
+## Project Structure
 
-```bash
-# Creates a new project folder with PRD template and CLAUDE.md
-bloom create my-new-app
-cd my-new-app
-
-# Claude launches to help you define requirements in PRD.md
-# Then continue with planning
-bloom plan
-bloom generate
-bloom run
-```
-
-`bloom create` makes a new project folder in your current directory with everything you need to get started.
-
-## Repository Management
-
-Repos are managed separately from projects. Add repos to your Bloom workspace once, then use them in any combination across multiple projects:
-
-```bash
-# Add repos you work with (do this once per repo)
-bloom repo clone https://github.com/org/backend
-bloom repo clone https://github.com/org/frontend
-
-# List your available repos
-bloom repo list
-```
-
-Think of your repos as a library—you build it up over time and draw from it for different projects. A single repo can be used in multiple projects, and a single project can use multiple repos.
-
-## Project Setup
-
-Bloom works inside a git repository that serves as your **planning repo**. This is where you organize all your project planning:
+A Bloom project is a git repository that contains your planning documents and references to the repos you're working on:
 
 ```
 my-project/                 # Your planning repo (bloom init or bloom create)
@@ -116,45 +80,45 @@ bloom repo worktree add backend feature-api
 
 You can organize everything outside `repos/` however you like—create folders for research, designs, meeting notes, or anything else that helps provide context for your project.
 
-### Workflow
-
-1. **Create project** - `bloom create <name>` to start a new project
-2. **Add context** - Organize planning docs, notes, designs however you like
-3. **Plan** - `bloom plan` creates plan.md from your context
-4. **Generate** - `bloom generate` converts plan.md into tasks.yaml
-5. **Run** - `bloom run` starts agents to execute tasks
-
-The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
-
 ## Workflow
 
 ```
 1. CREATE    bloom create <name>       # Create project with PRD template
-2. PLAN      bloom plan                # Create implementation plan (plan.md)
-3. GENERATE  bloom generate            # Generate tasks.yaml from plan
-4. VALIDATE  bloom validate            # Check for issues
-5. RUN       bloom run                 # Start agents
-6. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
-7. REVIEW    [CHECKPOINT] tasks        # Human reviews at phase boundaries
+2. ADD REPOS bloom repo clone <url>    # Add repos you'll work on
+3. PLAN      bloom plan                # Create implementation plan (plan.md)
+4. GENERATE  bloom generate            # Generate tasks.yaml from plan
+5. VALIDATE  bloom validate            # Check for issues
+6. RUN       bloom run                 # Start agents
+7. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
+8. REVIEW    [CHECKPOINT] tasks        # Human reviews at phase boundaries
 ```
+
+The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
 
 ## Commands
 
-### Setup
+### Project Setup
 
 ```bash
-bloom create <name>          # Create new project with PRD template and CLAUDE.md
-bloom init                   # Initialize workspace (bloom.config.yaml, repos/, tasks.yaml)
+bloom create <name>          # Create new project (recommended)
+bloom init                   # Initialize workspace in existing directory
 bloom setup                  # Sync repos according to config
 ```
 
-### Repository Management
+### Adding Repos to a Project
 
 ```bash
-bloom repo clone <url>       # Clone a repo (bare + default branch worktree)
-bloom repo list              # List all configured repos
+bloom repo clone <url>       # Add a repo to the project (bare + worktree)
+bloom repo list              # List repos in this project
 bloom repo sync              # Clone/fetch all repos from bloom.repos.yaml
 bloom repo remove <name>     # Remove a repo and its worktrees
+```
+
+### Worktree Management
+
+Worktrees are created automatically during `bloom run`. Manual management is only needed for working outside of Bloom:
+
+```bash
 bloom repo worktree add <repo> <branch>    # Add worktree for branch
 bloom repo worktree remove <repo> <branch> # Remove a worktree
 bloom repo worktree list <repo>            # List worktrees for repo
