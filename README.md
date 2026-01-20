@@ -44,12 +44,10 @@ bloom run
 
 The `repos/` folder keeps your cloned repositories separate from your planning documents. You can organize the rest of your planning repo however you like—add research notes, design docs, architecture diagrams, or anything else that provides context.
 
-### Creating Brand New Projects
-
-If you're starting a project from scratch (no existing repos):
+### Creating a New Project
 
 ```bash
-# Creates a new folder wherever you are with PRD template and CLAUDE.md
+# Creates a new project folder with PRD template and CLAUDE.md
 bloom create my-new-app
 cd my-new-app
 
@@ -60,11 +58,26 @@ bloom generate
 bloom run
 ```
 
-`bloom create` makes a new folder in your current directory with everything you need to get started.
+`bloom create` makes a new project folder in your current directory with everything you need to get started.
+
+## Repository Management
+
+Repos are managed separately from projects. Add repos to your Bloom workspace once, then use them in any combination across multiple projects:
+
+```bash
+# Add repos you work with (do this once per repo)
+bloom repo clone https://github.com/org/backend
+bloom repo clone https://github.com/org/frontend
+
+# List your available repos
+bloom repo list
+```
+
+Think of your repos as a library—you build it up over time and draw from it for different projects. A single repo can be used in multiple projects, and a single project can use multiple repos.
 
 ## Project Setup
 
-Bloom works inside a git repository that serves as your **planning repo**. This is where you organize all your project planning, and cloned code repositories live in the `repos/` folder:
+Bloom works inside a git repository that serves as your **planning repo**. This is where you organize all your project planning:
 
 ```
 my-project/                 # Your planning repo (bloom init or bloom create)
@@ -73,8 +86,8 @@ my-project/                 # Your planning repo (bloom init or bloom create)
 ├── plan.md                 # Implementation plan (created by bloom plan)
 ├── tasks.yaml              # Task definitions (created by bloom generate)
 ├── bloom.config.yaml       # Bloom config (created by bloom init)
-├── repos/                  # Cloned code repos live here
-│   ├── backend/            # bloom repo clone puts repos here
+├── repos/                  # Repos used by this project
+│   ├── backend/            # Repos are cloned/linked here
 │   └── frontend/           # Each repo is isolated from planning docs
 ├── research/               # Your notes, research, context (optional)
 └── designs/                # Mockups, architecture diagrams (optional)
@@ -105,12 +118,11 @@ You can organize everything outside `repos/` however you like—create folders f
 
 ### Workflow
 
-1. **Initialize** - `bloom init` (existing repos) or `bloom create` (new project)
-2. **Clone repos** - `bloom repo clone <url>` to add code repositories
-3. **Add context** - Organize planning docs, notes, designs however you like
-4. **Plan** - `bloom plan` creates plan.md from your context
-5. **Generate** - `bloom generate` converts plan.md into tasks.yaml
-6. **Run** - `bloom run` starts agents to execute tasks
+1. **Create project** - `bloom create <name>` to start a new project
+2. **Add context** - Organize planning docs, notes, designs however you like
+3. **Plan** - `bloom plan` creates plan.md from your context
+4. **Generate** - `bloom generate` converts plan.md into tasks.yaml
+5. **Run** - `bloom run` starts agents to execute tasks
 
 The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
 
