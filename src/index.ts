@@ -49,7 +49,23 @@ import {
 import { ansi, semantic } from "./colors";
 import { loadAgentPrompt } from "./prompts";
 import { setupRepos, worktreeExists, createWorktree, getWorktreePath } from "./git";
-import { getRepos, loadConfig, initConfig, getConfigTemplate, getConfigPath } from "./config";
+import {
+  loadUserConfig,
+  saveUserConfig,
+  setGitProtocol,
+  getUserConfigPath,
+} from "./user-config";
+import {
+  cloneRepo,
+  syncRepos,
+  removeRepo,
+  listRepos,
+  addWorktree,
+  removeWorktree,
+  listWorktrees,
+  loadReposFile,
+  getReposFilePath,
+} from "./repos";
 
 // =============================================================================
 // Constants
@@ -218,12 +234,17 @@ interface AgentConfig {
 }
 
 async function startOrchestrator(): Promise<void> {
-  logger.orchestrator.info("Setting up repos...");
-  const repos = await getRepos(BLOOM_DIR, REPOS_DIR);
-  if (repos.length > 0) {
-    await setupRepos(REPOS_DIR, TASKS_FILE, repos, logger.setup);
+  logger.orchestrator.info("Checking repos...");
+  const repos = await listRepos(BLOOM_DIR);
+  if (repos.length === 0) {
+    logger.orchestrator.info("No repos configured. Use 'bloom repo clone <url>' to add one.");
   } else {
-    logger.orchestrator.info("No repos configured. Run 'bloom init' or create bloom.config.yaml");
+    const missingRepos = repos.filter(r => !r.exists);
+    if (missingRepos.length > 0) {
+      logger.orchestrator.warn(`Missing repos: ${missingRepos.map(r => r.name).join(", ")}. Run 'bloom repo sync'.`);
+    } else {
+      logger.orchestrator.info(`Found ${repos.length} repo(s): ${repos.map(r => r.name).join(", ")}`);
+    }
   }
 
   let agents: Set<string>;
@@ -1066,11 +1087,18 @@ Options:
   -v, --verbose             Enable debug logging
   -q, --quiet               Only show errors
 
+Repository Commands:
+  repo clone <url>          Clone a repo (bare + default branch worktree)
+  repo list                 List all configured repos
+  repo sync                 Clone/fetch all repos from bloom.repos.yaml
+  repo remove <name>        Remove a repo and its worktrees
+  repo worktree add <repo> <branch>   Add worktree for branch
+  repo worktree remove <repo> <branch> Remove a worktree
+  repo worktree list <repo>           List worktrees for repo
+
 Configuration Commands:
-  init [repos...]           Initialize bloom.config.yaml (auto-detect or specify repos)
-  config [show]             Show current config
-  config repos              List configured repos
-  config template           Show example config template
+  config [show]             Show user config (~/.bloom/config.yaml)
+  config set-protocol <ssh|https>  Set git URL preference
 
 Orchestrator Commands:
   run                       Start the orchestrator TUI
@@ -1117,9 +1145,9 @@ Interjection Commands:
   interject dismiss <id>    Dismiss an interjection
 
 Examples:
-  bloom init                        Create config with auto-detect
-  bloom init frontend backend       Create config with specific repos
-  bloom config repos                Show configured repos
+  bloom repo clone https://github.com/org/repo   Clone a repository
+  bloom repo list                   List configured repos
+  bloom repo sync                   Clone/update all repos
   bloom plan                        Create task breakdown with Claude
   bloom run                         Start TUI with all agents
   bloom -f project.yaml run         Use custom tasks file
@@ -1195,63 +1223,178 @@ async function main(): Promise<void> {
       break;
 
     case "setup": {
-      const repos = await getRepos(BLOOM_DIR, REPOS_DIR);
+      // Setup is now just an alias for repo sync
+      const repos = await listRepos(BLOOM_DIR);
       if (repos.length === 0) {
-        console.error("No repos configured. Run 'bloom init' or create bloom.config.yaml");
-        console.log("\nExample bloom.config.yaml:");
-        console.log(getConfigTemplate());
+        console.error("No repos configured. Use 'bloom repo clone <url>' to add repos first.");
         process.exit(1);
       }
-      await setupRepos(REPOS_DIR, TASKS_FILE, repos, logger.setup);
+      console.log("Syncing repositories...\n");
+      const result = await syncRepos(BLOOM_DIR);
+      if (result.cloned.length > 0) {
+        console.log(`Cloned: ${result.cloned.join(", ")}`);
+      }
+      if (result.skipped.length > 0) {
+        console.log(`Updated: ${result.skipped.join(", ")}`);
+      }
+      if (result.failed.length > 0) {
+        console.log(`Failed:`);
+        for (const f of result.failed) {
+          console.log(`  ${f.name}: ${f.error}`);
+        }
+      }
+      console.log("\nSetup complete.");
       break;
     }
 
-    case "init": {
-      // bloom init [repo1] [repo2] ...
-      const repoNames = args.slice(1);
-      if (repoNames.length === 0) {
-        // Create config with auto-detect
-        await initConfig(BLOOM_DIR);
-        console.log("Created bloom.config.yaml with auto-detect enabled.");
-        console.log("Place your git repos in the repos/ directory, or edit the config.");
+    case "repo": {
+      const subCmd = args[1];
+
+      if (subCmd === "clone") {
+        const url = args[2];
+        if (!url) {
+          console.error("Usage: bloom repo clone <url> [--name <name>]");
+          process.exit(1);
+        }
+        const nameIdx = args.indexOf("--name");
+        const name = nameIdx !== -1 ? args[nameIdx + 1] : undefined;
+
+        const result = await cloneRepo(BLOOM_DIR, url, { name });
+        if (result.success) {
+          console.log(`\nSuccessfully cloned ${result.repoName}`);
+          console.log(`  Bare repo: ${result.bareRepoPath}`);
+          console.log(`  Worktree:  ${result.worktreePath} (${result.defaultBranch})`);
+        } else {
+          console.error(`Failed: ${result.error}`);
+          process.exit(1);
+        }
+      } else if (subCmd === "list") {
+        const repos = await listRepos(BLOOM_DIR);
+        if (repos.length === 0) {
+          console.log("No repos configured. Use 'bloom repo clone <url>' to add one.");
+        } else {
+          console.log("Configured repositories:\n");
+          for (const repo of repos) {
+            const status = repo.exists ? "✓" : "✗ (missing)";
+            console.log(`${status} ${repo.name}`);
+            console.log(`    url: ${repo.url}`);
+            console.log(`    default: ${repo.defaultBranch}`);
+            if (repo.worktrees.length > 0) {
+              console.log(`    worktrees: ${repo.worktrees.join(", ")}`);
+            }
+          }
+        }
+      } else if (subCmd === "sync") {
+        console.log("Syncing repositories...\n");
+        const result = await syncRepos(BLOOM_DIR);
+        if (result.cloned.length > 0) {
+          console.log(`Cloned: ${result.cloned.join(", ")}`);
+        }
+        if (result.skipped.length > 0) {
+          console.log(`Updated: ${result.skipped.join(", ")}`);
+        }
+        if (result.failed.length > 0) {
+          console.log(`Failed:`);
+          for (const f of result.failed) {
+            console.log(`  ${f.name}: ${f.error}`);
+          }
+        }
+        console.log("\nSync complete.");
+      } else if (subCmd === "remove") {
+        const name = args[2];
+        if (!name) {
+          console.error("Usage: bloom repo remove <name>");
+          process.exit(1);
+        }
+        const result = await removeRepo(BLOOM_DIR, name);
+        if (result.success) {
+          console.log(`Removed repository: ${name}`);
+        } else {
+          console.error(`Failed: ${result.error}`);
+          process.exit(1);
+        }
+      } else if (subCmd === "worktree") {
+        const wtCmd = args[2];
+        const repoName = args[3];
+
+        if (wtCmd === "add") {
+          const branch = args[4];
+          if (!repoName || !branch) {
+            console.error("Usage: bloom repo worktree add <repo> <branch> [--create]");
+            process.exit(1);
+          }
+          const create = args.includes("--create");
+          const result = await addWorktree(BLOOM_DIR, repoName, branch, { create });
+          if (result.success) {
+            console.log(`Created worktree at: ${result.path}`);
+          } else {
+            console.error(`Failed: ${result.error}`);
+            process.exit(1);
+          }
+        } else if (wtCmd === "remove") {
+          const branch = args[4];
+          if (!repoName || !branch) {
+            console.error("Usage: bloom repo worktree remove <repo> <branch>");
+            process.exit(1);
+          }
+          const result = await removeWorktree(BLOOM_DIR, repoName, branch);
+          if (result.success) {
+            console.log(`Removed worktree for branch: ${branch}`);
+          } else {
+            console.error(`Failed: ${result.error}`);
+            process.exit(1);
+          }
+        } else if (wtCmd === "list") {
+          if (!repoName) {
+            console.error("Usage: bloom repo worktree list <repo>");
+            process.exit(1);
+          }
+          const worktrees = await listWorktrees(BLOOM_DIR, repoName);
+          if (worktrees.length === 0) {
+            console.log(`No worktrees found for ${repoName}`);
+          } else {
+            console.log(`Worktrees for ${repoName}:\n`);
+            for (const wt of worktrees) {
+              console.log(`  ${wt.branch}`);
+              console.log(`    path: ${wt.path}`);
+              console.log(`    commit: ${wt.commit.slice(0, 8)}`);
+            }
+          }
+        } else {
+          console.error("Usage: bloom repo worktree <add|remove|list> ...");
+          process.exit(1);
+        }
       } else {
-        // Create config with specified repos
-        await initConfig(BLOOM_DIR, { repos: repoNames });
-        console.log(`Created bloom.config.yaml with repos: ${repoNames.join(", ")}`);
+        console.error("Usage: bloom repo <clone|list|sync|remove|worktree> ...");
+        process.exit(1);
       }
-      console.log(`\nConfig file: ${getConfigPath(BLOOM_DIR)}`);
       break;
     }
 
     case "config": {
       if (args[1] === "show" || !args[1]) {
-        const configPath = getConfigPath(BLOOM_DIR);
-        if (existsSync(configPath)) {
-          const content = await Bun.file(configPath).text();
-          console.log(content);
-        } else {
-          console.log("No bloom.config.yaml found. Run 'bloom init' to create one.");
-          console.log("\nExample config:");
-          console.log(getConfigTemplate());
-        }
-      } else if (args[1] === "repos") {
-        const repos = await getRepos(BLOOM_DIR, REPOS_DIR);
+        const userConfig = await loadUserConfig();
+        console.log("User config (~/.bloom/config.yaml):\n");
+        console.log(`  gitProtocol: ${userConfig.gitProtocol}`);
+        console.log(`\nProject repos (bloom.repos.yaml):`);
+        const repos = await listRepos(BLOOM_DIR);
         if (repos.length === 0) {
-          console.log("No repos configured or detected.");
+          console.log("  (none)");
         } else {
-          console.log("Configured repos:");
           for (const repo of repos) {
-            console.log(`  ${repo.name}`);
-            console.log(`    path: ${repo.path}`);
-            if (repo.remote) console.log(`    remote: ${repo.remote}`);
-            console.log(`    branch: ${repo.baseBranch}`);
+            console.log(`  - ${repo.name}`);
           }
         }
-      } else if (args[1] === "template") {
-        console.log(getConfigTemplate());
+      } else if (args[1] === "set-protocol") {
+        const protocol = args[2];
+        if (protocol !== "ssh" && protocol !== "https") {
+          console.error("Usage: bloom config set-protocol <ssh|https>");
+          process.exit(1);
+        }
+        await setGitProtocol(protocol);
+        console.log(`Git protocol set to: ${protocol}`);
       } else {
-        console.error(`Unknown config subcommand: ${args[1]}`);
-        console.error("Usage: bloom config [show|repos|template]");
+        console.error("Usage: bloom config [show|set-protocol <ssh|https>]");
         process.exit(1);
       }
       break;
@@ -1458,4 +1601,5 @@ main().catch(err => {
 export * from "./task-schema";
 export * from "./logger";
 export * from "./tasks";
-export * from "./config";
+export * from "./user-config";
+export * from "./repos";

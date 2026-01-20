@@ -1,11 +1,18 @@
 // =============================================================================
-// Git Worktree Helpers
+// Git Worktree Helpers (Legacy - for task worktrees within repos)
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { NormalizedRepo } from "./config";
+
+// Simple repo interface for setupRepos (legacy compatibility)
+export interface SetupRepo {
+  name: string;
+  path: string;
+  remote?: string;
+  baseBranch: string;
+}
 
 export function worktreeExists(repoPath: string, worktreeName: string): boolean {
   const result = spawnSync("git", ["worktree", "list", "--porcelain"], { cwd: repoPath });
@@ -54,7 +61,7 @@ export function getWorktreePath(repoPath: string, worktreeName: string): string 
 export async function setupRepos(
   reposDir: string,
   tasksFile: string,
-  repos: NormalizedRepo[],
+  repos: SetupRepo[],
   logger: { info: (msg: string) => void; debug: (msg: string) => void }
 ): Promise<void> {
   logger.info("Setting up repos directory structure...");

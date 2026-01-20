@@ -3,172 +3,91 @@ import { join } from "node:path";
 import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import {
-  loadConfig,
-  saveConfig,
-  getRepos,
-  initConfig,
-  getConfigPath,
-} from "../src/config";
+  loadUserConfig,
+  saveUserConfig,
+  normalizeGitUrl,
+  extractRepoName,
+  extractRepoInfo,
+} from "../src/user-config";
+import {
+  loadReposFile,
+  saveReposFile,
+  cloneRepo,
+  removeRepo,
+  listRepos,
+  getReposFilePath,
+} from "../src/repos";
 
 const TEST_DIR = join(import.meta.dirname, ".test-config");
-const TEST_REPOS_DIR = join(TEST_DIR, "repos");
 
-describe("Configuration System", () => {
-  beforeEach(() => {
-    if (!existsSync(TEST_DIR)) {
-      mkdirSync(TEST_DIR, { recursive: true });
-    }
-  });
-
-  afterEach(() => {
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true });
-    }
-  });
-
-  describe("Config File Management", () => {
-    test("missing config file returns default config with auto-detect", async () => {
-      const config = await loadConfig(TEST_DIR);
-
-      expect(config.autoDetect).toBe(true);
-      expect(config.repos).toBeUndefined();
+describe("User Configuration (~/.bloom/config.yaml)", () => {
+  describe("Git URL Normalization", () => {
+    test("converts HTTPS URL to SSH format", () => {
+      const url = "https://github.com/owner/repo.git";
+      const result = normalizeGitUrl(url, "ssh");
+      expect(result).toBe("git@github.com:owner/repo.git");
     });
 
-    test("config file persists and loads correctly", async () => {
-      await saveConfig(TEST_DIR, {
-        repos: ["frontend", "backend"],
-        autoDetect: false,
-      });
-
-      const loaded = await loadConfig(TEST_DIR);
-
-      expect(loaded.repos).toEqual(["frontend", "backend"]);
-      expect(loaded.autoDetect).toBe(false);
+    test("converts SSH URL to HTTPS format", () => {
+      const url = "git@github.com:owner/repo.git";
+      const result = normalizeGitUrl(url, "https");
+      expect(result).toBe("https://github.com/owner/repo.git");
     });
 
-    test("init creates config file at expected location", async () => {
-      await initConfig(TEST_DIR, { repos: ["my-repo"] });
+    test("handles URLs without .git suffix", () => {
+      const url = "https://github.com/owner/repo";
+      const sshResult = normalizeGitUrl(url, "ssh");
+      expect(sshResult).toBe("git@github.com:owner/repo.git");
+    });
 
-      const configPath = getConfigPath(TEST_DIR);
-      expect(existsSync(configPath)).toBe(true);
+    test("preserves non-GitHub hosts", () => {
+      const url = "https://gitlab.com/owner/repo.git";
+      const result = normalizeGitUrl(url, "ssh");
+      expect(result).toBe("git@gitlab.com:owner/repo.git");
     });
   });
 
-  describe("Repository Resolution", () => {
-    test("explicit repo list takes precedence over auto-detect", async () => {
-      await saveConfig(TEST_DIR, {
-        repos: ["explicitly-configured"],
-        autoDetect: true, // should be ignored when repos are specified
-      });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos).toHaveLength(1);
-      expect(repos[0].name).toBe("explicitly-configured");
+  describe("Repo Name Extraction", () => {
+    test("extracts repo name from HTTPS URL", () => {
+      const url = "https://github.com/owner/my-project.git";
+      expect(extractRepoName(url)).toBe("my-project");
     });
 
-    test("simple repo names resolve to repos/ directory", async () => {
-      await saveConfig(TEST_DIR, {
-        repos: ["frontend", "backend"],
-      });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos).toHaveLength(2);
-      expect(repos[0].path).toBe(join(TEST_REPOS_DIR, "frontend"));
-      expect(repos[1].path).toBe(join(TEST_REPOS_DIR, "backend"));
+    test("extracts repo name from SSH URL", () => {
+      const url = "git@github.com:owner/my-project.git";
+      expect(extractRepoName(url)).toBe("my-project");
     });
 
-    test("full repo config allows custom paths and remotes", async () => {
-      await saveConfig(TEST_DIR, {
-        repos: [
-          {
-            name: "custom-repo",
-            path: "/absolute/path/to/repo",
-            remote: "https://github.com/org/repo.git",
-            baseBranch: "develop",
-          },
-        ],
-      });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos).toHaveLength(1);
-      expect(repos[0].name).toBe("custom-repo");
-      expect(repos[0].path).toBe("/absolute/path/to/repo");
-      expect(repos[0].remote).toBe("https://github.com/org/repo.git");
-      expect(repos[0].baseBranch).toBe("develop");
-    });
-
-    test("auto-detect finds git repos in repos/ directory", async () => {
-      // Create repos/ with a git repo
-      mkdirSync(TEST_REPOS_DIR, { recursive: true });
-      const repoPath = join(TEST_REPOS_DIR, "detected-repo");
-      mkdirSync(repoPath);
-      spawnSync("git", ["init"], { cwd: repoPath });
-
-      await saveConfig(TEST_DIR, { autoDetect: true });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos).toHaveLength(1);
-      expect(repos[0].name).toBe("detected-repo");
-    });
-
-    test("auto-detect ignores non-git directories", async () => {
-      mkdirSync(TEST_REPOS_DIR, { recursive: true });
-
-      // Create a git repo
-      const gitRepo = join(TEST_REPOS_DIR, "is-git");
-      mkdirSync(gitRepo);
-      spawnSync("git", ["init"], { cwd: gitRepo });
-
-      // Create a non-git directory
-      const notGit = join(TEST_REPOS_DIR, "not-git");
-      mkdirSync(notGit);
-
-      await saveConfig(TEST_DIR, { autoDetect: true });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos).toHaveLength(1);
-      expect(repos[0].name).toBe("is-git");
-    });
-
-    test("empty repos/ with auto-detect returns empty list", async () => {
-      mkdirSync(TEST_REPOS_DIR, { recursive: true });
-      await saveConfig(TEST_DIR, { autoDetect: true });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos).toHaveLength(0);
+    test("handles URLs without .git suffix", () => {
+      const url = "https://github.com/owner/my-project";
+      expect(extractRepoName(url)).toBe("my-project");
     });
   });
 
-  describe("Default Values", () => {
-    test("repos default to main branch when not specified", async () => {
-      await saveConfig(TEST_DIR, {
-        repos: ["my-repo"],
+  describe("Repo Info Extraction", () => {
+    test("extracts host, owner, and repo from HTTPS URL", () => {
+      const url = "https://github.com/myorg/myrepo.git";
+      const info = extractRepoInfo(url);
+      expect(info).toEqual({
+        host: "github.com",
+        owner: "myorg",
+        repo: "myrepo",
       });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos[0].baseBranch).toBe("main");
     });
 
-    test("full repo config without baseBranch defaults to main", async () => {
-      await saveConfig(TEST_DIR, {
-        repos: [{ name: "my-repo" }],
+    test("extracts host, owner, and repo from SSH URL", () => {
+      const url = "git@gitlab.com:myorg/myrepo.git";
+      const info = extractRepoInfo(url);
+      expect(info).toEqual({
+        host: "gitlab.com",
+        owner: "myorg",
+        repo: "myrepo",
       });
-
-      const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
-
-      expect(repos[0].baseBranch).toBe("main");
     });
   });
 });
 
-describe("Multi-Repo Workflow Support", () => {
+describe("Project Repos (bloom.repos.yaml)", () => {
   beforeEach(() => {
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true });
@@ -181,36 +100,112 @@ describe("Multi-Repo Workflow Support", () => {
     }
   });
 
-  test("can configure diverse set of repos for a monorepo-style project", async () => {
-    await saveConfig(TEST_DIR, {
-      repos: [
-        { name: "web-app", baseBranch: "main" },
-        { name: "mobile-app", baseBranch: "main" },
-        { name: "api-server", baseBranch: "develop" },
-        { name: "shared-libs", baseBranch: "main" },
-      ],
+  describe("Repos File Operations", () => {
+    test("missing repos file returns empty repos list", async () => {
+      const reposFile = await loadReposFile(TEST_DIR);
+      expect(reposFile.repos).toEqual([]);
     });
 
-    const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
+    test("repos file persists and loads correctly", async () => {
+      await saveReposFile(TEST_DIR, {
+        repos: [
+          {
+            name: "test-repo",
+            url: "https://github.com/test/test-repo.git",
+            defaultBranch: "main",
+            addedAt: new Date().toISOString(),
+          },
+        ],
+      });
 
-    expect(repos).toHaveLength(4);
-    expect(repos.map(r => r.name)).toEqual(["web-app", "mobile-app", "api-server", "shared-libs"]);
+      const loaded = await loadReposFile(TEST_DIR);
+      expect(loaded.repos).toHaveLength(1);
+      expect(loaded.repos[0].name).toBe("test-repo");
+    });
   });
 
-  test("mixed simple and full repo configs work together", async () => {
-    await saveConfig(TEST_DIR, {
-      repos: [
-        "simple-repo", // string format
-        { name: "full-repo", remote: "https://example.com/repo.git" }, // object format
-      ],
+  describe("Repo Listing", () => {
+    test("listRepos returns empty list when no repos configured", async () => {
+      const repos = await listRepos(TEST_DIR);
+      expect(repos).toHaveLength(0);
     });
 
-    const repos = await getRepos(TEST_DIR, TEST_REPOS_DIR);
+    test("listRepos returns configured repos with existence status", async () => {
+      await saveReposFile(TEST_DIR, {
+        repos: [
+          {
+            name: "missing-repo",
+            url: "https://github.com/test/missing.git",
+            defaultBranch: "main",
+            addedAt: new Date().toISOString(),
+          },
+        ],
+      });
 
-    expect(repos).toHaveLength(2);
-    expect(repos[0].name).toBe("simple-repo");
-    expect(repos[0].remote).toBeUndefined();
-    expect(repos[1].name).toBe("full-repo");
-    expect(repos[1].remote).toBe("https://example.com/repo.git");
+      const repos = await listRepos(TEST_DIR);
+      expect(repos).toHaveLength(1);
+      expect(repos[0].name).toBe("missing-repo");
+      expect(repos[0].exists).toBe(false); // bare repo doesn't exist
+    });
+  });
+
+  describe("Repo Removal", () => {
+    test("removeRepo removes repo from config", async () => {
+      await saveReposFile(TEST_DIR, {
+        repos: [
+          {
+            name: "to-remove",
+            url: "https://github.com/test/to-remove.git",
+            defaultBranch: "main",
+            addedAt: new Date().toISOString(),
+          },
+        ],
+      });
+
+      const result = await removeRepo(TEST_DIR, "to-remove");
+      expect(result.success).toBe(true);
+
+      const loaded = await loadReposFile(TEST_DIR);
+      expect(loaded.repos).toHaveLength(0);
+    });
+
+    test("removeRepo fails for non-existent repo", async () => {
+      const result = await removeRepo(TEST_DIR, "nonexistent");
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not found");
+    });
+  });
+});
+
+describe("Bare Repo + Worktree Structure", () => {
+  beforeEach(() => {
+    if (!existsSync(TEST_DIR)) {
+      mkdirSync(TEST_DIR, { recursive: true });
+    }
+  });
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true });
+    }
+  });
+
+  test("repos are stored at repos/<name>.git (bare) with worktrees at repos/<name>/<branch>", async () => {
+    // This is a design/documentation test
+    // The structure should be:
+    // repos/
+    //   myrepo.git/     <- bare repo
+    //   myrepo/
+    //     main/         <- worktree for main branch
+    //     feature-x/    <- worktree for feature branch
+
+    const reposDir = join(TEST_DIR, "repos");
+    const bareRepoPath = join(reposDir, "myrepo.git");
+    const worktreesDir = join(reposDir, "myrepo");
+    const mainWorktree = join(worktreesDir, "main");
+
+    // These paths follow the expected convention
+    expect(bareRepoPath.endsWith(".git")).toBe(true);
+    expect(mainWorktree).toBe(join(worktreesDir, "main"));
   });
 });
