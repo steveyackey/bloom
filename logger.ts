@@ -2,6 +2,8 @@
 // Structured Logger for Bloom
 // =============================================================================
 
+import { logColors, ansi } from "./colors";
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LOG_LEVELS: Record<LogLevel, number> = {
@@ -11,15 +13,8 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
-// No colors - plain text logging for terminal compatibility
-const LOG_COLORS: Record<LogLevel, string> = {
-  debug: "",
-  info: "",
-  warn: "",
-  error: "",
-};
-
-const RESET = "";
+// Use centralized color definitions
+const LOG_COLORS: Record<LogLevel, string> = logColors;
 
 let currentLevel: LogLevel = "info";
 
@@ -42,7 +37,7 @@ function shouldLog(level: LogLevel): boolean {
 function formatMessage(level: LogLevel, context: string, message: string): string {
   const color = LOG_COLORS[level];
   const levelTag = level.toUpperCase().padEnd(5);
-  return `${color}[${timestamp()}] [${levelTag}] [${context}] ${message}${RESET}`;
+  return `${color}[${timestamp()}] [${levelTag}] [${context}] ${message}${ansi.reset}`;
 }
 
 export interface Logger {

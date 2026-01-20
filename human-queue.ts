@@ -8,16 +8,31 @@ import { createLogger } from "./logger";
 
 const logger = createLogger("human-queue");
 
+export type QuestionType = "yes_no" | "open" | "choice";
+
+export interface QuestionAction {
+  type: "set_status" | "add_note" | "custom";
+  // For set_status: the status to set on the task when answered "yes"
+  // For add_note: the note template (answer will be appended)
+  payload?: string;
+  // For yes_no: what to do on "yes" vs "no"
+  onYes?: string;  // e.g., "done", "ready_for_agent"
+  onNo?: string;   // e.g., "blocked", "todo"
+}
+
 export interface Question {
   id: string;
   agentName: string;
   taskId?: string;
   question: string;
-  options?: string[];  // Optional multiple choice
+  questionType?: QuestionType;  // Type of question (yes_no, open, choice)
+  options?: string[];  // Optional multiple choice options
+  action?: QuestionAction;  // What to do when answered
   createdAt: string;
   status: "pending" | "answered";
   answer?: string;
   answeredAt?: string;
+  actionExecuted?: boolean;  // Whether the programmatic action was executed
 }
 
 export interface Interjection {
@@ -61,23 +76,50 @@ export async function askQuestion(
   options?: {
     taskId?: string;
     choices?: string[];
+    questionType?: QuestionType;
+    action?: QuestionAction;
   }
 ): Promise<string> {
   ensureQueueDir();
 
   const id = generateId();
+
+  // Auto-detect question type if not specified
+  let questionType = options?.questionType;
+  if (!questionType) {
+    if (options?.choices && options.choices.length > 0) {
+      questionType = "choice";
+    } else if (
+      question.toLowerCase().includes("yes or no") ||
+      question.toLowerCase().includes("yes/no") ||
+      question.toLowerCase().endsWith("?") && (
+        question.toLowerCase().includes("should i") ||
+        question.toLowerCase().includes("do you want") ||
+        question.toLowerCase().includes("is this") ||
+        question.toLowerCase().includes("can i") ||
+        question.toLowerCase().includes("ready to")
+      )
+    ) {
+      questionType = "yes_no";
+    } else {
+      questionType = "open";
+    }
+  }
+
   const q: Question = {
     id,
     agentName,
     taskId: options?.taskId,
     question,
+    questionType,
     options: options?.choices,
+    action: options?.action,
     createdAt: new Date().toISOString(),
     status: "pending",
   };
 
   await Bun.write(getQuestionPath(id), JSON.stringify(q, null, 2));
-  logger.info(`Question created: ${id} from ${agentName}`);
+  logger.info(`Question created: ${id} from ${agentName} (type: ${questionType})`);
 
   return id;
 }
@@ -381,5 +423,69 @@ export async function dismissInterjection(id: string): Promise<boolean> {
 
   unlinkSync(path);
   logger.info(`Interjection dismissed: ${id}`);
+  return true;
+}
+
+// =============================================================================
+// Action Helpers - Parse answer for yes/no and determine action
+// =============================================================================
+
+export function isYesAnswer(answer: string): boolean {
+  const normalized = answer.toLowerCase().trim();
+  return ["yes", "y", "yeah", "yep", "sure", "ok", "okay", "approve", "approved", "confirm", "confirmed", "true", "1"].includes(normalized);
+}
+
+export function isNoAnswer(answer: string): boolean {
+  const normalized = answer.toLowerCase().trim();
+  return ["no", "n", "nope", "nah", "reject", "rejected", "deny", "denied", "false", "0"].includes(normalized);
+}
+
+/**
+ * Determine the action result based on the question type and answer
+ */
+export function getActionResult(question: Question): { shouldExecute: boolean; status?: string; note?: string } {
+  if (!question.action || !question.answer) {
+    return { shouldExecute: false };
+  }
+
+  const action = question.action;
+
+  if (question.questionType === "yes_no") {
+    if (isYesAnswer(question.answer)) {
+      return { shouldExecute: true, status: action.onYes };
+    } else if (isNoAnswer(question.answer)) {
+      return { shouldExecute: true, status: action.onNo };
+    }
+    // Answer wasn't a clear yes/no
+    return { shouldExecute: false };
+  }
+
+  // For open questions, add the answer as a note
+  if (action.type === "add_note") {
+    const notePrefix = action.payload || "Human response:";
+    return { shouldExecute: true, note: `${notePrefix} ${question.answer}` };
+  }
+
+  return { shouldExecute: false };
+}
+
+/**
+ * Mark a question's action as executed
+ */
+export async function markActionExecuted(id: string): Promise<boolean> {
+  const path = getQuestionPath(id);
+
+  if (!existsSync(path)) {
+    return false;
+  }
+
+  const content = await Bun.file(path).text();
+  const q: Question = JSON.parse(content);
+
+  q.actionExecuted = true;
+
+  await Bun.write(path, JSON.stringify(q, null, 2));
+  logger.info(`Question action executed: ${id}`);
+
   return true;
 }

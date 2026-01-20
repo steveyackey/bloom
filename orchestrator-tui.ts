@@ -5,74 +5,7 @@ import YAML from 'yaml';
 import { validateTasksFile, type Task, type TasksFile } from './task-schema';
 import { interjectSession } from './agent-provider-claude';
 import { createInterjection } from './human-queue';
-
-// =============================================================================
-// ANSI escape sequences
-// =============================================================================
-
-const ESC = '\x1b';
-const CSI = `${ESC}[`;
-
-const ansi = {
-  enterAltScreen: `${CSI}?1049h`,
-  leaveAltScreen: `${CSI}?1049l`,
-  clearScreen: `${CSI}2J${CSI}H`,  // Clear screen AND move cursor home
-  hideCursor: `${CSI}?25l`,
-  showCursor: `${CSI}?25h`,
-  moveTo: (row: number, col: number) => `${CSI}${row};${col}H`,
-  reset: `${CSI}0m`,
-  bold: `${CSI}1m`,
-  dim: `${CSI}2m`,
-  italic: `${CSI}3m`,
-  underline: `${CSI}4m`,
-  inverse: `${CSI}7m`,
-  strikethrough: `${CSI}9m`,
-  fg: (n: number) => `${CSI}38;5;${n}m`,
-  bg: (n: number) => `${CSI}48;5;${n}m`,
-  fgRgb: (r: number, g: number, b: number) => `${CSI}38;2;${r};${g};${b}m`,
-  bgRgb: (r: number, g: number, b: number) => `${CSI}48;2;${r};${g};${b}m`,
-};
-
-const enum ColorMode {
-  DEFAULT = 0,
-  PALETTE_16 = 16,
-  PALETTE_256 = 256,
-  RGB = 16777216,
-}
-
-function cellFgToAnsi(cell: any): string {
-  const mode = cell.getFgColorMode();
-  const color = cell.getFgColor();
-  if (mode === ColorMode.DEFAULT || mode === 0) return '';
-  if (mode === ColorMode.PALETTE_16 || mode === 16) {
-    return color < 8 ? `${CSI}${30 + color}m` : `${CSI}${90 + (color - 8)}m`;
-  }
-  if (mode === ColorMode.PALETTE_256 || mode === 256) return ansi.fg(color);
-  if (mode === ColorMode.RGB || mode >= 16777216) {
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-    return ansi.fgRgb(r, g, b);
-  }
-  return '';
-}
-
-function cellBgToAnsi(cell: any): string {
-  const mode = cell.getBgColorMode();
-  const color = cell.getBgColor();
-  if (mode === ColorMode.DEFAULT || mode === 0) return '';
-  if (mode === ColorMode.PALETTE_16 || mode === 16) {
-    return color < 8 ? `${CSI}${40 + color}m` : `${CSI}${100 + (color - 8)}m`;
-  }
-  if (mode === ColorMode.PALETTE_256 || mode === 256) return ansi.bg(color);
-  if (mode === ColorMode.RGB || mode >= 16777216) {
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-    return ansi.bgRgb(r, g, b);
-  }
-  return '';
-}
+import { ansi, CSI, semantic, cellFgToAnsi, cellBgToAnsi, getBorderColor } from './colors';
 
 // =============================================================================
 // Types
@@ -457,7 +390,7 @@ export class OrchestratorTUI {
 
     // Skip non-agent panes (dashboard, questions)
     if (pane.config.name === 'dashboard' || pane.config.name === 'questions') {
-      pane.term.write('\r\n\x1b[93m[Cannot interject this pane]\x1b[0m\r\n');
+      pane.term.write(`\r\n${semantic.warning}[Cannot interject this pane]${ansi.reset}\r\n`);
       this.scheduleRender();
       return;
     }
@@ -482,8 +415,8 @@ export class OrchestratorTUI {
     } catch {}
 
     // Show interjection message in original pane
-    pane.term.write('\r\n\x1b[93m━━━ INTERJECTED ━━━\x1b[0m\r\n');
-    pane.term.write(`\x1b[90mSession moved to new pane. Press "r" to restart agent later.\x1b[0m\r\n`);
+    pane.term.write(`\r\n${semantic.warning}━━━ INTERJECTED ━━━${ansi.reset}\r\n`);
+    pane.term.write(`${semantic.muted}Session moved to new pane. Press "r" to restart agent later.${ansi.reset}\r\n`);
 
     // Build command for interactive session
     const interactiveCmd: string[] = ['claude'];
@@ -507,16 +440,16 @@ export class OrchestratorTUI {
     // Write context info to the new pane
     const newPane = this.panes[newPaneIndex];
     if (newPane) {
-      newPane.term.write(`\x1b[93m━━━ HUMAN TAKEOVER: ${pane.config.name} ━━━\x1b[0m\r\n`);
-      newPane.term.write(`\x1b[90mInterjection ID: ${interjectionId}\x1b[0m\r\n`);
+      newPane.term.write(`${semantic.warning}━━━ HUMAN TAKEOVER: ${pane.config.name} ━━━${ansi.reset}\r\n`);
+      newPane.term.write(`${semantic.muted}Interjection ID: ${interjectionId}${ansi.reset}\r\n`);
       if (session?.taskId) {
-        newPane.term.write(`\x1b[90mTask: ${session.taskId}\x1b[0m\r\n`);
+        newPane.term.write(`${semantic.muted}Task: ${session.taskId}${ansi.reset}\r\n`);
       }
-      newPane.term.write(`\x1b[90mDir: ${workingDir}\x1b[0m\r\n`);
+      newPane.term.write(`${semantic.muted}Dir: ${workingDir}${ansi.reset}\r\n`);
       if (session?.sessionId) {
-        newPane.term.write(`\x1b[90mResuming session: ${session.sessionId}\x1b[0m\r\n`);
+        newPane.term.write(`${semantic.muted}Resuming session: ${session.sessionId}${ansi.reset}\r\n`);
       }
-      newPane.term.write(`\x1b[90mCtrl+B to exit focus, "X" to close when done\x1b[0m\r\n\r\n`);
+      newPane.term.write(`${semantic.muted}Ctrl+B to exit focus, "X" to close when done${ansi.reset}\r\n\r\n`);
     }
 
     this.scheduleRender();
@@ -543,20 +476,20 @@ export class OrchestratorTUI {
 
     // Header
     output += ansi.moveTo(1, 1);
-    output += `${CSI}48;5;19m${CSI}97m${CSI}1m`;
+    output += `${semantic.header.bg}${semantic.header.fg}${semantic.header.style}`;
     const header = ` Bloom Orchestrator | View: ${this.viewMode} | Agents: ${this.panes.length} | n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit `;
     output += header.padEnd(this.cols);
     output += ansi.reset;
 
     // Separator
     output += ansi.moveTo(2, 1);
-    output += `${CSI}34m${'─'.repeat(this.cols)}${ansi.reset}`;
+    output += `${semantic.separator}${'─'.repeat(this.cols)}${ansi.reset}`;
 
     if (this.panes.length === 0) {
       const msg = "No agents configured. Press 'n' to create a new agent.";
       const x = Math.floor((this.cols - msg.length) / 2);
       const y = Math.floor(this.rows / 2);
-      output += ansi.moveTo(y, x) + `${CSI}33m${msg}${ansi.reset}`;
+      output += ansi.moveTo(y, x) + `${semantic.warning}${msg}${ansi.reset}`;
     } else {
       const indicesToRender = this.viewMode === 'single'
         ? [this.selectedIndex]
@@ -579,15 +512,15 @@ export class OrchestratorTUI {
     const isSelected = index === this.selectedIndex && this.focusedIndex === null;
 
     // Color based on status and selection
-    let borderColor = '90'; // gray default
+    let borderColor = getBorderColor('default');
     if (pane.status === 'error') {
-      borderColor = '31'; // red
+      borderColor = getBorderColor('error');
     } else if (isFocused) {
-      borderColor = '32'; // green
+      borderColor = getBorderColor('focused');
     } else if (isSelected) {
-      borderColor = '33'; // yellow
+      borderColor = getBorderColor('selected');
     } else if (pane.status === 'running') {
-      borderColor = '36'; // cyan
+      borderColor = getBorderColor('running');
     }
 
     let output = '';

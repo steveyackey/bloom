@@ -26,7 +26,7 @@ tasks:                           # Root array of tasks
       - other-task-id
     repo: ./path/to/repo         # OPTIONAL. Directory to work in
     worktree: branch-name        # OPTIONAL. Git worktree for isolated work
-    agent_name: claude-code      # OPTIONAL. Which agent should do this task
+    agent_name: claude-code      # OPTIONAL. Agent name for task grouping (see AGENT NAMING below)
     instructions: |              # OPTIONAL. Detailed multi-line instructions
       Step by step instructions
       for the agent to follow.
@@ -52,6 +52,35 @@ STATUS VALUES:
 - blocked: Waiting on something (human review, external dependency, etc.)
 
 ================================================================================
+AGENT NAMING (How to Split Work Across Agents)
+================================================================================
+
+The agent_name field controls how tasks are grouped and assigned:
+
+- **You choose the names**: Use any descriptive name that makes sense for your project
+- **Same name = Same agent**: All tasks with the same agent_name will be worked on
+  by the SAME agent instance sequentially (one agent pane in the TUI)
+- **Different names = Different agents**: Tasks with different agent_names will run
+  in PARALLEL with separate agent instances (multiple panes in the TUI)
+- **No agent_name**: Tasks without an agent_name go to the "floating" pool and are
+  picked up by any available agent
+
+NAMING STRATEGIES:
+1. By domain: "frontend", "backend", "database", "infra"
+2. By feature: "auth-agent", "payment-agent", "search-agent"
+3. By worktree: "phase-1-agent", "phase-2-agent" (keeps worktree work sequential)
+4. Mixed: Use specific names for specialized work, leave generic tasks unnamed
+
+EXAMPLES:
+- agent_name: frontend     # All frontend tasks → same agent
+- agent_name: backend      # All backend tasks → different agent (parallel)
+- agent_name: claude-code  # Generic name for sequential tasks
+- (no agent_name)          # Floating pool - any agent can pick it up
+
+TIP: Tasks that modify the same files should use the same agent_name to avoid
+conflicts. Tasks working in different directories can use different agents.
+
+================================================================================
 PLANNING RULES
 ================================================================================
 
@@ -59,9 +88,10 @@ PLANNING RULES
 2. DEPENDENCIES: Use depends_on to enforce task ordering
 3. CHECKPOINTS: Create "[CHECKPOINT]" validation tasks at phase boundaries
 4. WORKTREES: One agent per worktree at a time (no conflicts)
-5. ACCEPTANCE CRITERIA: Every task needs clear, testable criteria
-6. SMALL TASKS: Each task should be 1-4 hours of focused work
-7. YAML QUOTING: Quote strings containing special characters:
+5. AGENT NAMES: Use the same agent_name for tasks that touch the same files
+6. ACCEPTANCE CRITERIA: Every task needs clear, testable criteria
+7. SMALL TASKS: Each task should be 1-4 hours of focused work
+8. YAML QUOTING: Quote strings containing special characters:
    - Backticks: \`command\` → "\`command\`"
    - Curly braces: { key: value } → "{ key: value }"
    - Colons with space: foo: bar → "foo: bar"

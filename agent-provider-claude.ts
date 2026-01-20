@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Agent, AgentRunOptions, AgentRunResult } from "./agent-core";
 import { createLogger } from "./logger";
+import { ansi, semantic } from "./colors";
 
 const logger = createLogger("claude-provider");
 
@@ -175,7 +176,7 @@ export class ClaudeAgentProvider implements Agent {
             this.onTimeout();
           }
           if (this.streamOutput) {
-            process.stdout.write(`\n\x1b[91m[TIMEOUT] No activity for ${Math.round(elapsed / 1000)}s - agent may be stuck\x1b[0m\n`);
+            process.stdout.write(`\n${semantic.timeout}[TIMEOUT] No activity for ${Math.round(elapsed / 1000)}s - agent may be stuck${ansi.reset}\n`);
           }
           clearInterval(heartbeatTimer);
           try {
@@ -188,7 +189,7 @@ export class ClaudeAgentProvider implements Agent {
           }
           if (this.streamOutput) {
             const secs = Math.round(elapsed / 1000);
-            process.stdout.write(`\x1b[90m[heartbeat ${secs}s]\x1b[0m `);
+            process.stdout.write(`${semantic.heartbeat}[heartbeat ${secs}s]${ansi.reset} `);
           }
         }
       }, this.heartbeatIntervalMs);
@@ -296,27 +297,27 @@ export class ClaudeAgentProvider implements Agent {
         break;
 
       case "tool_use":
-        process.stdout.write(`\n\x1b[96m[tool: ${event.tool_name}]\x1b[0m\n`);
+        process.stdout.write(`\n${semantic.tool}[tool: ${event.tool_name}]${ansi.reset}\n`);
         break;
 
       case "tool_result":
         // Tool results can be verbose, just show indicator
-        process.stdout.write(`\x1b[90m[tool result]\x1b[0m\n`);
+        process.stdout.write(`${semantic.toolResult}[tool result]${ansi.reset}\n`);
         break;
 
       case "result":
         if (event.cost_usd !== undefined) {
-          process.stdout.write(`\n\x1b[90m[cost: $${event.cost_usd.toFixed(4)}]\x1b[0m\n`);
+          process.stdout.write(`\n${semantic.cost}[cost: $${event.cost_usd.toFixed(4)}]${ansi.reset}\n`);
         }
         break;
 
       case "error":
-        process.stdout.write(`\n\x1b[91m[error: ${event.content || "unknown"}]\x1b[0m\n`);
+        process.stdout.write(`\n${semantic.error}[error: ${event.content || "unknown"}]${ansi.reset}\n`);
         break;
 
       case "system":
         if (event.subtype === "init" && event.session_id) {
-          process.stdout.write(`\x1b[90m[session: ${event.session_id}]\x1b[0m\n`);
+          process.stdout.write(`${semantic.session}[session: ${event.session_id}]${ansi.reset}\n`);
         }
         break;
     }
