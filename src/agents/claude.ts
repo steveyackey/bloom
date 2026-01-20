@@ -107,7 +107,7 @@ export class ClaudeAgentProvider implements Agent {
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
-      const args = this.buildArgs(options);
+      const args = this.buildInteractiveArgs(options);
 
       const proc = spawn("claude", args, {
         cwd: options.startingDirectory,
@@ -134,7 +134,7 @@ export class ClaudeAgentProvider implements Agent {
 
   private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
-      const args = this.buildArgs(options);
+      const args = this.buildStreamingArgs(options);
       args.push("--output-format", "stream-json");
 
       const proc = spawn("claude", args, {
@@ -322,7 +322,21 @@ export class ClaudeAgentProvider implements Agent {
     }
   }
 
-  private buildArgs(options: AgentRunOptions): string[] {
+  private buildInteractiveArgs(options: AgentRunOptions): string[] {
+    // Interactive mode: no -p flag, Claude runs in REPL mode
+    const args: string[] = ["--verbose"];
+
+    if (this.dangerouslySkipPermissions) {
+      args.push("--dangerously-skip-permissions");
+    }
+
+    args.push("--append-system-prompt", options.systemPrompt);
+
+    return args;
+  }
+
+  private buildStreamingArgs(options: AgentRunOptions): string[] {
+    // Streaming/print mode: -p flag for single-shot execution
     const args: string[] = ["-p", "--verbose"];
 
     if (this.dangerouslySkipPermissions) {
