@@ -82,7 +82,23 @@ my-project/                 # Your planning repo (bloom init or bloom create)
 
 ### How the repos/ Folder Works
 
-When you run `bloom repo clone <url>`, the repository is cloned into the `repos/` folder. This keeps your actual code separate from your planning documents. Agents work on code inside `repos/` while referencing your planning context from the root.
+When you run `bloom repo clone <url>`, Bloom clones the repository as a **bare repo** and automatically creates a worktree for the default branch (usually `main` or `master`). This setup enables multiple agents to work on the same repo simultaneously without conflicts.
+
+**Why worktrees?** Each agent needs its own working directory to make changes. With git worktrees, you can have multiple branches checked out at once—each in its own folder. When you run parallel tasks, Bloom creates separate worktrees so agents don't step on each other:
+
+```
+repos/
+├── backend.git/              # Bare repo (shared git data)
+├── backend/                  # Default branch worktree (main)
+├── backend-feature-auth/     # Worktree for agent 1
+└── backend-feature-api/      # Worktree for agent 2
+```
+
+Add worktrees for parallel work:
+```bash
+bloom repo worktree add backend feature-auth
+bloom repo worktree add backend feature-api
+```
 
 You can organize everything outside `repos/` however you like—create folders for research, designs, meeting notes, or anything else that helps provide context for your project.
 
