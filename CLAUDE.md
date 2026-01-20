@@ -9,6 +9,18 @@ We use release-please with this config:
 
 Always update README.md when adding new commands, changing CLI behavior, or modifying project structure.
 
+## Documentation & Website Maintenance
+
+When making changes to bloom:
+- **README.md**: Update for any new commands, CLI behavior changes, or project structure modifications
+- **docs/**: Update the Docusaurus documentation site (docs.use-bloom.dev) with detailed guides and API references
+- **web/**: Update the landing page (use-bloom.dev) for any changes to installation instructions or major feature announcements
+
+Installation changes must be reflected in:
+1. README.md (quick start)
+2. docs/ (detailed installation guide)
+3. web/ landing page (all platform instructions: macOS, Linux, Windows)
+
 ## Key Definitions
 
 - **Workspace**: A git repo initialized with `bloom init`. Contains template/, repos/, and projects.
