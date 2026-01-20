@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.5](https://github.com/steveyackey/bloom/compare/bloom-v0.1.4...bloom-v0.1.5) (2026-01-20)
+
+
+### Features
+
+* add create, plan, and generate commands for new workflow ([c9393d1](https://github.com/steveyackey/bloom/commit/c9393d133a1669d598f615d17ad68c6178b4077c))
+* use /template folder for project scaffolding ([89b5d16](https://github.com/steveyackey/bloom/commit/89b5d163864aa1629eed0ee9fb7ce2289d7ab87f))
+
+
+### Bug Fixes
+
+* make plan and generate prompts explicitly read project context files ([13184da](https://github.com/steveyackey/bloom/commit/13184da70940af439c9e44d89b95d542ee32edec))
+* remove backticks from file paths in prompts to avoid slash command parsing ([7f5a2cd](https://github.com/steveyackey/bloom/commit/7f5a2cd97ae58d67ed92606f8cad07425111f0d9))
+
+
+### Documentation
+
+* clarify that bloom run auto-creates worktrees ([04dfe85](https://github.com/steveyackey/bloom/commit/04dfe853e0e020702d30dde3b538e09c4ce00256))
+* explain worktrees and how they enable parallel agents ([ed9f976](https://github.com/steveyackey/bloom/commit/ed9f97691426ffa51140b03ed446f55b1ca91892))
+* fix project structure in README to show PRD.md at root ([2d9a051](https://github.com/steveyackey/bloom/commit/2d9a0510d8dc302fed9b4a4299607b3c9dd45e70))
+* improve getting started guide with bloom init workflow ([0d95c1f](https://github.com/steveyackey/bloom/commit/0d95c1f999387bcbc6885d2624ff56b258085658))
+
 ## [0.1.4](https://github.com/steveyackey/bloom/compare/bloom-v0.1.3...bloom-v0.1.4) (2026-01-20)
 
 
