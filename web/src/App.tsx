@@ -40,8 +40,8 @@ function App() {
             Multi-Agent<br />Task Orchestration
           </h1>
           <p className="hero-subtitle">
-            Orchestrate AI agents in parallel. Define tasks in YAML.<br />
-            Let Claude Code do the work while you stay in control.
+            For teams and solo developers. From PRD to production with AI agents.<br />
+            Collaborate on requirements, validate at checkpoints, ship faster.
           </p>
           <div className="hero-actions">
             <a href="#install" className="btn btn-primary">
@@ -64,18 +64,18 @@ function App() {
         <div className="container">
           <h2 className="section-title">Why Bloom?</h2>
           <p className="section-subtitle">
-            From high-level requirements to parallel AI execution
+            Structured collaboration for teams. Fast iteration for solo devs.
           </p>
           <div className="features-grid">
             <FeatureCard
               icon={<AgentsIcon />}
-              title="Multi-Agent Orchestration"
-              description="Run multiple Claude Code agents simultaneously. Each works on isolated tasks in separate git worktrees."
+              title="Team & Solo Friendly"
+              description="PMs define PRDs, designers add mockups, developers plan, QA validates. Or move fast as a solo dev with AI assistance."
             />
             <FeatureCard
               icon={<HumanIcon />}
-              title="Human-in-the-Loop"
-              description="Stay in control. Agents ask questions and wait for your decisions on critical choices."
+              title="Built-in Checkpoints"
+              description="Validate work at phase boundaries. QA and team members review before agents continue. You control the pace."
             />
             <FeatureCard
               icon={<YamlIcon />}
@@ -95,7 +95,7 @@ function App() {
             <FeatureCard
               icon={<WorkflowIcon />}
               title="Complete Workflow"
-              description="From PRD to plan to tasks to execution. Bloom guides the entire development lifecycle."
+              description="From PRD to plan to tasks to execution. Add designs, mockups, and research to guide AI agents."
             />
           </div>
         </div>
@@ -106,11 +106,11 @@ function App() {
         <div className="container">
           <h2 className="section-title">The Bloom Workflow</h2>
           <div className="workflow-steps">
-            <WorkflowStep number="1" title="Initialize" description="Set up your workspace with repos" />
-            <WorkflowStep number="2" title="Create" description="Start a project with PRD" />
-            <WorkflowStep number="3" title="Plan" description="Claude creates implementation plan" />
+            <WorkflowStep number="1" title="Initialize" description="Set up workspace with repos" />
+            <WorkflowStep number="2" title="Create & Define" description="PMs add PRD, designers add mockups" />
+            <WorkflowStep number="3" title="Plan" description="Devs and architects refine approach" />
             <WorkflowStep number="4" title="Generate" description="Convert plan to executable tasks" />
-            <WorkflowStep number="5" title="Run" description="Agents execute in parallel" />
+            <WorkflowStep number="5" title="Run & Validate" description="QA validates at checkpoints" />
           </div>
           <div className="workflow-code">
             <pre><code>{`# The complete workflow
@@ -186,7 +186,7 @@ bloom help`}</code></pre>
         <div className="container cta-container">
           <h2 className="cta-title">Ready to orchestrate?</h2>
           <p className="cta-subtitle">
-            Start building with multi-agent AI today.
+            Whether you're a team or flying solo, start building with AI agents today.
           </p>
           <div className="cta-actions">
             <a href="https://docs.use-bloom.dev/getting-started/quick-start" className="btn btn-primary">
@@ -204,7 +204,7 @@ bloom help`}</code></pre>
         <div className="container footer-container">
           <div className="footer-brand">
             <h3 className="footer-title">Bloom</h3>
-            <p className="footer-tagline">Multi-agent task orchestration for AI-powered development.</p>
+            <p className="footer-tagline">Multi-agent task orchestration for teams and solo developers.</p>
           </div>
           <div className="footer-links">
             <div className="footer-column">

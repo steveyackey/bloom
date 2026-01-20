@@ -4,7 +4,15 @@
 
 # Bloom - Multi-Agent Task Orchestrator
 
-A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel.
+A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel. Designed for teams and solo developers alike.
+
+## Built for Teams and Solo Developers
+
+Bloom adapts to how you work:
+
+**For Teams**: Product managers and designers define requirements in PRDs, adding mockups and designs to the project folder. Developers, architects, and technical leads collaborate on implementation plans. QA engineers validate checkpoints throughout the process. Everyone stays aligned from requirements to deployment.
+
+**For Solo Developers**: Move fast with AI-powered planning. Turn your ideas into structured plans and let multiple agents execute in parallel while you focus on what matters.
 
 ## Install
 
@@ -111,7 +119,13 @@ You can organize everything outside `repos/` however you like—create folders f
 10. REVIEW   [CHECKPOINT] tasks        # Human reviews at phase boundaries
 ```
 
-The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
+### Team Collaboration Points
+
+- **Steps 3-4 (Create & Refine PRD)**: PMs and designers add requirements, mockups, and design assets to the project folder
+- **Steps 5-6 (Plan & Refine)**: Technical leads, architects, and developers review and refine the implementation approach
+- **Step 10 (Checkpoints)**: QA and team members validate work at phase boundaries before agents continue
+
+The more context you provide upfront (PRD, architecture notes, existing code, design mockups), the better your task breakdown will be.
 
 ## Commands
 

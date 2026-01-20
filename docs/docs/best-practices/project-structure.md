@@ -260,6 +260,19 @@ This is intentional - repos are cloned, not stored in the workspace repo.
 
 ## Team Practices
 
+Bloom naturally supports cross-functional collaboration. Here's how different roles contribute:
+
+### Role Responsibilities
+
+| Role | Primary Contributions |
+|------|----------------------|
+| **Product Manager** | PRD.md, requirements, success criteria |
+| **Designer** | Mockups, wireframes, design links in `designs/` folder |
+| **Developer** | CLAUDE.md, plan refinement, technical constraints |
+| **Architect** | Plan review, dependency design, phase strategy |
+| **QA Engineer** | Checkpoint validation, acceptance criteria review |
+| **DevOps/Security** | Infrastructure requirements, security constraints |
+
 ### Shared Templates
 
 Standardize templates for consistency:
@@ -274,6 +287,9 @@ Standardize templates for consistency:
 ## Requirements
 <!-- Use checkboxes for trackable items -->
 
+## Design References
+<!-- Links to Figma, mockups, or local files in designs/ -->
+
 ## Technical Approach
 <!-- High-level technical decisions -->
 
@@ -283,10 +299,29 @@ Standardize templates for consistency:
 
 ### Review Process
 
-1. **PRD Review** — Before planning
-2. **Plan Review** — Before generating tasks
-3. **Task Review** — Before running
-4. **Code Review** — After completion
+1. **PRD Review** — PMs and designers finalize before planning
+2. **Plan Review** — Architects and tech leads approve approach
+3. **Task Review** — Developers validate breakdown before running
+4. **Checkpoint Validation** — QA validates at phase boundaries
+5. **Code Review** — Standard code review after completion
+
+### Adding Design Assets
+
+Teams should organize supporting materials in the project folder:
+
+```
+my-feature/
+├── PRD.md
+├── designs/
+│   ├── mockups/
+│   ├── user-flows/
+│   └── figma-links.md
+├── research/
+│   └── competitive-analysis.md
+└── ...
+```
+
+Agents can reference these files for context when executing tasks.
 
 ### Documentation
 

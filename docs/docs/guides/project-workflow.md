@@ -5,7 +5,7 @@ title: Project Workflow
 
 # Project Workflow
 
-This guide walks through the complete lifecycle of a Bloom project, from requirements to execution.
+This guide walks through the complete lifecycle of a Bloom project, from requirements to execution. Bloom supports both team collaboration and solo developer workflows.
 
 ## Overview
 
@@ -14,6 +14,20 @@ create → refine PRD → plan → refine plan → generate → validate → run
 ```
 
 Each step builds on the previous, transforming high-level requirements into executable tasks.
+
+## Team Collaboration Model
+
+Bloom provides natural collaboration points for cross-functional teams:
+
+| Stage | Team Roles | Activities |
+|-------|-----------|------------|
+| **Create & PRD** | PM, Designer | Define requirements, add mockups, link designs |
+| **Plan** | Dev, Architect, Tech Lead | Review technical approach, identify risks |
+| **Refine Plan** | All stakeholders | Iterate on scope and implementation details |
+| **Generate & Validate** | Dev, QA | Review task breakdown, verify completeness |
+| **Run & Checkpoints** | QA, Dev | Validate work at phase boundaries |
+
+Solo developers can move through these stages independently, using AI assistance to refine requirements and plans.
 
 ## 1. Create a Project
 
@@ -36,7 +50,24 @@ user-authentication/
 
 ## 2. Define Requirements (PRD)
 
-Edit `PRD.md` to describe what you want to build.
+Edit `PRD.md` to describe what you want to build. This is where product managers and designers shine—add detailed requirements, link to designs, and include mockups.
+
+### Adding Design Assets
+
+Organize design assets in your project folder:
+
+```
+user-authentication/
+├── PRD.md              # References designs below
+├── designs/            # Mockups and design files
+│   ├── login-flow.png
+│   ├── signup-wireframe.pdf
+│   └── figma-link.md   # Link to Figma/Sketch files
+├── research/           # User research, competitive analysis
+└── ...
+```
+
+Reference designs in your PRD to give agents visual context.
 
 ### PRD Structure
 
@@ -158,13 +189,19 @@ Claude analyzes your PRD and creates `plan.md`:
 
 ### Refine the Plan
 
-Iterate on the plan:
+Iterate on the plan until all stakeholders are satisfied:
 
 ```bash
 bloom refine
 ```
 
-Discuss changes with Claude:
+**For teams**: This is a key collaboration point. Share `plan.md` with architects, tech leads, and developers. Gather feedback on:
+- Technical approach and architecture decisions
+- Risk identification and mitigation strategies
+- Security, performance, and scalability considerations
+- Dependency ordering and parallelization opportunities
+
+**For solo developers**: Use `bloom refine` to discuss changes with Claude:
 - Add missing steps
 - Reorder phases
 - Adjust scope
@@ -336,6 +373,25 @@ bloom reset task-id
 # Add notes for context
 bloom note task-id "Discovered dependency on config service"
 ```
+
+### Team Validation at Checkpoints
+
+Checkpoints (`[CHECKPOINT]` tasks) pause execution for human review. This is where QA and team members validate work:
+
+```bash
+# Review changes before allowing agents to continue
+cd repos/backend-feature-auth
+git diff main
+
+# If validation passes, mark checkpoint complete
+bloom done checkpoint-phase-1
+
+# If issues found, block and add notes
+bloom block checkpoint-phase-1
+bloom note checkpoint-phase-1 "Auth tokens missing refresh logic"
+```
+
+Teams requiring manual validation can add checkpoints at phase boundaries to ensure quality gates are met before agents proceed.
 
 ## 8. After Completion
 
