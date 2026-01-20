@@ -40,7 +40,7 @@ jobs:
         run: bun install
 
       - name: Bundle all platforms
-        run: bun run bundle:all
+        run: bun run package:all
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
