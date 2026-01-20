@@ -119,7 +119,6 @@ async function loadBunPty(): Promise<BunPty> {
   if (bunPtyLoadPromise) return bunPtyLoadPromise;
 
   // Dynamic import - bun-pty is an optional dependency
-  // @ts-expect-error - bun-pty may not be installed
   bunPtyLoadPromise = import("bun-pty").then((mod) => {
     bunPtyModule = mod as unknown as BunPty;
     return bunPtyModule;
