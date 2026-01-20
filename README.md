@@ -165,8 +165,9 @@ bloom run                    # Start TUI with all agents
 
 ```bash
 bloom plan                   # Create implementation plan (plan.md) with Claude
-bloom refine                 # Refine any project documents
+bloom refine                 # Refine PRD, plan, tasks.yaml, or other docs
 bloom generate               # Generate tasks.yaml from plan.md
+bloom enter                  # Enter Claude Code in project context
 ```
 
 ### Monitoring

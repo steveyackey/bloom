@@ -46,9 +46,10 @@ Orchestrator Commands:
   setup                     Setup repos according to config
 
 Planning Commands:
-  refine                    Refine PRD, plan, or any project documents
+  refine                    Refine PRD, plan, tasks.yaml, or other project docs
   plan                      Create implementation plan (plan.md) with Claude
   generate                  Generate tasks.yaml from plan.md
+  enter                     Enter Claude Code in project context
 
 Task Commands:
   dashboard                 Live dashboard view (refreshes every 10s)

@@ -13,6 +13,7 @@ import {
   cmdClearAnswered,
   cmdCreate,
   cmdDashboard,
+  cmdEnter,
   cmdGenerate,
   cmdInit,
   cmdInterjectDismiss,
@@ -207,6 +208,10 @@ export async function main(): Promise<void> {
 
     case "refine":
       await cmdRefine();
+      break;
+
+    case "enter":
+      await cmdEnter();
       break;
 
     case "generate":

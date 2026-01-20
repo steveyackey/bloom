@@ -5,6 +5,7 @@
 export * from "./config-cli";
 export * from "./context";
 export * from "./create";
+export * from "./enter";
 export * from "./generate";
 export * from "./help";
 export * from "./init";
