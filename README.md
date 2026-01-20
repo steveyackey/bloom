@@ -58,9 +58,8 @@ Bloom works inside a git repository. Each project gets its own repo with bloom f
 
 ```
 my-project/                 # Created by bloom create
-├── template/
-│   └── PRD.md              # Product Requirements Document
-├── CLAUDE.md               # Project guidelines for Claude
+├── PRD.md                  # Product Requirements Document (from template)
+├── CLAUDE.md               # Project guidelines for Claude (from template)
 ├── plan.md                 # Implementation plan (created by bloom plan)
 ├── tasks.yaml              # Task definitions (created by bloom generate)
 ├── bloom.config.yaml       # Bloom config (created by bloom init)
