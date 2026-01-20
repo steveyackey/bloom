@@ -21,7 +21,13 @@ import {
   listInterjections,
   markInterjectionResumed,
   dismissInterjection,
+  getActionResult,
+  markActionExecuted,
+  type Question,
+  type QuestionType,
+  type QuestionAction,
 } from "./human-queue";
+import { ansi, semantic } from "./colors";
 
 // =============================================================================
 // Constants
@@ -435,10 +441,23 @@ CRITICAL INSTRUCTIONS:
 
 HUMAN QUESTIONS (use when you need human input):
 If you need clarification, a decision, or human approval, use the question queue:
-1. Ask: ${taskResult.taskCli} ask ${agentName} "Your question here?" --task ${taskResult.taskId}
-2. Wait: ${taskResult.taskCli} wait-answer <question-id>
-The wait command will block until the human answers. Use this for important decisions
-rather than making assumptions. The human sees all questions in a dedicated pane.
+
+1. YES/NO questions with auto-action (task status changes automatically based on answer):
+   ${taskResult.taskCli} ask ${agentName} "Ready to mark as done?" --task ${taskResult.taskId} --type yes_no --on-yes done --on-no blocked
+   This will automatically set the task to "done" if human says yes, or "blocked" if no.
+
+2. OPEN questions (human answers, you read the response on next run):
+   ${taskResult.taskCli} ask ${agentName} "What approach do you prefer?" --task ${taskResult.taskId} --add-note
+   The human's answer will be added as a note to the task. Check the task's ai_notes on your next run.
+
+3. CHOICE questions (human picks from options):
+   ${taskResult.taskCli} ask ${agentName} "Which framework?" --task ${taskResult.taskId} --choices "React,Vue,Svelte"
+
+4. Wait for immediate answer:
+   ${taskResult.taskCli} wait-answer <question-id>
+   The wait command will block until the human answers. Use this for important decisions.
+
+The human sees all questions in a dedicated pane with visual indicators for question types.
 
 TASK CLI: ${taskResult.taskCli}
 AGENT ID: ${agentName}
@@ -776,10 +795,55 @@ async function cmdNote(taskId: string, note: string) {
 // Human Queue Commands
 // =============================================================================
 
-async function cmdAsk(agentName: string, question: string, taskId?: string) {
-  const id = await askQuestion(agentName, question, { taskId });
+async function cmdAsk(
+  agentName: string,
+  question: string,
+  options: {
+    taskId?: string;
+    questionType?: QuestionType;
+    choices?: string[];
+    onYes?: string;
+    onNo?: string;
+    addNote?: boolean;
+  } = {}
+) {
+  // Build action if applicable
+  let action: QuestionAction | undefined;
+
+  if (options.onYes || options.onNo) {
+    action = {
+      type: "set_status",
+      onYes: options.onYes,
+      onNo: options.onNo,
+    };
+  } else if (options.addNote) {
+    action = {
+      type: "add_note",
+      payload: "Human response:",
+    };
+  }
+
+  const id = await askQuestion(agentName, question, {
+    taskId: options.taskId,
+    choices: options.choices,
+    questionType: options.questionType,
+    action,
+  });
+
   console.log(`Question ID: ${id}`);
   console.log(`Agent "${agentName}" asks: ${question}`);
+  console.log(`Type: ${options.questionType || "auto-detected"}`);
+
+  if (options.choices) {
+    console.log(`Choices: ${options.choices.join(", ")}`);
+  }
+
+  if (action) {
+    console.log(`Action: ${action.type}`);
+    if (action.onYes) console.log(`  On Yes: ${action.onYes}`);
+    if (action.onNo) console.log(`  On No: ${action.onNo}`);
+  }
+
   console.log(`\nTo answer: bloom answer ${id} "your response"`);
 }
 
@@ -888,7 +952,7 @@ async function cmdInterjections() {
     const time = new Date(i.createdAt).toLocaleTimeString();
     const taskInfo = i.taskId ? ` [task: ${i.taskId}]` : "";
 
-    console.log(`\x1b[96m${i.id}\x1b[0m`);
+    console.log(`${semantic.info}${i.id}${ansi.reset}`);
     console.log(`  Agent: ${i.agentName}${taskInfo}`);
     console.log(`  Time: ${time}`);
     console.log(`  Dir: ${i.workingDirectory}`);
@@ -898,7 +962,7 @@ async function cmdInterjections() {
     if (i.reason) {
       console.log(`  Reason: ${i.reason}`);
     }
-    console.log(`  \x1b[32mResume:\x1b[0m bloom interject resume ${i.id}`);
+    console.log(`  ${semantic.success}Resume:${ansi.reset} bloom interject resume ${i.id}`);
     console.log();
   }
 }
@@ -918,7 +982,7 @@ async function cmdInterjectResume(id: string) {
 
   await markInterjectionResumed(id);
 
-  console.log(`\x1b[93mResuming interjected session for ${i.agentName}\x1b[0m\n`);
+  console.log(`${semantic.warning}Resuming interjected session for ${i.agentName}${ansi.reset}\n`);
   console.log(`Working directory: ${i.workingDirectory}`);
 
   if (i.sessionId) {
@@ -958,6 +1022,38 @@ async function cmdInterjectDismiss(id: string) {
 async function cmdQuestionsDashboard() {
   const select = (await import("@inquirer/select")).default;
   const input = (await import("@inquirer/input")).default;
+  const confirm = (await import("@inquirer/confirm")).default;
+
+  // Helper to execute action if applicable
+  const executeAction = async (q: Question, answer: string) => {
+    if (!q.action || !q.taskId) return;
+
+    const result = getActionResult({ ...q, answer });
+    if (!result.shouldExecute) return;
+
+    try {
+      const tasksFile = await loadTasks();
+      const task = findTask(tasksFile.tasks, q.taskId);
+      if (!task) return;
+
+      if (result.status) {
+        const oldStatus = task.status;
+        task.status = result.status as TaskStatus;
+        await saveTasks(tasksFile);
+        console.log(`${semantic.success}Action executed:${ansi.reset} ${q.taskId}: ${oldStatus} → ${result.status}`);
+        await markActionExecuted(q.id);
+      }
+
+      if (result.note) {
+        task.ai_notes.push(result.note);
+        await saveTasks(tasksFile);
+        console.log(`${semantic.success}Note added to task:${ansi.reset} ${q.taskId}`);
+        await markActionExecuted(q.id);
+      }
+    } catch (err) {
+      console.log(`${semantic.error}Failed to execute action:${ansi.reset}`, err);
+    }
+  };
 
   const runLoop = async () => {
     while (true) {
@@ -988,8 +1084,9 @@ async function cmdQuestionsDashboard() {
       const choices = questions.map((q) => {
         const time = new Date(q.createdAt).toLocaleTimeString();
         const taskInfo = q.taskId ? ` [${q.taskId}]` : "";
+        const typeIcon = q.questionType === "yes_no" ? "◉" : q.questionType === "choice" ? "◈" : "◇";
         return {
-          name: `[${q.agentName}${taskInfo}] ${q.question.slice(0, 60)}${q.question.length > 60 ? "..." : ""}`,
+          name: `${typeIcon} [${q.agentName}${taskInfo}] ${q.question.slice(0, 55)}${q.question.length > 55 ? "..." : ""}`,
           value: q.id,
           description: `Asked at ${time}: ${q.question}`,
         };
@@ -1005,7 +1102,7 @@ async function cmdQuestionsDashboard() {
       try {
         // Select a question
         const selectedId = await select({
-          message: `${questions.length} question(s) need your attention:`,
+          message: `${questions.length} question(s) need your attention: (◉=yes/no ◈=choice ◇=open)`,
           choices,
           pageSize: 10,
         });
@@ -1021,7 +1118,22 @@ async function cmdQuestionsDashboard() {
         console.log("\n──────────────────────────────────────────");
         console.log(`Agent: ${selectedQ.agentName}`);
         if (selectedQ.taskId) console.log(`Task: ${selectedQ.taskId}`);
+        console.log(`Type: ${selectedQ.questionType || "open"}`);
         console.log(`\nQuestion: ${selectedQ.question}`);
+
+        // Show action info if present
+        if (selectedQ.action && selectedQ.taskId) {
+          console.log(`\n${semantic.info}Auto-action:${ansi.reset}`);
+          if (selectedQ.action.onYes) {
+            console.log(`  Yes → set task status to "${selectedQ.action.onYes}"`);
+          }
+          if (selectedQ.action.onNo) {
+            console.log(`  No → set task status to "${selectedQ.action.onNo}"`);
+          }
+          if (selectedQ.action.type === "add_note") {
+            console.log(`  Answer will be added as note to task`);
+          }
+        }
 
         if (selectedQ.options && selectedQ.options.length > 0) {
           console.log("\nSuggested options:");
@@ -1029,15 +1141,51 @@ async function cmdQuestionsDashboard() {
         }
         console.log("──────────────────────────────────────────\n");
 
-        // Get the answer
-        const answer = await input({
-          message: "Your answer:",
-          validate: (value) => value.trim().length > 0 || "Please provide an answer",
-        });
+        let answer: string;
+
+        // Handle different question types
+        if (selectedQ.questionType === "yes_no") {
+          const result = await confirm({
+            message: "Your answer:",
+            default: true,
+          });
+          answer = result ? "yes" : "no";
+        } else if (selectedQ.questionType === "choice" && selectedQ.options && selectedQ.options.length > 0) {
+          // Use select for choice questions
+          const choiceOptions = selectedQ.options.map((opt, i) => ({
+            name: opt,
+            value: opt,
+          }));
+          choiceOptions.push({ name: "Other (type custom answer)", value: "__other__" });
+
+          const selected = await select({
+            message: "Your answer:",
+            choices: choiceOptions,
+          });
+
+          if (selected === "__other__") {
+            answer = await input({
+              message: "Custom answer:",
+              validate: (value) => value.trim().length > 0 || "Please provide an answer",
+            });
+          } else {
+            answer = selected;
+          }
+        } else {
+          // Open-ended question
+          answer = await input({
+            message: "Your answer:",
+            validate: (value) => value.trim().length > 0 || "Please provide an answer",
+          });
+        }
 
         // Submit the answer
         await answerQuestion(selectedId, answer.trim());
-        console.log("\n✓ Answer submitted!\n");
+        console.log("\n✓ Answer submitted!");
+
+        // Execute action if applicable
+        await executeAction(selectedQ, answer.trim());
+
         await Bun.sleep(1000);
 
       } catch (err: unknown) {
@@ -1245,6 +1393,13 @@ Other Commands:
 Human Queue Commands:
   questions [--all]         List pending questions (--all for all)
   ask <agent> <question>    Create a question from an agent
+    Options:
+      --task <taskid>       Associate with a task
+      --type <type>         Question type: yes_no, open, choice
+      --choices <list>      Comma-separated choices
+      --on-yes <status>     Status to set on yes (for yes_no)
+      --on-no <status>      Status to set on no (for yes_no)
+      --add-note            Add answer as note to task
   answer <id> <response>    Answer a pending question
   wait-answer <id>          Wait for answer (for agents)
   clear-answered            Delete all answered questions
@@ -1421,16 +1576,52 @@ async function main(): Promise<void> {
 
     case "ask":
       if (!args[1] || !args[2]) {
-        console.error("Usage: bloom ask <agent> <question> [--task <taskid>]");
+        console.error("Usage: bloom ask <agent> <question> [options]");
+        console.error("Options:");
+        console.error("  --task <taskid>     Associate with a task");
+        console.error("  --type <type>       Question type: yes_no, open, choice");
+        console.error("  --choices <list>    Comma-separated choices for choice questions");
+        console.error("  --on-yes <status>   Status to set when answered yes (yes_no questions)");
+        console.error("  --on-no <status>    Status to set when answered no (yes_no questions)");
+        console.error("  --add-note          Add answer as a note to the task");
         process.exit(1);
       }
       {
-        const taskIdx = args.indexOf("--task");
-        const taskId = taskIdx !== -1 ? args[taskIdx + 1] : undefined;
-        const questionParts = args.slice(2).filter((_, i) =>
-          i < args.slice(2).indexOf("--task") || args.slice(2).indexOf("--task") === -1
-        );
-        await cmdAsk(args[1], questionParts.join(" "), taskId);
+        // Parse options
+        const parseOption = (name: string): string | undefined => {
+          const idx = args.indexOf(name);
+          return idx !== -1 ? args[idx + 1] : undefined;
+        };
+
+        const taskId = parseOption("--task");
+        const questionType = parseOption("--type") as QuestionType | undefined;
+        const choicesStr = parseOption("--choices");
+        const onYes = parseOption("--on-yes");
+        const onNo = parseOption("--on-no");
+        const addNote = args.includes("--add-note");
+
+        const choices = choicesStr ? choicesStr.split(",").map(s => s.trim()) : undefined;
+
+        // Extract question (everything from args[2] up to first option flag)
+        const optionFlags = ["--task", "--type", "--choices", "--on-yes", "--on-no", "--add-note"];
+        const questionParts: string[] = [];
+        for (let i = 2; i < args.length; i++) {
+          if (optionFlags.includes(args[i]!)) {
+            // Skip option and its value (except --add-note which has no value)
+            if (args[i] !== "--add-note") i++;
+            continue;
+          }
+          questionParts.push(args[i]!);
+        }
+
+        await cmdAsk(args[1], questionParts.join(" "), {
+          taskId,
+          questionType,
+          choices,
+          onYes,
+          onNo,
+          addNote,
+        });
       }
       break;
 

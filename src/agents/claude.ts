@@ -1,7 +1,7 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import type { Agent, AgentRunOptions, AgentRunResult } from "./agent-core";
-import { createLogger } from "./logger";
-import { ansi, semantic } from "./colors";
+import { type ChildProcess, spawn } from "node:child_process";
+import { ansi, semantic } from "../colors";
+import { createLogger } from "../logger";
+import type { Agent, AgentRunOptions, AgentRunResult } from "./core";
 
 const logger = createLogger("claude-provider");
 
@@ -102,9 +102,7 @@ export class ClaudeAgentProvider implements Agent {
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
-    return this.interactive
-      ? this.runInteractive(options)
-      : this.runStreaming(options);
+    return this.interactive ? this.runInteractive(options) : this.runStreaming(options);
   }
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
@@ -176,7 +174,9 @@ export class ClaudeAgentProvider implements Agent {
             this.onTimeout();
           }
           if (this.streamOutput) {
-            process.stdout.write(`\n${semantic.timeout}[TIMEOUT] No activity for ${Math.round(elapsed / 1000)}s - agent may be stuck${ansi.reset}\n`);
+            process.stdout.write(
+              `\n${semantic.timeout}[TIMEOUT] No activity for ${Math.round(elapsed / 1000)}s - agent may be stuck${ansi.reset}\n`
+            );
           }
           clearInterval(heartbeatTimer);
           try {
@@ -223,7 +223,6 @@ export class ClaudeAgentProvider implements Agent {
           if (event.type === "assistant" && event.content) {
             output += event.content;
           }
-
         } catch {
           // Not JSON, output raw
           if (this.streamOutput) {

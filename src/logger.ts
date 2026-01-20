@@ -2,7 +2,7 @@
 // Structured Logger for Bloom
 // =============================================================================
 
-import { logColors, ansi } from "./colors";
+import { ansi, logColors } from "./colors";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
