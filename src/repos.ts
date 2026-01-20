@@ -311,7 +311,45 @@ export async function createRepo(
   console.log(`Creating worktree for '${defaultBranch}' branch...`);
 
   // For a new repo, we need to create an orphan branch worktree
-  const worktreeResult = runGit(["worktree", "add", "--orphan", "-b", defaultBranch, worktreePath], bareRepoPath);
+  // Try the modern --orphan flag first (Git 2.38+)
+  let worktreeResult = runGit(["worktree", "add", "--orphan", "-b", defaultBranch, worktreePath], bareRepoPath);
+
+  // Fall back for older Git versions that don't support --orphan
+  if (!worktreeResult.success && worktreeResult.error.includes("unknown option")) {
+    // Create an empty tree and initial commit in the bare repo
+    const emptyTreeResult = runGit(["hash-object", "-t", "tree", "--stdin"], bareRepoPath);
+    if (!emptyTreeResult.success) {
+      return {
+        success: false,
+        repoName: name,
+        bareRepoPath,
+        worktreePath,
+        defaultBranch,
+        error: `Failed to create empty tree: ${emptyTreeResult.error}`,
+      };
+    }
+    const emptyTreeHash = emptyTreeResult.output.trim();
+
+    // Create an initial empty commit
+    const commitResult = runGit(["commit-tree", "-m", "Initial commit", emptyTreeHash], bareRepoPath);
+    if (!commitResult.success) {
+      return {
+        success: false,
+        repoName: name,
+        bareRepoPath,
+        worktreePath,
+        defaultBranch,
+        error: `Failed to create initial commit: ${commitResult.error}`,
+      };
+    }
+    const commitHash = commitResult.output.trim();
+
+    // Update the branch ref to point to this commit
+    runGit(["update-ref", `refs/heads/${defaultBranch}`, commitHash], bareRepoPath);
+
+    // Now create a normal worktree (not orphan)
+    worktreeResult = runGit(["worktree", "add", worktreePath, defaultBranch], bareRepoPath);
+  }
 
   if (!worktreeResult.success) {
     return {
