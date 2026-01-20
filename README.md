@@ -24,7 +24,7 @@ iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 |
 # 1. Create a new planning workspace
 mkdir my-workspace && cd my-workspace
 git init
-bloom init
+bloom init   # You'll be asked to choose SSH or HTTPS for cloning repos
 
 # 2. Clone repos you'll be working on
 bloom repo clone https://github.com/org/backend
@@ -118,7 +118,7 @@ The more context you provide upfront (PRD, architecture notes, existing code), t
 ### Workspace Setup
 
 ```bash
-bloom init                   # Initialize workspace in current directory
+bloom init                   # Initialize workspace (prompts for SSH/HTTPS preference)
 bloom setup                  # Sync repos according to config
 ```
 
@@ -152,8 +152,10 @@ bloom repo worktree list <repo>            # List worktrees for repo
 
 ```bash
 bloom config                 # Show user config (~/.bloom/config.yaml)
-bloom config set-protocol <ssh|https>  # Set git URL preference
+bloom config set-protocol <ssh|https>  # Change git URL preference (SSH or HTTPS)
 ```
+
+Git protocol preference is set during `bloom init` and stored in `~/.bloom/config.yaml`. This determines how repository URLs are normalized when cloning.
 
 ### Orchestrator
 

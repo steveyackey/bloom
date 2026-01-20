@@ -5,6 +5,7 @@
 import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as YAML from "yaml";
+import { getUserConfigPath, loadUserConfig, setGitProtocol } from "../user-config";
 import { BLOOM_DIR, isInGitRepo } from "./context";
 
 // Path to template folder (relative to this file's package)
@@ -176,6 +177,29 @@ Always use conventional commits.
   return result;
 }
 
+async function promptGitProtocol(): Promise<"ssh" | "https"> {
+  const select = (await import("@inquirer/select")).default;
+
+  const protocol = await select({
+    message: "How do you want to clone repositories?",
+    choices: [
+      {
+        name: "HTTPS (recommended for most users)",
+        value: "https",
+        description: "Works out of the box, uses personal access tokens",
+      },
+      {
+        name: "SSH",
+        value: "ssh",
+        description: "Requires SSH key setup, preferred for frequent contributors",
+      },
+    ],
+    default: "https",
+  });
+
+  return protocol as "ssh" | "https";
+}
+
 export async function cmdInit(): Promise<void> {
   if (!isInGitRepo()) {
     console.log("Not in a git repository.\n");
@@ -203,6 +227,20 @@ export async function cmdInit(): Promise<void> {
     for (const item of result.skipped) {
       console.log(`  - ${item}`);
     }
+  }
+
+  // Prompt for git protocol preference if user config doesn't exist yet
+  const configExists = existsSync(getUserConfigPath());
+  if (!configExists) {
+    console.log("");
+    const protocol = await promptGitProtocol();
+    await setGitProtocol(protocol);
+    console.log(`\nGit protocol set to: ${protocol}`);
+    console.log("  To change later: bloom config set-protocol <ssh|https>");
+  } else {
+    const userConfig = await loadUserConfig();
+    console.log(`\nUsing existing git protocol preference: ${userConfig.gitProtocol}`);
+    console.log("  To change: bloom config set-protocol <ssh|https>");
   }
 
   console.log("\nWorkspace ready. Next steps:");
