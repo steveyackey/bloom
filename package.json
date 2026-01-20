@@ -20,12 +20,12 @@
     "typecheck": "tsc --noEmit",
     "validate": "bun run check && bun run typecheck && bun run test",
     "prepare": "simple-git-hooks",
-    "package": "bun build --compile ./src/cli.ts --outfile dist/bloom --external bun-pty",
-    "package:linux-x64": "bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile dist/bloom-linux-x64 --external bun-pty",
-    "package:linux-arm64": "bun build --compile --target=bun-linux-arm64 ./src/cli.ts --outfile dist/bloom-linux-arm64 --external bun-pty",
-    "package:darwin-x64": "bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile dist/bloom-darwin-x64 --external bun-pty",
-    "package:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile dist/bloom-darwin-arm64 --external bun-pty",
-    "package:windows-x64": "bun build --compile --target=bun-windows-x64 ./src/cli.ts --outfile dist/bloom-windows-x64.exe",
+    "package": "bun build --compile ./src/cli.ts --outfile dist/bloom",
+    "package:linux-x64": "bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile dist/bloom-linux-x64",
+    "package:linux-arm64": "bun build --compile --target=bun-linux-arm64 ./src/cli.ts --outfile dist/bloom-linux-arm64",
+    "package:darwin-x64": "bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile dist/bloom-darwin-x64",
+    "package:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile dist/bloom-darwin-arm64",
+    "package:windows-x64": "bun build --compile --target=bun-windows-x64 --feature WINDOWS ./src/cli.ts --outfile dist/bloom-windows-x64.exe",
     "package:all": "bun run package:linux-x64 && bun run package:linux-arm64 && bun run package:darwin-x64 && bun run package:darwin-arm64 && bun run package:windows-x64"
   },
   "simple-git-hooks": {
@@ -34,6 +34,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "@types/bun": "latest",
+    "bun-pty": "^0.4.0",
     "simple-git-hooks": "^2.13.1"
   },
   "peerDependencies": {
@@ -47,8 +48,5 @@
     "@xterm/headless": "^6.0.0",
     "yaml": "^2.8.2",
     "zod": "^4.3.5"
-  },
-  "optionalDependencies": {
-    "bun-pty": "^0.4.0"
   }
 }

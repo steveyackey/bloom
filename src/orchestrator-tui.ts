@@ -6,7 +6,7 @@ import { interjectSession } from "./agents";
 import { ansi, CSI, cellBgToAnsi, cellFgToAnsi, getBorderColor, semantic } from "./colors";
 import { createInterjection } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
-import { isBunPtyAvailable, requiresBunPty, spawnTerminal, type TerminalProcess } from "./terminal";
+import { spawnTerminal, type TerminalProcess } from "./terminal";
 
 // =============================================================================
 // Types
@@ -53,13 +53,6 @@ export class OrchestratorTUI {
   }
 
   async start() {
-    // Check for bun-pty on Windows
-    if (requiresBunPty() && !(await isBunPtyAvailable())) {
-      console.error("Error: bun-pty is required on Windows but not installed.");
-      console.error("Install it with: bun add bun-pty");
-      process.exit(1);
-    }
-
     process.stdout.write(ansi.enterAltScreen + ansi.hideCursor + ansi.clearScreen);
 
     if (process.stdin.isTTY) {
