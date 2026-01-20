@@ -44,19 +44,18 @@ describe("init command", () => {
       expect(existsSync(join(TEST_DIR, "tasks.yaml"))).toBe(true);
     });
 
-    it("should create project/ folder with starter templates", async () => {
+    it("should create PRD.md at workspace root", async () => {
       const result = await initWorkspace(TEST_DIR);
 
       expect(result.success).toBe(true);
-      expect(existsSync(join(TEST_DIR, "project"))).toBe(true);
-      // Should have PRD.md in project folder
-      expect(existsSync(join(TEST_DIR, "project", "PRD.md"))).toBe(true);
+      // PRD.md should be at workspace root, not in a subfolder
+      expect(existsSync(join(TEST_DIR, "PRD.md"))).toBe(true);
     });
 
-    it("should provide PRD template in project folder", async () => {
+    it("should provide PRD template with key sections", async () => {
       await initWorkspace(TEST_DIR);
 
-      const prdPath = join(TEST_DIR, "project", "PRD.md");
+      const prdPath = join(TEST_DIR, "PRD.md");
       const content = await Bun.file(prdPath).text();
 
       // PRD should guide user through key product decisions
@@ -87,7 +86,7 @@ describe("init command", () => {
       expect(result.created).toContain("bloom.config.yaml");
       expect(result.created).toContain("repos/");
       expect(result.created).toContain("tasks.yaml");
-      expect(result.created).toContain("project/");
+      expect(result.created).toContain("PRD.md");
     });
   });
 });

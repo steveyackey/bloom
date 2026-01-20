@@ -27,7 +27,6 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
   const configFile = join(dir, "bloom.config.yaml");
   const reposDir = join(dir, "repos");
   const tasksFile = join(dir, "tasks.yaml");
-  const projectDir = join(dir, "project");
 
   // Create bloom.config.yaml (marks this as a bloom project)
   if (existsSync(configFile)) {
@@ -57,24 +56,25 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
     result.created.push("tasks.yaml");
   }
 
-  // Create project directory with template files
-  if (existsSync(projectDir)) {
-    result.skipped.push("project/");
-  } else {
-    mkdirSync(projectDir, { recursive: true });
-    result.created.push("project/");
-
-    // Copy template files into project folder
-    if (existsSync(TEMPLATE_DIR)) {
-      const templateFiles = readdirSync(TEMPLATE_DIR);
-      for (const file of templateFiles) {
-        const srcPath = join(TEMPLATE_DIR, file);
-        const destPath = join(projectDir, file);
+  // Copy template files to workspace root
+  if (existsSync(TEMPLATE_DIR)) {
+    const templateFiles = readdirSync(TEMPLATE_DIR);
+    for (const file of templateFiles) {
+      const srcPath = join(TEMPLATE_DIR, file);
+      const destPath = join(dir, file);
+      if (existsSync(destPath)) {
+        result.skipped.push(file);
+      } else {
         cpSync(srcPath, destPath, { recursive: true });
-        result.created.push(`project/${file}`);
+        result.created.push(file);
       }
+    }
+  } else {
+    // Fallback: create minimal PRD.md if template doesn't exist
+    const prdPath = join(dir, "PRD.md");
+    if (existsSync(prdPath)) {
+      result.skipped.push("PRD.md");
     } else {
-      // Fallback: create minimal PRD.md if template doesn't exist
       const prdContent = `# Product Requirements Document: [Project Name]
 
 ## Overview
@@ -105,8 +105,8 @@ Who will use this? What are their needs?
 ## Open Questions
 - Any unresolved decisions or unknowns
 `;
-      await Bun.write(join(projectDir, "PRD.md"), prdContent);
-      result.created.push("project/PRD.md");
+      await Bun.write(prdPath, prdContent);
+      result.created.push("PRD.md");
     }
   }
 

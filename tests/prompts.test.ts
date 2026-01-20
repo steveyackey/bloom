@@ -51,16 +51,15 @@ describe("prompts", () => {
       expect(prompt).toContain("IMPORTANT");
     });
 
-    it("should check both possible PRD locations", async () => {
+    it("should check PRD at working directory root", async () => {
       const prompt = await loadPrompt("plan", {
         WORKING_DIR: "/test/project",
         PLAN_FILE: "/test/project/plan.md",
         REPOS_CONTEXT: "No repos configured",
       });
 
-      // Should check both root and project/ folder
+      // Should check PRD at working directory root
       expect(prompt).toContain("/test/project/PRD.md");
-      expect(prompt).toContain("/test/project/project/PRD.md");
     });
 
     it("should ask about checkpoint preferences", async () => {
