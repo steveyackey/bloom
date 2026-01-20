@@ -166,7 +166,7 @@ List active sessions that can be interjected.
 bloom interject list
 ```
 
-### bloom interject <agent>
+### bloom interject `<agent>`
 
 Send a message to a running agent.
 
