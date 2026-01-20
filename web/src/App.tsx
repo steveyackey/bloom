@@ -1,6 +1,21 @@
+import { useState } from 'react'
 import './App.css'
 
 function App() {
+  const [activeTab, setActiveTab] = useState<'unix' | 'windows'>('unix')
+  const [copied, setCopied] = useState(false)
+
+  const installCommands = {
+    unix: 'curl -fsSL https://raw.githubusercontent.com/steveyackey/bloom/main/install.sh | bash',
+    windows: 'iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 | iex'
+  }
+
+  const copyToClipboard = async () => {
+    await navigator.clipboard.writeText(installCommands[activeTab])
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="app">
       {/* Navigation */}
@@ -100,7 +115,7 @@ function App() {
           </div>
           <div className="workflow-code">
             <pre><code>{`# The complete workflow
-bloom init                # Initialize workspace
+bloom init                  # Initialize workspace
 bloom repo clone myorg/api  # Add repositories
 bloom create feature-auth   # Create project
 bloom plan                  # Generate plan with Claude
@@ -118,19 +133,32 @@ bloom run                   # Execute with parallel agents`}</code></pre>
             Pre-built binaries for macOS, Linux, and Windows
           </p>
 
-          <div className="install-tabs">
-            <div className="install-tab">
-              <h3 className="install-tab-title">
-                <AppleIcon /> macOS & <LinuxIcon /> Linux
-              </h3>
-              <pre><code>curl -fsSL https://raw.githubusercontent.com/steveyackey/bloom/main/install.sh | bash</code></pre>
+          <div className="install-card">
+            <div className="install-tabs-header">
+              <button
+                className={`install-tab-btn ${activeTab === 'unix' ? 'active' : ''}`}
+                onClick={() => setActiveTab('unix')}
+              >
+                <AppleIcon />
+                <span>macOS</span>
+                <span className="tab-divider">/</span>
+                <TerminalSmallIcon />
+                <span>Linux</span>
+              </button>
+              <button
+                className={`install-tab-btn ${activeTab === 'windows' ? 'active' : ''}`}
+                onClick={() => setActiveTab('windows')}
+              >
+                <WindowsIcon />
+                <span>Windows</span>
+              </button>
             </div>
-
-            <div className="install-tab">
-              <h3 className="install-tab-title">
-                <WindowsIcon /> Windows (PowerShell)
-              </h3>
-              <pre><code>iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 | iex</code></pre>
+            <div className="install-code-wrapper">
+              <pre className="install-code"><code>{installCommands[activeTab]}</code></pre>
+              <button className="copy-btn" onClick={copyToClipboard} title="Copy to clipboard">
+                {copied ? <CheckIcon /> : <CopyIcon />}
+                <span>{copied ? 'Copied!' : 'Copy'}</span>
+              </button>
             </div>
           </div>
 
@@ -293,6 +321,15 @@ function TerminalIcon() {
   )
 }
 
+function TerminalSmallIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  )
+}
+
 function WorkflowIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -311,24 +348,33 @@ function GithubIcon() {
 
 function AppleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
       <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-    </svg>
-  )
-}
-
-function LinuxIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12.504 0c-.155 0-.311.001-.465.003-.653.014-1.302.065-1.94.153-1.271.175-2.498.512-3.642 1.004-.574.247-1.127.532-1.654.852-.528.32-1.029.676-1.498 1.063-.94.775-1.745 1.685-2.387 2.704-.32.509-.604 1.042-.85 1.594-.247.553-.454 1.124-.62 1.709-.331 1.168-.514 2.383-.545 3.609-.006.242-.009.485-.009.728 0 .244.003.487.009.729.031 1.226.214 2.441.545 3.609.166.585.373 1.156.62 1.709.246.552.53 1.085.85 1.594.642 1.019 1.447 1.929 2.387 2.704.469.387.97.743 1.498 1.063.527.32 1.08.605 1.654.852 1.144.492 2.371.829 3.642 1.004.638.088 1.287.139 1.94.153.154.002.31.003.465.003.155 0 .311-.001.465-.003.653-.014 1.302-.065 1.94-.153 1.271-.175 2.498-.512 3.642-1.004.574-.247 1.127-.532 1.654-.852.528-.32 1.029-.676 1.498-1.063.94-.775 1.745-1.685 2.387-2.704.32-.509.604-1.042.85-1.594.247-.553.454-1.124.62-1.709.331-1.168.514-2.383.545-3.609.006-.242.009-.485.009-.729 0-.243-.003-.486-.009-.728-.031-1.226-.214-2.441-.545-3.609-.166-.585-.373-1.156-.62-1.709-.246-.552-.53-1.085-.85-1.594-.642-1.019-1.447-1.929-2.387-2.704-.469-.387-.97-.743-1.498-1.063-.527-.32-1.08-.605-1.654-.852-1.144-.492-2.371-.829-3.642-1.004-.638-.088-1.287-.139-1.94-.153-.154-.002-.31-.003-.465-.003zm0 1.5c.146 0 .292.001.437.003.602.013 1.2.06 1.787.14 1.166.161 2.295.47 3.346.921.527.227 1.035.489 1.52.783.484.294.943.62 1.373.973.86.71 1.597 1.544 2.186 2.479.295.468.556.958.782 1.466.227.508.418 1.033.572 1.57.306 1.072.475 2.188.503 3.315.006.222.008.445.008.668 0 .223-.002.446-.008.668-.028 1.127-.197 2.243-.503 3.315-.154.537-.345 1.062-.572 1.57-.226.508-.487.998-.782 1.466-.589.935-1.326 1.769-2.186 2.479-.43.353-.889.679-1.373.973-.485.294-.993.556-1.52.783-1.051.451-2.18.76-3.346.921-.587.08-1.185.127-1.787.14-.145.002-.291.003-.437.003-.146 0-.292-.001-.437-.003-.602-.013-1.2-.06-1.787-.14-1.166-.161-2.295-.47-3.346-.921-.527-.227-1.035-.489-1.52-.783-.484-.294-.943-.62-1.373-.973-.86-.71-1.597-1.544-2.186-2.479-.295-.468-.556-.958-.782-1.466-.227-.508-.418-1.033-.572-1.57-.306-1.072-.475-2.188-.503-3.315-.006-.222-.008-.445-.008-.668 0-.223.002-.446.008-.668.028-1.127.197-2.243.503-3.315.154-.537.345-1.062.572-1.57.226-.508.487-.998.782-1.466.589-.935 1.326-1.769 2.186-2.479.43-.353.889-.679 1.373-.973.485-.294.993-.556 1.52-.783 1.051-.451 2.18-.76 3.346-.921.587-.08 1.185-.127 1.787-.14.145-.002.291-.003.437-.003z"/>
     </svg>
   )
 }
 
 function WindowsIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
       <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+    </svg>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   )
 }
