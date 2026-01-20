@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/steveyackey/bloom/compare/bloom-v0.1.1...bloom-v0.1.2) (2026-01-20)
+
+
+### Bug Fixes
+
+* correct release-please output references for root package ([c292a5f](https://github.com/steveyackey/bloom/commit/c292a5f8a4dbe09a03a700cf8081e12b47e9ee16))
+
 ## [0.1.1](https://github.com/steveyackey/bloom/compare/bloom-v0.1.0...bloom-v0.1.1) (2026-01-20)
 
 
