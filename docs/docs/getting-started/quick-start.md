@@ -27,6 +27,7 @@ You'll be prompted to choose your Git protocol preference:
 ```
 
 This creates:
+- `.gitignore` — Excludes `repos/` from version control
 - `bloom.config.yaml` — Workspace configuration
 - `repos/` — Directory for cloned repositories
 - `template/` — Templates for new projects

@@ -198,6 +198,7 @@ Template for agent guidelines. Becomes `CLAUDE.md` in projects.
 
 ```
 my-workspace/
+├── .gitignore              # Excludes repos/
 ├── bloom.config.yaml      # Workspace config
 ├── repos/                  # Repositories
 │   ├── backend.git/       # Bare repo

@@ -21,6 +21,7 @@ The `init` command sets up a directory as a Bloom workspace. It creates the nece
 
 ```
 ./
+├── .gitignore           # Ignores repos/ folder
 ├── bloom.config.yaml    # Workspace configuration
 ├── repos/               # Repository storage directory
 └── template/            # Project templates
@@ -28,6 +29,8 @@ The `init` command sets up a directory as a Bloom workspace. It creates the nece
     ├── plan.md
     └── CLAUDE.template.md
 ```
+
+The `.gitignore` file is created (or updated) to exclude the `repos/` folder, preventing cloned repositories from being accidentally committed to the workspace.
 
 ## Interactive Prompts
 
