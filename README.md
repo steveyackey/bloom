@@ -20,62 +20,99 @@ iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 |
 
 ## Quick Start
 
-```bash
-# Create a new project (creates folder, PRD template, CLAUDE.md, launches Claude)
-bloom create my-project
-cd my-project
-
-# Create implementation plan (generates plan.md)
-bloom plan
-
-# Generate tasks from plan (generates tasks.yaml)
-bloom generate
-
-# Start the orchestrator
-bloom run
-```
-
-### Alternative: Existing Project
+### New Users: Setting Up Your Planning Repo
 
 ```bash
-# For existing projects, initialize workspace
-cd existing-project
+# 1. Create a folder for your project planning and cd into it
+mkdir my-project-planning
+cd my-project-planning
+git init
+
+# 2. Initialize bloom workspace
 bloom init
 
-# Add repos to work on
+# 3. Clone repos you'll be working on (they go into the repos/ folder)
 bloom repo clone https://github.com/org/backend
 bloom repo clone https://github.com/org/frontend
 
-# Create plan and generate tasks
+# 4. Add your planning documents, notes, designs - organize however you like!
+# 5. Create plan and generate tasks
 bloom plan
 bloom generate
 bloom run
 ```
 
+The `repos/` folder keeps your cloned repositories separate from your planning documents. You can organize the rest of your planning repo however you like—add research notes, design docs, architecture diagrams, or anything else that provides context.
+
+### Creating Brand New Projects
+
+If you're starting a project from scratch (no existing repos):
+
+```bash
+# Creates a new folder wherever you are with PRD template and CLAUDE.md
+bloom create my-new-app
+cd my-new-app
+
+# Claude launches to help you define requirements in PRD.md
+# Then continue with planning
+bloom plan
+bloom generate
+bloom run
+```
+
+`bloom create` makes a new folder in your current directory with everything you need to get started.
+
 ## Project Setup
 
-Bloom works inside a git repository. Each project gets its own repo with bloom files at the root:
+Bloom works inside a git repository that serves as your **planning repo**. This is where you organize all your project planning, and cloned code repositories live in the `repos/` folder:
 
 ```
-my-project/                 # Created by bloom create
-├── PRD.md                  # Product Requirements Document (from template)
-├── CLAUDE.md               # Project guidelines for Claude (from template)
+my-project/                 # Your planning repo (bloom init or bloom create)
+├── PRD.md                  # Product Requirements Document
+├── CLAUDE.md               # Project guidelines for Claude
 ├── plan.md                 # Implementation plan (created by bloom plan)
 ├── tasks.yaml              # Task definitions (created by bloom generate)
 ├── bloom.config.yaml       # Bloom config (created by bloom init)
-├── repos/                  # Cloned repos for tasks
-├── research/               # Your notes, research, context
-└── designs/                # Mockups, architecture diagrams
+├── repos/                  # Cloned code repos live here
+│   ├── backend/            # bloom repo clone puts repos here
+│   └── frontend/           # Each repo is isolated from planning docs
+├── research/               # Your notes, research, context (optional)
+└── designs/                # Mockups, architecture diagrams (optional)
 ```
 
-**Workflow:**
+### How the repos/ Folder Works
 
-1. `bloom create my-project` - Creates project with PRD template, launches Claude to help define requirements
-2. `bloom plan` - Claude reads context (PRD, repos config) and creates plan.md
-3. `bloom generate` - Claude converts plan.md into executable tasks.yaml
-4. `bloom run` - Start the orchestrator to execute tasks
+When you run `bloom repo clone <url>`, Bloom clones the repository as a **bare repo** and automatically creates a worktree for the default branch (usually `main` or `master`). This setup enables multiple agents to work on the same repo simultaneously without conflicts.
 
-The more context you provide upfront, the better your task breakdown will be.
+**Why worktrees?** Each agent needs its own working directory to make changes. With git worktrees, you can have multiple branches checked out at once—each in its own folder. When you run parallel tasks, Bloom creates separate worktrees so agents don't step on each other:
+
+```
+repos/
+├── backend.git/              # Bare repo (shared git data)
+├── backend/                  # Default branch worktree (main)
+├── backend-feature-auth/     # Worktree for agent 1
+└── backend-feature-api/      # Worktree for agent 2
+```
+
+When you run `bloom run`, worktrees are **automatically created** as needed based on task definitions—you don't need to manage them manually. The manual commands are only needed if you want to work outside of Bloom:
+
+```bash
+bloom repo worktree add backend feature-auth
+bloom repo worktree add backend feature-api
+```
+
+You can organize everything outside `repos/` however you like—create folders for research, designs, meeting notes, or anything else that helps provide context for your project.
+
+### Workflow
+
+1. **Initialize** - `bloom init` (existing repos) or `bloom create` (new project)
+2. **Clone repos** - `bloom repo clone <url>` to add code repositories
+3. **Add context** - Organize planning docs, notes, designs however you like
+4. **Plan** - `bloom plan` creates plan.md from your context
+5. **Generate** - `bloom generate` converts plan.md into tasks.yaml
+6. **Run** - `bloom run` starts agents to execute tasks
+
+The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
 
 ## Workflow
 
