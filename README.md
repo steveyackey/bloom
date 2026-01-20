@@ -24,7 +24,7 @@ iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 |
 # 1. Create a new planning workspace
 mkdir my-workspace && cd my-workspace
 git init
-bloom init
+bloom init   # You'll be asked to choose SSH or HTTPS for cloning repos
 
 # 2. Clone repos you'll be working on
 bloom repo clone https://github.com/org/backend
@@ -118,17 +118,26 @@ The more context you provide upfront (PRD, architecture notes, existing code), t
 ### Workspace Setup
 
 ```bash
-bloom init                   # Initialize workspace in current directory
+bloom init                   # Initialize workspace (prompts for SSH/HTTPS preference)
 bloom setup                  # Sync repos according to config
 ```
 
 ### Repository Management
 
 ```bash
-bloom repo clone <url>       # Add a repo to the workspace (bare + worktree)
-bloom repo list              # List repos in the workspace
-bloom repo sync              # Clone/fetch all repos from bloom.repos.yaml
-bloom repo remove <name>     # Remove a repo and its worktrees
+bloom repo clone <url|org/repo>  # Clone a repo (supports org/repo shorthand)
+bloom repo create <name>         # Create a new local repo with worktree setup
+bloom repo list                  # List repos in the workspace
+bloom repo sync                  # Clone/fetch all repos from bloom.repos.yaml
+bloom repo remove <name>         # Remove a repo and its worktrees
+```
+
+Examples:
+```bash
+bloom repo clone steveyackey/bloom           # Shorthand for GitHub
+bloom repo clone https://github.com/org/repo # Full HTTPS URL
+bloom repo clone git@github.com:org/repo.git # Full SSH URL
+bloom repo create my-new-project             # Create new local repo
 ```
 
 ### Project Management
@@ -152,8 +161,10 @@ bloom repo worktree list <repo>            # List worktrees for repo
 
 ```bash
 bloom config                 # Show user config (~/.bloom/config.yaml)
-bloom config set-protocol <ssh|https>  # Set git URL preference
+bloom config set-protocol <ssh|https>  # Change git URL preference (SSH or HTTPS)
 ```
+
+Git protocol preference is set during `bloom init` and stored in `~/.bloom/config.yaml`. This determines how repository URLs are normalized when cloning.
 
 ### Orchestrator
 

@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import * as YAML from "yaml";
 import { z } from "zod";
-import { extractRepoName, loadUserConfig, normalizeGitUrl } from "./user-config";
+import { expandRepoUrl, extractRepoName, loadUserConfig, normalizeGitUrl } from "./user-config";
 
 // =============================================================================
 // Schema for bloom.config.yaml (project-level)
@@ -129,8 +129,10 @@ export interface CloneResult {
 
 export async function cloneRepo(bloomDir: string, url: string, options?: { name?: string }): Promise<CloneResult> {
   const userConfig = await loadUserConfig();
-  const normalizedUrl = normalizeGitUrl(url, userConfig.gitProtocol);
-  const repoName = options?.name || extractRepoName(url);
+  // Expand shorthand (org/repo) to full URL, then normalize to preferred protocol
+  const expandedUrl = expandRepoUrl(url, userConfig.gitProtocol);
+  const normalizedUrl = normalizeGitUrl(expandedUrl, userConfig.gitProtocol);
+  const repoName = options?.name || extractRepoName(normalizedUrl);
 
   const reposDir = getReposDir(bloomDir);
   const bareRepoPath = getBareRepoPath(bloomDir, repoName);
@@ -226,6 +228,123 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
   return {
     success: true,
     repoName,
+    bareRepoPath,
+    worktreePath,
+    defaultBranch,
+  };
+}
+
+// =============================================================================
+// Create Command (new local repo)
+// =============================================================================
+
+export interface CreateRepoResult {
+  success: boolean;
+  repoName: string;
+  bareRepoPath: string;
+  worktreePath: string;
+  defaultBranch: string;
+  error?: string;
+}
+
+export async function createRepo(
+  bloomDir: string,
+  name: string,
+  options?: { defaultBranch?: string }
+): Promise<CreateRepoResult> {
+  const defaultBranch = options?.defaultBranch || "main";
+  const reposDir = getReposDir(bloomDir);
+  const bareRepoPath = getBareRepoPath(bloomDir, name);
+  const worktreesDir = getWorktreesDir(bloomDir, name);
+
+  // Require workspace to be initialized
+  if (!existsSync(reposDir)) {
+    return {
+      success: false,
+      repoName: name,
+      bareRepoPath,
+      worktreePath: "",
+      defaultBranch,
+      error: "Workspace not initialized. Run 'bloom init' first.",
+    };
+  }
+
+  // Check if already exists
+  if (existsSync(bareRepoPath)) {
+    return {
+      success: false,
+      repoName: name,
+      bareRepoPath,
+      worktreePath: "",
+      defaultBranch,
+      error: `Repository '${name}' already exists at ${bareRepoPath}`,
+    };
+  }
+
+  // Initialize bare repository
+  console.log(`Creating new repository '${name}'...`);
+  mkdirSync(bareRepoPath, { recursive: true });
+  const initResult = runGit(["init", "--bare"], bareRepoPath);
+
+  if (!initResult.success) {
+    rmSync(bareRepoPath, { recursive: true, force: true });
+    return {
+      success: false,
+      repoName: name,
+      bareRepoPath,
+      worktreePath: "",
+      defaultBranch,
+      error: `Failed to initialize bare repo: ${initResult.error}`,
+    };
+  }
+
+  // Set default branch
+  runGit(["symbolic-ref", "HEAD", `refs/heads/${defaultBranch}`], bareRepoPath);
+
+  // Create worktrees directory
+  if (!existsSync(worktreesDir)) {
+    mkdirSync(worktreesDir, { recursive: true });
+  }
+
+  // Create worktree for default branch with orphan (no commits yet)
+  const worktreePath = getWorktreePath(bloomDir, name, defaultBranch);
+  console.log(`Creating worktree for '${defaultBranch}' branch...`);
+
+  // For a new repo, we need to create an orphan branch worktree
+  const worktreeResult = runGit(["worktree", "add", "--orphan", "-b", defaultBranch, worktreePath], bareRepoPath);
+
+  if (!worktreeResult.success) {
+    return {
+      success: false,
+      repoName: name,
+      bareRepoPath,
+      worktreePath,
+      defaultBranch,
+      error: `Failed to create worktree: ${worktreeResult.error}`,
+    };
+  }
+
+  // Create initial commit so the repo is in a usable state
+  const readmeContent = `# ${name}\n\nA new repository created with bloom.\n`;
+  const readmePath = join(worktreePath, "README.md");
+  await Bun.write(readmePath, readmeContent);
+
+  runGit(["add", "README.md"], worktreePath);
+  runGit(["commit", "-m", "Initial commit"], worktreePath);
+
+  // Save to repos file (no remote URL yet)
+  const reposFile = await loadReposFile(bloomDir);
+  reposFile.repos.push({
+    name,
+    url: "", // No remote yet
+    defaultBranch,
+    addedAt: new Date().toISOString(),
+  });
+  await saveReposFile(bloomDir, reposFile);
+
+  return {
+    success: true,
+    repoName: name,
     bareRepoPath,
     worktreePath,
     defaultBranch,
