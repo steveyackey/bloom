@@ -51,10 +51,6 @@ const config: Config = {
     },
     navbar: {
       title: 'Bloom',
-      logo: {
-        alt: 'Bloom Logo',
-        src: 'img/bloom-logo.png',
-      },
       items: [
         {
           type: 'docSidebar',
