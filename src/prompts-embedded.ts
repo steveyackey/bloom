@@ -309,10 +309,13 @@ tasks:
 
 ## When Done
 
-After writing the tasks.yaml, let the user know:
-1. The tasks have been generated to \`tasks.yaml\`
-2. They can review and edit it if needed
-3. They should run \`bloom run\` to start the orchestrator and begin execution
+After writing the tasks.yaml:
+1. **Run \`bloom validate\`** to check for YAML syntax errors
+2. If validation fails, fix the issues (usually quoting problems with special characters) and re-validate
+3. Once validation passes, let the user know:
+   - The tasks have been generated to \`tasks.yaml\`
+   - They can review and edit it if needed
+   - They should run \`bloom run\` to start the orchestrator and begin execution
 `,
 
   plan: `# Planning Assistant

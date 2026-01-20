@@ -8,10 +8,71 @@ import { ClaudeAgentProvider } from "../agents";
 import { findGitRoot } from "./context";
 
 // =============================================================================
+// File Selection
+// =============================================================================
+
+interface RefineFile {
+  name: string;
+  description: string;
+  nextStep: string;
+  nextCommand: string;
+}
+
+const REFINE_FILES: RefineFile[] = [
+  {
+    name: "PRD.md",
+    description: "Product Requirements Document - defines WHAT to build and WHY",
+    nextStep: "Create implementation plan from PRD",
+    nextCommand: "bloom plan",
+  },
+  {
+    name: "plan.md",
+    description: "Implementation Plan - defines HOW to build it",
+    nextStep: "Generate tasks.yaml for execution",
+    nextCommand: "bloom generate",
+  },
+  {
+    name: "tasks.yaml",
+    description: "Task Definitions - machine-readable tasks for agents",
+    nextStep: "Execute tasks with agents",
+    nextCommand: "bloom run",
+  },
+  {
+    name: "CLAUDE.md",
+    description: "Guidelines for Claude agents working on this project",
+    nextStep: "Continue with your workflow",
+    nextCommand: "",
+  },
+];
+
+async function selectFileToRefine(workingDir: string): Promise<RefineFile | null> {
+  const select = (await import("@inquirer/select")).default;
+
+  // Find which files exist
+  const existingFiles = REFINE_FILES.filter((f) => existsSync(join(workingDir, f.name)));
+
+  if (existingFiles.length === 0) {
+    return null;
+  }
+
+  const choices = existingFiles.map((f) => ({
+    name: `${f.name} - ${f.description}`,
+    value: f,
+  }));
+
+  const selected = await select({
+    message: "Which file would you like to refine?",
+    choices,
+  });
+
+  return selected;
+}
+
+// =============================================================================
 // Run Refine Session
 // =============================================================================
 
-export async function runRefineSession(workingDir: string): Promise<void> {
+export async function runRefineSession(workingDir: string, selectedFile: RefineFile): Promise<void> {
   const gitRoot = findGitRoot() || workingDir;
 
   // Build context about what files exist in the project
@@ -63,8 +124,8 @@ Your role is to help the user refine their project documents. The key files are:
 You can read files from anywhere in the git repository to gather context (repos/, other projects, etc.), but you should only modify files in the current project directory: ${workingDir}
 
 When helping the user:
-1. Ask clarifying questions to understand their goals
-2. Read existing documents to understand current state
+1. Read the target file first to understand its current state
+2. Ask clarifying questions to understand what they want to change
 3. Suggest specific improvements with clear reasoning
 4. Make edits when the user approves
 
@@ -75,13 +136,13 @@ Focus on making documents clear, complete, and actionable.`;
     dangerouslySkipPermissions: true,
   });
 
-  console.log(`Refine session for: ${workingDir}\n`);
-  console.log(`You can refine PRD.md, plan.md, CLAUDE.md, or any other documents.`);
-  console.log(`Claude can read context from the entire workspace but will only edit files in this project.\n`);
+  console.log(`Refining: ${selectedFile.name}\n`);
+
+  const initialPrompt = `I want to refine ${selectedFile.name}. Please read it first and help me improve it.`;
 
   await agent.run({
     systemPrompt,
-    prompt: "",
+    prompt: initialPrompt,
     startingDirectory: workingDir,
   });
 }
@@ -93,41 +154,27 @@ Focus on making documents clear, complete, and actionable.`;
 export async function cmdRefine(): Promise<void> {
   const workingDir = process.cwd();
 
-  // Check what project files exist
-  const hasPrd = existsSync(join(workingDir, "PRD.md"));
-  const hasPlan = existsSync(join(workingDir, "plan.md"));
-  const hasTasks = existsSync(join(workingDir, "tasks.yaml"));
-  const hasClaudeMd = existsSync(join(workingDir, "CLAUDE.md"));
+  // Ask user which file to refine
+  const selectedFile = await selectFileToRefine(workingDir);
 
-  // Show helpful context about what exists
-  if (!hasPrd && !hasPlan && !hasClaudeMd && !hasTasks) {
+  if (!selectedFile) {
     console.log("No project files found in the current directory.\n");
     console.log("Typical project files:");
     console.log("  PRD.md      - Product Requirements Document");
     console.log("  plan.md     - Implementation plan");
     console.log("  tasks.yaml  - Task definitions");
     console.log("  CLAUDE.md   - Guidelines for Claude\n");
-    console.log("You can:");
-    console.log("  - Run 'bloom create <name>' to create a new project with templates");
-    console.log("  - Continue anyway to create files from scratch\n");
+    console.log("Run 'bloom create <name>' to create a new project with templates.");
+    process.exit(1);
   }
 
-  await runRefineSession(workingDir);
+  await runRefineSession(workingDir, selectedFile);
 
   console.log(`\n---`);
   console.log(`Refine session complete.`);
 
-  // Show contextual next steps
-  if (!hasPlan && hasPrd) {
-    console.log(`\nNext: bloom plan      # Create implementation plan from PRD`);
-  } else if (!hasTasks && hasPlan) {
-    console.log(`\nNext: bloom generate  # Generate tasks.yaml from plan`);
-  } else if (hasTasks) {
-    console.log(`\nNext: bloom run       # Execute tasks`);
-  } else {
-    console.log(`\nNext steps:`);
-    console.log(`  bloom plan          # Create implementation plan`);
-    console.log(`  bloom generate      # Generate tasks.yaml from plan`);
-    console.log(`  bloom run           # Execute tasks`);
+  // Show next step based on selected file
+  if (selectedFile.nextCommand) {
+    console.log(`\nNext: ${selectedFile.nextCommand.padEnd(16)} # ${selectedFile.nextStep}`);
   }
 }
