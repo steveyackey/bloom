@@ -3,13 +3,14 @@
   "private": true,
   "description": "Multi-agent task orchestrator with YAML-based task management",
   "bin": {
-    "bloom": "./bloom.ts"
+    "bloom": "./src/index.ts"
   },
   "scripts": {
-    "bloom": "bun bloom.ts",
-    "start": "bun bloom.ts run",
-    "plan": "bun bloom.ts plan",
-    "dashboard": "bun bloom.ts dashboard"
+    "bloom": "bun src/index.ts",
+    "start": "bun src/index.ts run",
+    "plan": "bun src/index.ts plan",
+    "dashboard": "bun src/index.ts dashboard",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest"
