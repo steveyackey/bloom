@@ -209,6 +209,7 @@ bloom assign <taskid> <agent> # Assign to agent
 bloom note <taskid> <note>   # Add a note
 bloom reset <taskid>         # Reset stuck task
 bloom reset --stuck          # Reset ALL stuck tasks
+bloom update                 # Update bloom to the latest version
 ```
 
 ### Custom Tasks File

@@ -29,6 +29,7 @@ import {
   cmdReset,
   cmdSetStatus,
   cmdShow,
+  cmdUpdate,
   cmdValidate,
   cmdWaitAnswer,
   runAgentWorkLoop,
@@ -376,6 +377,10 @@ export async function main(): Promise<void> {
         console.error(`Unknown interject subcommand: ${args[1]}`);
         process.exit(1);
       }
+      break;
+
+    case "update":
+      await cmdUpdate();
       break;
 
     case "version":

@@ -91,6 +91,7 @@ Interjection Commands:
   interject dismiss <id>    Dismiss an interjection
 
 Other Commands:
+  update                    Update bloom to the latest version
   version                   Show bloom version
   help                      Show this help message
 

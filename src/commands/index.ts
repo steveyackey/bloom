@@ -16,3 +16,4 @@ export * from "./questions";
 export * from "./refine";
 export * from "./repos-cli";
 export * from "./tasks";
+export * from "./update";
