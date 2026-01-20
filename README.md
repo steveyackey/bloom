@@ -1,3 +1,12 @@
+```
+  ██████╗ ██╗      ██████╗  ██████╗ ███╗   ███╗
+  ██╔══██╗██║     ██╔═══██╗██╔═══██╗████╗ ████║
+  ██████╔╝██║     ██║   ██║██║   ██║██╔████╔██║
+  ██╔══██╗██║     ██║   ██║██║   ██║██║╚██╔╝██║
+  ██████╔╝███████╗╚██████╔╝╚██████╔╝██║ ╚═╝ ██║
+  ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚═╝
+```
+
 # Bloom - Multi-Agent Task Orchestrator
 
 A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel.
