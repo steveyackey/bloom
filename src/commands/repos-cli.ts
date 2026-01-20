@@ -2,13 +2,26 @@
 // Repository CLI Command Handlers
 // =============================================================================
 
-import { addWorktree, cloneRepo, listRepos, listWorktrees, removeRepo, removeWorktree, syncRepos } from "../repos";
+import {
+  addWorktree,
+  cloneRepo,
+  createRepo,
+  listRepos,
+  listWorktrees,
+  removeRepo,
+  removeWorktree,
+  syncRepos,
+} from "../repos";
 import { BLOOM_DIR } from "./context";
 
 export async function cmdRepoClone(args: string[]): Promise<void> {
   const url = args[0];
   if (!url) {
-    console.error("Usage: bloom repo clone <url> [--name <name>]");
+    console.error("Usage: bloom repo clone <url|org/repo> [--name <name>]");
+    console.error("\nExamples:");
+    console.error("  bloom repo clone steveyackey/bloom");
+    console.error("  bloom repo clone https://github.com/org/repo");
+    console.error("  bloom repo clone git@github.com:org/repo.git");
     process.exit(1);
   }
   const nameIdx = args.indexOf("--name");
@@ -19,6 +32,35 @@ export async function cmdRepoClone(args: string[]): Promise<void> {
     console.log(`\nSuccessfully cloned ${result.repoName}`);
     console.log(`  Bare repo: ${result.bareRepoPath}`);
     console.log(`  Worktree:  ${result.worktreePath} (${result.defaultBranch})`);
+  } else {
+    console.error(`Failed: ${result.error}`);
+    process.exit(1);
+  }
+}
+
+export async function cmdRepoCreate(args: string[]): Promise<void> {
+  const name = args[0];
+  if (!name) {
+    console.error("Usage: bloom repo create <name>");
+    console.error("\nCreates a new local repository with worktree setup.");
+    process.exit(1);
+  }
+
+  const result = await createRepo(BLOOM_DIR, name);
+  if (result.success) {
+    console.log(`\nSuccessfully created ${result.repoName}`);
+    console.log(`  Bare repo: ${result.bareRepoPath}`);
+    console.log(`  Worktree:  ${result.worktreePath} (${result.defaultBranch})`);
+    console.log(`\nTo push to GitHub with gh CLI:`);
+    console.log(`  cd ${result.worktreePath}`);
+    console.log(`  gh repo create ${result.repoName} --public --source=. --push`);
+    console.log(`  # or for private: gh repo create ${result.repoName} --private --source=. --push`);
+    console.log(`\nOr manually via GitHub UI:`);
+    console.log(`  1. Create a new repository on github.com (without README)`);
+    console.log(`  2. Then run:`);
+    console.log(`     cd ${result.worktreePath}`);
+    console.log(`     git remote add origin <your-repo-url>`);
+    console.log(`     git push -u origin ${result.defaultBranch}`);
   } else {
     console.error(`Failed: ${result.error}`);
     process.exit(1);
@@ -129,6 +171,9 @@ export async function handleRepoCommand(args: string[]): Promise<void> {
     case "clone":
       await cmdRepoClone(args.slice(2));
       break;
+    case "create":
+      await cmdRepoCreate(args.slice(2));
+      break;
     case "list":
       await cmdRepoList();
       break;
@@ -142,7 +187,7 @@ export async function handleRepoCommand(args: string[]): Promise<void> {
       await handleWorktreeCommand(args);
       break;
     default:
-      console.error("Usage: bloom repo <clone|list|sync|remove|worktree> ...");
+      console.error("Usage: bloom repo <clone|create|list|sync|remove|worktree> ...");
       process.exit(1);
   }
 }

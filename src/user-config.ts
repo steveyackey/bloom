@@ -73,6 +73,31 @@ export async function setGitProtocol(protocol: "ssh" | "https"): Promise<void> {
 // Git URL Conversion
 // =============================================================================
 
+/**
+ * Expands shorthand repo format (org/repo) to a full URL.
+ * Returns the original URL if it's already a full URL.
+ */
+export function expandRepoUrl(input: string, protocol: "ssh" | "https", host = "github.com"): string {
+  // Already a full URL (SSH or HTTPS)
+  if (input.startsWith("git@") || input.startsWith("https://") || input.startsWith("http://")) {
+    return input;
+  }
+
+  // Check for org/repo format (e.g., "steveyackey/bloom")
+  const shortMatch = input.match(/^([^/\s]+)\/([^/\s]+)$/);
+  if (shortMatch?.[1] && shortMatch[2]) {
+    const owner = shortMatch[1];
+    const repo = shortMatch[2].replace(/\.git$/, "");
+    if (protocol === "ssh") {
+      return `git@${host}:${owner}/${repo}.git`;
+    }
+    return `https://${host}/${owner}/${repo}.git`;
+  }
+
+  // Return as-is if we can't parse it
+  return input;
+}
+
 export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string {
   // Extract owner/repo from various URL formats
   let owner: string | null = null;

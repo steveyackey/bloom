@@ -125,10 +125,19 @@ bloom setup                  # Sync repos according to config
 ### Repository Management
 
 ```bash
-bloom repo clone <url>       # Add a repo to the workspace (bare + worktree)
-bloom repo list              # List repos in the workspace
-bloom repo sync              # Clone/fetch all repos from bloom.repos.yaml
-bloom repo remove <name>     # Remove a repo and its worktrees
+bloom repo clone <url|org/repo>  # Clone a repo (supports org/repo shorthand)
+bloom repo create <name>         # Create a new local repo with worktree setup
+bloom repo list                  # List repos in the workspace
+bloom repo sync                  # Clone/fetch all repos from bloom.repos.yaml
+bloom repo remove <name>         # Remove a repo and its worktrees
+```
+
+Examples:
+```bash
+bloom repo clone steveyackey/bloom           # Shorthand for GitHub
+bloom repo clone https://github.com/org/repo # Full HTTPS URL
+bloom repo clone git@github.com:org/repo.git # Full SSH URL
+bloom repo create my-new-project             # Create new local repo
 ```
 
 ### Project Management
