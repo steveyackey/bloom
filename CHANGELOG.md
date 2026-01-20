@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.10](https://github.com/steveyackey/bloom/compare/bloom-v0.1.9...bloom-v0.1.10) (2026-01-20)
+
+
+### Bug Fixes
+
+* **prompts:** embed prompts for bundled binary support ([e6669e1](https://github.com/steveyackey/bloom/commit/e6669e1fc8f6c2787c4ce539f2b5deb8cc756811))
+* **repos:** add fallback for git worktree without --orphan support ([ba0f74c](https://github.com/steveyackey/bloom/commit/ba0f74c7b6eb12eddf122c9fee4c69e2ee8050ba))
+
 ## [0.1.9](https://github.com/steveyackey/bloom/compare/bloom-v0.1.8...bloom-v0.1.9) (2026-01-20)
 
 
