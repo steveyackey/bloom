@@ -14,6 +14,7 @@ Options:
   -q, --quiet               Only show errors
 
 Setup Commands:
+  create <name>             Create new project with PRD template
   init                      Initialize workspace (creates repos/, config files)
 
 Repository Commands:
@@ -33,8 +34,11 @@ Orchestrator Commands:
   run                       Start the orchestrator TUI
   setup                     Setup repos according to config
 
+Planning Commands:
+  plan                      Create implementation plan (plan.md) with Claude
+  generate                  Generate tasks.yaml from plan.md
+
 Task Commands:
-  plan                      Interactive planning session with Claude
   dashboard                 Live dashboard view (refreshes every 10s)
   list [status]             List all tasks or filter by status
   show <taskid>             Show task details
@@ -78,12 +82,11 @@ Other Commands:
   help                      Show this help message
 
 Examples:
-  bloom init                        Initialize a new workspace
-  bloom repo clone https://github.com/org/repo   Clone a repository
-  bloom repo list                   List configured repos
-  bloom repo sync                   Clone/update all repos
-  bloom plan                        Create task breakdown with Claude
+  bloom create my-app               Create new project with PRD template
+  cd my-app && bloom plan           Create implementation plan
+  bloom generate                    Generate tasks.yaml from plan
   bloom run                         Start TUI with all agents
+  bloom repo clone https://github.com/org/repo   Clone a repository
   bloom -f project.yaml run         Use custom tasks file
   bloom list in_progress            Show in-progress tasks
   bloom done my-task-id             Mark task complete

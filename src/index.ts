@@ -11,7 +11,9 @@ import {
   cmdAsk,
   cmdAssign,
   cmdClearAnswered,
+  cmdCreate,
   cmdDashboard,
+  cmdGenerate,
   cmdInit,
   cmdInterjectDismiss,
   cmdInterjections,
@@ -19,6 +21,7 @@ import {
   cmdList,
   cmdNext,
   cmdNote,
+  cmdPlan,
   cmdQuestions,
   cmdQuestionsDashboard,
   cmdReset,
@@ -26,7 +29,6 @@ import {
   cmdShow,
   cmdValidate,
   cmdWaitAnswer,
-  getTasksFile,
   runAgentWorkLoop,
   setTasksFile,
   startOrchestrator,
@@ -36,7 +38,6 @@ import { printUsage } from "./commands/help";
 import { handleRepoCommand } from "./commands/repos-cli";
 import type { QuestionType } from "./human-queue";
 import { type LogLevel, setLogLevel } from "./logger";
-import { runPlanningSession } from "./plan-session";
 import { listRepos, syncRepos } from "./repos";
 import type { TaskStatus } from "./task-schema";
 import { VERSION } from "./version";
@@ -159,6 +160,10 @@ export async function main(): Promise<void> {
       await cmdInit();
       break;
 
+    case "create":
+      await cmdCreate(args[1] || "");
+      break;
+
     case "run":
       await startOrchestrator();
       break;
@@ -196,7 +201,11 @@ export async function main(): Promise<void> {
       break;
 
     case "plan":
-      await runPlanningSession(getTasksFile());
+      await cmdPlan();
+      break;
+
+    case "generate":
+      await cmdGenerate();
       break;
 
     case "dashboard":

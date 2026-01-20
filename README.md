@@ -21,18 +21,34 @@ iwr -useb https://raw.githubusercontent.com/steveyackey/bloom/main/install.ps1 |
 ## Quick Start
 
 ```bash
-# Create a new project
-mkdir my-project && cd my-project
-git init
+# Create a new project (creates folder, PRD template, CLAUDE.md, launches Claude)
+bloom create my-project
+cd my-project
 
-# Initialize bloom workspace (creates bloom.config.yaml, repos/, tasks.yaml)
-bloom init
-
-# Add context to your project (research, designs, notes)
-# Then plan your tasks with Claude
+# Create implementation plan (generates plan.md)
 bloom plan
 
+# Generate tasks from plan (generates tasks.yaml)
+bloom generate
+
 # Start the orchestrator
+bloom run
+```
+
+### Alternative: Existing Project
+
+```bash
+# For existing projects, initialize workspace
+cd existing-project
+bloom init
+
+# Add repos to work on
+bloom repo clone https://github.com/org/backend
+bloom repo clone https://github.com/org/frontend
+
+# Create plan and generate tasks
+bloom plan
+bloom generate
 bloom run
 ```
 
@@ -41,30 +57,32 @@ bloom run
 Bloom works inside a git repository. Each project gets its own repo with bloom files at the root:
 
 ```
-my-project/                 # Your git repo
-├── bloom.config.yaml       # Created by bloom init (marks this as a bloom project)
-├── tasks.yaml              # Created by bloom plan
-├── repos/                  # Created by bloom init (cloned repos for tasks)
+my-project/                 # Created by bloom create
+├── PRD.md                  # Product Requirements Document (from template)
+├── CLAUDE.md               # Project guidelines for Claude (from template)
+├── plan.md                 # Implementation plan (created by bloom plan)
+├── tasks.yaml              # Task definitions (created by bloom generate)
+├── bloom.config.yaml       # Bloom config (created by bloom init)
+├── repos/                  # Cloned repos for tasks
 ├── research/               # Your notes, research, context
-├── designs/                # Mockups, architecture diagrams
-└── reference/              # Example code, docs
+└── designs/                # Mockups, architecture diagrams
 ```
 
-**Before running `bloom plan`:**
+**Workflow:**
 
-1. Create a git repo for your project (`git init` + set up remote)
-2. Run `bloom init` to set up the workspace
-3. Add context - research notes, design docs, reference materials
-4. Run `bloom plan` so Claude has full context when creating tasks
+1. `bloom create my-project` - Creates project with PRD template, launches Claude to help define requirements
+2. `bloom plan` - Claude reads context (PRD, repos config) and creates plan.md
+3. `bloom generate` - Claude converts plan.md into executable tasks.yaml
+4. `bloom run` - Start the orchestrator to execute tasks
 
 The more context you provide upfront, the better your task breakdown will be.
 
 ## Workflow
 
 ```
-1. INIT      bloom init                # Create bloom.config.yaml, repos/, tasks.yaml
-2. CONTEXT   Add research, designs     # Give Claude context for planning
-3. PLAN      bloom plan                # Break down your project into tasks
+1. CREATE    bloom create <name>       # Create project with PRD template
+2. PLAN      bloom plan                # Create implementation plan (plan.md)
+3. GENERATE  bloom generate            # Generate tasks.yaml from plan
 4. VALIDATE  bloom validate            # Check for issues
 5. RUN       bloom run                 # Start agents
 6. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
@@ -76,6 +94,7 @@ The more context you provide upfront, the better your task breakdown will be.
 ### Setup
 
 ```bash
+bloom create <name>          # Create new project with PRD template and CLAUDE.md
 bloom init                   # Initialize workspace (bloom.config.yaml, repos/, tasks.yaml)
 bloom setup                  # Sync repos according to config
 ```
@@ -105,10 +124,16 @@ bloom config set-protocol <ssh|https>  # Set git URL preference
 bloom run                    # Start TUI with all agents
 ```
 
-### Planning & Monitoring
+### Planning
 
 ```bash
-bloom plan                   # Interactive planning session with Claude
+bloom plan                   # Create implementation plan (plan.md) with Claude
+bloom generate               # Generate tasks.yaml from plan.md
+```
+
+### Monitoring
+
+```bash
 bloom dashboard              # Live task view (refreshes every 10s)
 bloom list                   # List all tasks by phase
 bloom list in_progress       # Filter by status
