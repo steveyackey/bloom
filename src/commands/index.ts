@@ -4,10 +4,13 @@
 
 export * from "./config-cli";
 export * from "./context";
+export * from "./create";
+export * from "./generate";
 export * from "./help";
 export * from "./init";
 export * from "./interjections";
 export * from "./orchestrator";
+export * from "./plan-command";
 export * from "./questions";
 export * from "./repos-cli";
 export * from "./tasks";

@@ -33,7 +33,7 @@ export async function loadPrompt(name: string, variables: PromptVariables = {}):
 }
 
 /**
- * Load the planning system prompt
+ * Load the planning system prompt (legacy - for direct task generation)
  */
 export async function loadPlanningPrompt(tasksFile: string): Promise<string> {
   return loadPrompt("planning", { TASKS_FILE: tasksFile });
@@ -47,5 +47,34 @@ export async function loadAgentPrompt(agentName: string, taskId: string, taskCli
     AGENT_NAME: agentName,
     TASK_ID: taskId,
     TASK_CLI: taskCli,
+  });
+}
+
+/**
+ * Load the create project prompt
+ */
+export async function loadCreatePrompt(projectDir: string): Promise<string> {
+  return loadPrompt("create", { PROJECT_DIR: projectDir });
+}
+
+/**
+ * Load the plan generation prompt
+ */
+export async function loadPlanPrompt(workingDir: string, planFile: string, reposContext: string): Promise<string> {
+  return loadPrompt("plan", {
+    WORKING_DIR: workingDir,
+    PLAN_FILE: planFile,
+    REPOS_CONTEXT: reposContext,
+  });
+}
+
+/**
+ * Load the task generation prompt
+ */
+export async function loadGeneratePrompt(workingDir: string, tasksFile: string, reposContext: string): Promise<string> {
+  return loadPrompt("generate", {
+    WORKING_DIR: workingDir,
+    TASKS_FILE: tasksFile,
+    REPOS_CONTEXT: reposContext,
   });
 }
