@@ -81,7 +81,7 @@ export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string 
 
   // SSH format: git@github.com:owner/repo.git
   const sshMatch = url.match(/^git@([^:]+):([^/]+)\/(.+?)(?:\.git)?$/);
-  if (sshMatch && sshMatch[1] && sshMatch[2] && sshMatch[3]) {
+  if (sshMatch?.[1] && sshMatch[2] && sshMatch[3]) {
     host = sshMatch[1];
     owner = sshMatch[2];
     repo = sshMatch[3];
@@ -89,7 +89,7 @@ export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string 
 
   // HTTPS format: https://github.com/owner/repo.git
   const httpsMatch = url.match(/^https?:\/\/([^/]+)\/([^/]+)\/(.+?)(?:\.git)?$/);
-  if (httpsMatch && httpsMatch[1] && httpsMatch[2] && httpsMatch[3]) {
+  if (httpsMatch?.[1] && httpsMatch[2] && httpsMatch[3]) {
     host = httpsMatch[1];
     owner = httpsMatch[2];
     repo = httpsMatch[3];
@@ -113,7 +113,7 @@ export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string 
 export function extractRepoName(url: string): string {
   // Extract repo name from URL
   const match = url.match(/\/([^/]+?)(?:\.git)?$/);
-  if (match && match[1]) {
+  if (match?.[1]) {
     return match[1].replace(/\.git$/, "");
   }
   // Fallback: use last segment
@@ -124,7 +124,7 @@ export function extractRepoName(url: string): string {
 export function extractRepoInfo(url: string): { host: string; owner: string; repo: string } | null {
   // SSH format
   const sshMatch = url.match(/^git@([^:]+):([^/]+)\/(.+?)(?:\.git)?$/);
-  if (sshMatch && sshMatch[1] && sshMatch[2] && sshMatch[3]) {
+  if (sshMatch?.[1] && sshMatch[2] && sshMatch[3]) {
     return {
       host: sshMatch[1],
       owner: sshMatch[2],
@@ -134,7 +134,7 @@ export function extractRepoInfo(url: string): { host: string; owner: string; rep
 
   // HTTPS format
   const httpsMatch = url.match(/^https?:\/\/([^/]+)\/([^/]+)\/(.+?)(?:\.git)?$/);
-  if (httpsMatch && httpsMatch[1] && httpsMatch[2] && httpsMatch[3]) {
+  if (httpsMatch?.[1] && httpsMatch[2] && httpsMatch[3]) {
     return {
       host: httpsMatch[1],
       owner: httpsMatch[2],

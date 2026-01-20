@@ -106,7 +106,7 @@ function getDefaultBranch(bareRepoPath: string): string {
   if (result.success) {
     // Returns something like "refs/heads/main"
     const match = result.output.trim().match(/refs\/heads\/(.+)/);
-    if (match && match[1]) return match[1];
+    if (match?.[1]) return match[1];
   }
   return "main"; // fallback
 }

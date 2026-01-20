@@ -19,14 +19,15 @@
     "rules": {
       "recommended": true,
       "complexity": {
-        "noForEach": "off"
+        "noForEach": "off",
+        "useOptionalChain": "error"
       },
       "style": {
         "noNonNullAssertion": "off",
         "useNodejsImportProtocol": "error"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
+        "noExplicitAny": "error",
         "noConsole": "off"
       }
     }
