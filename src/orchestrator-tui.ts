@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
 import { interjectSession } from "./agents";
