@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.12](https://github.com/steveyackey/bloom/compare/bloom-v0.1.11...bloom-v0.1.12) (2026-01-20)
+
+
+### Bug Fixes
+
+* **commands:** add file selection to refine and proactive prompts to all commands ([18427c4](https://github.com/steveyackey/bloom/commit/18427c4761d037004ed0e5ce60e8d178eb2a1e70))
+
+
+### Documentation
+
+* add refine and enter command documentation ([752d826](https://github.com/steveyackey/bloom/commit/752d826857ec57f43bd89480663cad81e437a05b))
+* document .gitignore generation in init command ([ff890fc](https://github.com/steveyackey/bloom/commit/ff890fc924fbf4ecea58b3c0ab89403b111f6a12))
+
 ## [0.1.11](https://github.com/steveyackey/bloom/compare/bloom-v0.1.10...bloom-v0.1.11) (2026-01-20)
 
 
