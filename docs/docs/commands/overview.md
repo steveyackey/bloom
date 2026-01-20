@@ -142,8 +142,10 @@ See individual command pages for detailed usage:
 - [init](/commands/init) — Workspace initialization
 - [repo](/commands/repo) — Repository management
 - [create](/commands/create) — Project creation
+- [refine](/commands/refine) — Interactive document refinement
 - [plan](/commands/plan) — Plan generation
 - [generate](/commands/generate) — Task generation
 - [run](/commands/run) — Agent orchestration
+- [enter](/commands/enter) — Open-ended Claude sessions
 - [Task Management](/commands/task-management) — Status and operations
 - [Questions](/commands/questions) — Human queue management
