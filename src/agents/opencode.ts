@@ -37,9 +37,7 @@ export class OpenCodeAgentProvider implements Agent {
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
-    return this.interactive
-      ? this.runInteractive(options)
-      : this.runNonInteractive(options);
+    return this.interactive ? this.runInteractive(options) : this.runNonInteractive(options);
   }
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {

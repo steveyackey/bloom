@@ -2,7 +2,7 @@
 // Centralized ANSI Color Codes for Bloom
 // =============================================================================
 
-const ESC = '\x1b';
+const ESC = "\x1b";
 export const CSI = `${ESC}[`;
 
 // =============================================================================
@@ -40,7 +40,7 @@ export const ansi = {
 // Color Mode Constants (for xterm cell parsing)
 // =============================================================================
 
-export const enum ColorMode {
+export enum ColorMode {
   DEFAULT = 0,
   PALETTE_16 = 16,
   PALETTE_256 = 256,
@@ -84,11 +84,11 @@ export const semantic = {
 
   // Border states (color codes for CSI)
   border: {
-    default: '90',
-    error: '31',
-    focused: '32',
-    selected: '33',
-    running: '36',
+    default: "90",
+    error: "31",
+    focused: "32",
+    selected: "33",
+    running: "36",
   },
 
   // Agent output
@@ -119,7 +119,7 @@ export function cellFgToAnsi(cell: { getFgColorMode(): number; getFgColor(): num
   const mode = cell.getFgColorMode();
   const color = cell.getFgColor();
 
-  if (mode === ColorMode.DEFAULT) return '';
+  if (mode === ColorMode.DEFAULT) return "";
   if (mode === ColorMode.PALETTE_16) {
     return color < 8 ? `${CSI}${30 + color}m` : `${CSI}${90 + (color - 8)}m`;
   }
@@ -127,14 +127,14 @@ export function cellFgToAnsi(cell: { getFgColorMode(): number; getFgColor(): num
   if (mode >= ColorMode.RGB) {
     return ansi.fgRgb((color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
   }
-  return '';
+  return "";
 }
 
 export function cellBgToAnsi(cell: { getBgColorMode(): number; getBgColor(): number }): string {
   const mode = cell.getBgColorMode();
   const color = cell.getBgColor();
 
-  if (mode === ColorMode.DEFAULT) return '';
+  if (mode === ColorMode.DEFAULT) return "";
   if (mode === ColorMode.PALETTE_16) {
     return color < 8 ? `${CSI}${40 + color}m` : `${CSI}${100 + (color - 8)}m`;
   }
@@ -142,7 +142,7 @@ export function cellBgToAnsi(cell: { getBgColorMode(): number; getBgColor(): num
   if (mode >= ColorMode.RGB) {
     return ansi.bgRgb((color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
   }
-  return '';
+  return "";
 }
 
 // =============================================================================

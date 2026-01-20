@@ -3,16 +3,11 @@
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, readdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import * as YAML from "yaml";
 import { z } from "zod";
-import {
-  loadUserConfig,
-  normalizeGitUrl,
-  extractRepoName,
-  extractRepoInfo,
-} from "./user-config";
+import { extractRepoName, loadUserConfig, normalizeGitUrl } from "./user-config";
 
 // =============================================================================
 // Schema for bloom.repos.yaml (project-level)
@@ -20,9 +15,9 @@ import {
 
 const RepoEntrySchema = z.object({
   name: z.string(),
-  url: z.string(),                    // Normalized URL (based on user's protocol preference)
+  url: z.string(), // Normalized URL (based on user's protocol preference)
   defaultBranch: z.string().default("main"),
-  addedAt: z.string(),                // ISO timestamp
+  addedAt: z.string(), // ISO timestamp
 });
 
 const ReposFileSchema = z.object({
@@ -85,11 +80,7 @@ export async function saveReposFile(bloomDir: string, data: ReposFile): Promise<
 
 export async function findRepo(bloomDir: string, nameOrUrl: string): Promise<RepoEntry | undefined> {
   const reposFile = await loadReposFile(bloomDir);
-  return reposFile.repos.find(r =>
-    r.name === nameOrUrl ||
-    r.url === nameOrUrl ||
-    r.url.includes(nameOrUrl)
-  );
+  return reposFile.repos.find((r) => r.name === nameOrUrl || r.url === nameOrUrl || r.url.includes(nameOrUrl));
 }
 
 // =============================================================================
@@ -115,7 +106,7 @@ function getDefaultBranch(bareRepoPath: string): string {
   if (result.success) {
     // Returns something like "refs/heads/main"
     const match = result.output.trim().match(/refs\/heads\/(.+)/);
-    if (match) return match[1];
+    if (match && match[1]) return match[1];
   }
   return "main"; // fallback
 }
@@ -133,11 +124,7 @@ export interface CloneResult {
   error?: string;
 }
 
-export async function cloneRepo(
-  bloomDir: string,
-  url: string,
-  options?: { name?: string }
-): Promise<CloneResult> {
+export async function cloneRepo(bloomDir: string, url: string, options?: { name?: string }): Promise<CloneResult> {
   const userConfig = await loadUserConfig();
   const normalizedUrl = normalizeGitUrl(url, userConfig.gitProtocol);
   const repoName = options?.name || extractRepoName(url);
@@ -196,10 +183,7 @@ export async function cloneRepo(
   const worktreePath = getWorktreePath(bloomDir, repoName, defaultBranch);
   console.log(`Creating worktree for '${defaultBranch}' branch...`);
 
-  const worktreeResult = runGit(
-    ["worktree", "add", worktreePath, defaultBranch],
-    bareRepoPath
-  );
+  const worktreeResult = runGit(["worktree", "add", worktreePath, defaultBranch], bareRepoPath);
 
   if (!worktreeResult.success) {
     // Try with origin/branch if local branch doesn't exist
@@ -291,7 +275,7 @@ export async function syncRepos(bloomDir: string): Promise<SyncResult> {
 
 export async function removeRepo(bloomDir: string, repoName: string): Promise<{ success: boolean; error?: string }> {
   const reposFile = await loadReposFile(bloomDir);
-  const repoIndex = reposFile.repos.findIndex(r => r.name === repoName);
+  const repoIndex = reposFile.repos.findIndex((r) => r.name === repoName);
 
   if (repoIndex === -1) {
     return { success: false, error: `Repository '${repoName}' not found in config` };
@@ -343,7 +327,7 @@ export async function listRepos(bloomDir: string): Promise<RepoInfo[]> {
     let worktrees: string[] = [];
     if (exists && existsSync(worktreesDir)) {
       try {
-        worktrees = readdirSync(worktreesDir).filter(f => {
+        worktrees = readdirSync(worktreesDir).filter((f) => {
           const fullPath = join(worktreesDir, f);
           return existsSync(join(fullPath, ".git"));
         });
@@ -385,7 +369,7 @@ export async function addWorktree(
     return { success: false, path: worktreePath, error: `Worktree for branch '${branch}' already exists` };
   }
 
-  let result;
+  let result: { success: boolean; output: string; error: string };
   if (options?.create) {
     // Create new branch and worktree
     result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
@@ -464,5 +448,5 @@ export async function listWorktrees(
   if (current) worktrees.push(current);
 
   // Filter out the bare repo itself
-  return worktrees.filter(w => w.branch !== "");
+  return worktrees.filter((w) => w.branch !== "");
 }

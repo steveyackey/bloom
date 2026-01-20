@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import * as YAML from "yaml";
 import { z } from "zod";
 
@@ -81,7 +81,7 @@ export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string 
 
   // SSH format: git@github.com:owner/repo.git
   const sshMatch = url.match(/^git@([^:]+):([^/]+)\/(.+?)(?:\.git)?$/);
-  if (sshMatch) {
+  if (sshMatch && sshMatch[1] && sshMatch[2] && sshMatch[3]) {
     host = sshMatch[1];
     owner = sshMatch[2];
     repo = sshMatch[3];
@@ -89,7 +89,7 @@ export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string 
 
   // HTTPS format: https://github.com/owner/repo.git
   const httpsMatch = url.match(/^https?:\/\/([^/]+)\/([^/]+)\/(.+?)(?:\.git)?$/);
-  if (httpsMatch) {
+  if (httpsMatch && httpsMatch[1] && httpsMatch[2] && httpsMatch[3]) {
     host = httpsMatch[1];
     owner = httpsMatch[2];
     repo = httpsMatch[3];
@@ -113,17 +113,18 @@ export function normalizeGitUrl(url: string, protocol: "ssh" | "https"): string 
 export function extractRepoName(url: string): string {
   // Extract repo name from URL
   const match = url.match(/\/([^/]+?)(?:\.git)?$/);
-  if (match) {
+  if (match && match[1]) {
     return match[1].replace(/\.git$/, "");
   }
   // Fallback: use last segment
-  return url.split("/").pop()?.replace(/\.git$/, "") || "repo";
+  const lastSegment = url.split("/").pop();
+  return lastSegment?.replace(/\.git$/, "") || "repo";
 }
 
 export function extractRepoInfo(url: string): { host: string; owner: string; repo: string } | null {
   // SSH format
   const sshMatch = url.match(/^git@([^:]+):([^/]+)\/(.+?)(?:\.git)?$/);
-  if (sshMatch) {
+  if (sshMatch && sshMatch[1] && sshMatch[2] && sshMatch[3]) {
     return {
       host: sshMatch[1],
       owner: sshMatch[2],
@@ -133,7 +134,7 @@ export function extractRepoInfo(url: string): { host: string; owner: string; rep
 
   // HTTPS format
   const httpsMatch = url.match(/^https?:\/\/([^/]+)\/([^/]+)\/(.+?)(?:\.git)?$/);
-  if (httpsMatch) {
+  if (httpsMatch && httpsMatch[1] && httpsMatch[2] && httpsMatch[3]) {
     return {
       host: httpsMatch[1],
       owner: httpsMatch[2],

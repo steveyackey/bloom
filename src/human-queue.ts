@@ -2,7 +2,7 @@
 // Human Question Queue - File-based queue for agent-human interaction
 // =============================================================================
 
-import { existsSync, mkdirSync, readdirSync, unlinkSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, type FSWatcher, mkdirSync, readdirSync, unlinkSync, watch } from "node:fs";
 import { join, resolve } from "node:path";
 import { createLogger } from "./logger";
 
@@ -56,7 +56,21 @@ const BLOOM_DIR = resolve(import.meta.dirname ?? ".");
 const QUEUE_DIR = join(BLOOM_DIR, ".questions");
 const INTERJECT_DIR = join(BLOOM_DIR, ".interjections");
 
-const YES_ANSWERS = new Set(["yes", "y", "yeah", "yep", "sure", "ok", "okay", "approve", "approved", "confirm", "confirmed", "true", "1"]);
+const YES_ANSWERS = new Set([
+  "yes",
+  "y",
+  "yeah",
+  "yep",
+  "sure",
+  "ok",
+  "okay",
+  "approve",
+  "approved",
+  "confirm",
+  "confirmed",
+  "true",
+  "1",
+]);
 const NO_ANSWERS = new Set(["no", "n", "nope", "nah", "reject", "rejected", "deny", "denied", "false", "0"]);
 
 function ensureDir(dir: string): void {
@@ -78,14 +92,16 @@ async function writeJson(path: string, data: unknown): Promise<void> {
 
 async function listJsonFiles<T>(dir: string, filter?: (item: T) => boolean): Promise<T[]> {
   ensureDir(dir);
-  const files = readdirSync(dir).filter(f => f.endsWith(".json"));
+  const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
   const items: T[] = [];
 
   for (const file of files) {
     try {
       const item = await readJson<T>(join(dir, file));
       if (item && (!filter || filter(item))) items.push(item);
-    } catch { /* skip invalid files */ }
+    } catch {
+      /* skip invalid files */
+    }
   }
 
   return items;
@@ -103,15 +119,15 @@ function detectQuestionType(question: string, hasChoices: boolean): QuestionType
   if (hasChoices) return "choice";
 
   const lower = question.toLowerCase();
-  const isYesNo = lower.includes("yes or no") ||
+  const isYesNo =
+    lower.includes("yes or no") ||
     lower.includes("yes/no") ||
-    (lower.endsWith("?") && (
-      lower.includes("should i") ||
-      lower.includes("do you want") ||
-      lower.includes("is this") ||
-      lower.includes("can i") ||
-      lower.includes("ready to")
-    ));
+    (lower.endsWith("?") &&
+      (lower.includes("should i") ||
+        lower.includes("do you want") ||
+        lower.includes("is this") ||
+        lower.includes("can i") ||
+        lower.includes("ready to")));
 
   return isYesNo ? "yes_no" : "open";
 }
@@ -171,10 +187,7 @@ export async function getQuestion(id: string): Promise<Question | null> {
 }
 
 export async function listQuestions(status?: "pending" | "answered"): Promise<Question[]> {
-  const questions = await listJsonFiles<Question>(
-    QUEUE_DIR,
-    status ? q => q.status === status : undefined
-  );
+  const questions = await listJsonFiles<Question>(QUEUE_DIR, status ? (q) => q.status === status : undefined);
   return questions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
@@ -228,7 +241,11 @@ export function watchQueue(handler: QueueEventHandler): () => void {
         : { type: "question_deleted", questionId };
 
       for (const h of eventHandlers) {
-        try { h(event); } catch (err) { logger.error("Error in queue event handler:", err); }
+        try {
+          h(event);
+        } catch (err) {
+          logger.error("Error in queue event handler:", err);
+        }
       }
     });
   }
@@ -311,7 +328,7 @@ export async function getInterjection(id: string): Promise<Interjection | null> 
 export async function listInterjections(status?: "pending" | "resumed" | "dismissed"): Promise<Interjection[]> {
   const interjections = await listJsonFiles<Interjection>(
     INTERJECT_DIR,
-    status ? i => i.status === status : undefined
+    status ? (i) => i.status === status : undefined
   );
   return interjections.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }

@@ -2,8 +2,8 @@
 // Prompt Loading from Markdown Files
 // =============================================================================
 
-import { join, resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 const PROMPTS_DIR = resolve(import.meta.dirname ?? ".", "..", "prompts");
 
@@ -42,11 +42,7 @@ export async function loadPlanningPrompt(tasksFile: string): Promise<string> {
 /**
  * Load the agent system prompt
  */
-export async function loadAgentPrompt(
-  agentName: string,
-  taskId: string,
-  taskCli: string
-): Promise<string> {
+export async function loadAgentPrompt(agentName: string, taskId: string, taskCli: string): Promise<string> {
   return loadPrompt("agent-system", {
     AGENT_NAME: agentName,
     TASK_ID: taskId,

@@ -1,22 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { existsSync, rmSync, mkdirSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import {
-  loadUserConfig,
-  saveUserConfig,
-  normalizeGitUrl,
-  extractRepoName,
-  extractRepoInfo,
-} from "../src/user-config";
-import {
-  loadReposFile,
-  saveReposFile,
-  cloneRepo,
-  removeRepo,
-  listRepos,
-  getReposFilePath,
-} from "../src/repos";
+import { listRepos, loadReposFile, removeRepo, saveReposFile } from "../src/repos";
+import { extractRepoInfo, extractRepoName, normalizeGitUrl } from "../src/user-config";
 
 const TEST_DIR = join(import.meta.dirname, ".test-config");
 
@@ -120,7 +106,7 @@ describe("Project Repos (bloom.repos.yaml)", () => {
 
       const loaded = await loadReposFile(TEST_DIR);
       expect(loaded.repos).toHaveLength(1);
-      expect(loaded.repos[0].name).toBe("test-repo");
+      expect(loaded.repos[0]!.name).toBe("test-repo");
     });
   });
 
@@ -144,8 +130,8 @@ describe("Project Repos (bloom.repos.yaml)", () => {
 
       const repos = await listRepos(TEST_DIR);
       expect(repos).toHaveLength(1);
-      expect(repos[0].name).toBe("missing-repo");
-      expect(repos[0].exists).toBe(false); // bare repo doesn't exist
+      expect(repos[0]!.name).toBe("missing-repo");
+      expect(repos[0]!.exists).toBe(false); // bare repo doesn't exist
     });
   });
 

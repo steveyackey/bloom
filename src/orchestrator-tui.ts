@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
-import { Terminal } from '@xterm/headless';
-import { resolve, join } from 'node:path';
-import YAML from 'yaml';
-import { validateTasksFile, type Task, type TasksFile } from './task-schema';
-import { interjectSession } from './agents';
-import { createInterjection } from './human-queue';
-import { ansi, CSI, semantic, cellFgToAnsi, cellBgToAnsi, getBorderColor } from './colors';
+import { join, resolve } from "node:path";
+import { Terminal } from "@xterm/headless";
+import YAML from "yaml";
+import { interjectSession } from "./agents";
+import { ansi, CSI, cellBgToAnsi, cellFgToAnsi, getBorderColor, semantic } from "./colors";
+import { createInterjection } from "./human-queue";
+import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 
 // =============================================================================
 // Types
@@ -23,10 +23,10 @@ interface Pane {
   proc: ReturnType<typeof Bun.spawn> | null;
   config: AgentConfig;
   term: Terminal;
-  status: 'running' | 'stopped' | 'error';
+  status: "running" | "stopped" | "error";
 }
 
-type ViewMode = 'tiled' | 'single';
+type ViewMode = "tiled" | "single";
 
 // =============================================================================
 // Orchestrator TUI
@@ -36,7 +36,7 @@ export class OrchestratorTUI {
   private panes: Pane[] = [];
   private selectedIndex = 0;
   private focusedIndex: number | null = null;
-  private viewMode: ViewMode = 'tiled';
+  private viewMode: ViewMode = "tiled";
   private nextId = 1;
   private cols: number;
   private rows: number;
@@ -58,9 +58,9 @@ export class OrchestratorTUI {
       process.stdin.setRawMode(true);
     }
     process.stdin.resume();
-    process.stdin.on('data', this.handleInput.bind(this));
+    process.stdin.on("data", this.handleInput.bind(this));
 
-    process.on('SIGWINCH', () => {
+    process.on("SIGWINCH", () => {
       this.cols = process.stdout.columns || 80;
       this.rows = process.stdout.rows || 24;
       this.resizeAllPanes();
@@ -72,8 +72,8 @@ export class OrchestratorTUI {
       process.exit(0);
     };
 
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
 
     // Auto-create panes for configured agents
     for (const config of this.agentConfigs) {
@@ -84,7 +84,7 @@ export class OrchestratorTUI {
   }
 
   private cleanup() {
-    this.panes.forEach(p => {
+    this.panes.forEach((p) => {
       try {
         p.proc?.kill();
         p.term.dispose();
@@ -97,7 +97,7 @@ export class OrchestratorTUI {
     const str = data.toString();
 
     // Ctrl+B to exit focus
-    if (str === '\x02') {
+    if (str === "\x02") {
       if (this.focusedIndex !== null) {
         this.focusedIndex = null;
         this.scheduleRender();
@@ -113,80 +113,80 @@ export class OrchestratorTUI {
     }
 
     // Ctrl+C when not focused - exit app
-    if (str === '\x03') {
+    if (str === "\x03") {
       this.cleanup();
       process.exit(0);
     }
 
     // Navigation mode
     switch (str) {
-      case 'n':
+      case "n":
         // Create a new agent pane (prompts would be needed, for now create floating)
         this.createPane({
           name: `agent-${this.nextId}`,
-          command: ['claude'],
+          command: ["claude"],
           cwd: process.cwd(),
         });
         break;
-      case 'r':
+      case "r":
         // Restart selected pane
         this.restartPane(this.selectedIndex);
         break;
-      case 'x':
-      case 'd':
+      case "x":
+      case "d":
         // Kill selected pane (don't remove, just stop)
         this.killPane(this.selectedIndex);
         break;
-      case 'X':
-      case 'D':
+      case "X":
+      case "D":
         // Delete pane entirely
         this.deletePane(this.selectedIndex);
         break;
-      case 'v':
-        this.viewMode = this.viewMode === 'tiled' ? 'single' : 'tiled';
+      case "v":
+        this.viewMode = this.viewMode === "tiled" ? "single" : "tiled";
         this.resizeAllPanes();
         this.scheduleRender();
         break;
-      case 'q':
+      case "q":
         this.cleanup();
         process.exit(0);
         break;
-      case 'h':
-      case '\x1b[D':
-        this.navigate('h');
+      case "h":
+      case "\x1b[D":
+        this.navigate("h");
         break;
-      case 'j':
-      case '\x1b[B':
-        this.navigate('j');
+      case "j":
+      case "\x1b[B":
+        this.navigate("j");
         break;
-      case 'k':
-      case '\x1b[A':
-        this.navigate('k');
+      case "k":
+      case "\x1b[A":
+        this.navigate("k");
         break;
-      case 'l':
-      case '\x1b[C':
-        this.navigate('l');
+      case "l":
+      case "\x1b[C":
+        this.navigate("l");
         break;
-      case '\r':
+      case "\r":
         if (this.panes.length > 0) {
           this.focusedIndex = this.selectedIndex;
           this.scheduleRender();
         }
         break;
-      case 'i':
+      case "i":
         // Interject - mark pane for human takeover
         this.interjectPane(this.selectedIndex);
         break;
     }
   }
 
-  private navigate(dir: 'h' | 'j' | 'k' | 'l') {
+  private navigate(dir: "h" | "j" | "k" | "l") {
     if (this.panes.length === 0) return;
 
     const count = this.panes.length;
 
-    if (this.viewMode === 'single') {
-      if (dir === 'h' || dir === 'k') {
+    if (this.viewMode === "single") {
+      if (dir === "h" || dir === "k") {
         this.selectedIndex = (this.selectedIndex - 1 + count) % count;
       } else {
         this.selectedIndex = (this.selectedIndex + 1) % count;
@@ -197,14 +197,14 @@ export class OrchestratorTUI {
       const currentCol = this.selectedIndex % tilesPerRow;
       let newIndex = this.selectedIndex;
 
-      if (dir === 'h') {
+      if (dir === "h") {
         newIndex = currentRow * tilesPerRow + ((currentCol - 1 + tilesPerRow) % tilesPerRow);
-      } else if (dir === 'l') {
+      } else if (dir === "l") {
         newIndex = currentRow * tilesPerRow + ((currentCol + 1) % tilesPerRow);
-      } else if (dir === 'k') {
+      } else if (dir === "k") {
         const totalRows = Math.ceil(count / tilesPerRow);
         newIndex = ((currentRow - 1 + totalRows) % totalRows) * tilesPerRow + currentCol;
-      } else if (dir === 'j') {
+      } else if (dir === "j") {
         const totalRows = Math.ceil(count / tilesPerRow);
         newIndex = ((currentRow + 1) % totalRows) * tilesPerRow + currentCol;
       }
@@ -220,7 +220,7 @@ export class OrchestratorTUI {
     const count = this.panes.length || 1;
     const availableHeight = this.rows - 2;
 
-    if (this.viewMode === 'single') {
+    if (this.viewMode === "single") {
       return { cols: this.cols - 2, rows: availableHeight - 2 };
     }
 
@@ -237,7 +237,7 @@ export class OrchestratorTUI {
     const count = this.panes.length;
     const availableHeight = this.rows - 2;
 
-    if (this.viewMode === 'single') {
+    if (this.viewMode === "single") {
       return { x: 0, y: 2, w: this.cols, h: availableHeight };
     }
 
@@ -256,7 +256,7 @@ export class OrchestratorTUI {
     const cols = Math.max(20, size.cols);
     const rows = Math.max(5, size.rows);
 
-    this.panes.forEach(pane => {
+    this.panes.forEach((pane) => {
       pane.term.resize(cols, rows);
       try {
         pane.proc?.terminal?.resize(cols, rows);
@@ -277,7 +277,7 @@ export class OrchestratorTUI {
       proc: null,
       config,
       term,
-      status: 'stopped',
+      status: "stopped",
     };
 
     this.panes.push(pane);
@@ -298,11 +298,11 @@ export class OrchestratorTUI {
       const proc = Bun.spawn(pane.config.command, {
         cwd: pane.config.cwd,
         env: { ...process.env, ...pane.config.env } as Record<string, string>,
-        stdin: 'pipe',
+        stdin: "pipe",
         terminal: {
           cols,
           rows,
-          name: 'xterm-256color',
+          name: "xterm-256color",
           data: (_t, data) => {
             const text = new TextDecoder().decode(data);
             pane.term.write(text, () => this.scheduleRender());
@@ -311,7 +311,7 @@ export class OrchestratorTUI {
       });
 
       pane.proc = proc;
-      pane.status = 'running';
+      pane.status = "running";
 
       // Monitor process exit - but only update status if this is still the current process
       const thisProc = proc;
@@ -319,13 +319,12 @@ export class OrchestratorTUI {
         // Ignore if this process was replaced by a restart
         if (pane.proc !== thisProc) return;
 
-        pane.status = code === 0 ? 'stopped' : 'error';
+        pane.status = code === 0 ? "stopped" : "error";
         pane.term.write(`\r\n[Process exited with code ${code}]\r\n`);
         this.scheduleRender();
       });
-
     } catch (err) {
-      pane.status = 'error';
+      pane.status = "error";
       pane.term.write(`Error starting process: ${err}\r\n`);
     }
   }
@@ -337,8 +336,8 @@ export class OrchestratorTUI {
     try {
       pane.proc?.kill();
       pane.proc = null;
-      pane.status = 'stopped';
-      pane.term.write('\r\n[Process killed]\r\n');
+      pane.status = "stopped";
+      pane.term.write("\r\n[Process killed]\r\n");
     } catch {}
     this.scheduleRender();
   }
@@ -389,7 +388,7 @@ export class OrchestratorTUI {
     if (!pane) return;
 
     // Skip non-agent panes (dashboard, questions)
-    if (pane.config.name === 'dashboard' || pane.config.name === 'questions') {
+    if (pane.config.name === "dashboard" || pane.config.name === "questions") {
       pane.term.write(`\r\n${semantic.warning}[Cannot interject this pane]${ansi.reset}\r\n`);
       this.scheduleRender();
       return;
@@ -404,14 +403,14 @@ export class OrchestratorTUI {
       taskId: session?.taskId,
       sessionId: session?.sessionId,
       workingDirectory: workingDir,
-      reason: 'Human interjection from TUI',
+      reason: "Human interjection from TUI",
     });
 
     // Kill the original agent process
     try {
       pane.proc?.kill();
       pane.proc = null;
-      pane.status = 'stopped';
+      pane.status = "stopped";
     } catch {}
 
     // Show interjection message in original pane
@@ -419,9 +418,9 @@ export class OrchestratorTUI {
     pane.term.write(`${semantic.muted}Session moved to new pane. Press "r" to restart agent later.${ansi.reset}\r\n`);
 
     // Build command for interactive session
-    const interactiveCmd: string[] = ['claude'];
+    const interactiveCmd: string[] = ["claude"];
     if (session?.sessionId) {
-      interactiveCmd.push('--resume', session.sessionId);
+      interactiveCmd.push("--resume", session.sessionId);
     }
 
     // Create new pane with interactive Claude session
@@ -466,10 +465,10 @@ export class OrchestratorTUI {
 
   private render() {
     // Full clear: reset, home, clear screen, clear scrollback, hide cursor
-    let output = ansi.reset + ansi.hideCursor + `${CSI}H${CSI}2J${CSI}3J`;
+    let output = `${ansi.reset + ansi.hideCursor}${CSI}H${CSI}2J${CSI}3J`;
 
     // Fill entire screen with spaces to ensure complete clear
-    const blankLine = ' '.repeat(this.cols);
+    const blankLine = " ".repeat(this.cols);
     for (let row = 1; row <= this.rows; row++) {
       output += ansi.moveTo(row, 1) + blankLine;
     }
@@ -483,17 +482,15 @@ export class OrchestratorTUI {
 
     // Separator
     output += ansi.moveTo(2, 1);
-    output += `${semantic.separator}${'─'.repeat(this.cols)}${ansi.reset}`;
+    output += `${semantic.separator}${"─".repeat(this.cols)}${ansi.reset}`;
 
     if (this.panes.length === 0) {
       const msg = "No agents configured. Press 'n' to create a new agent.";
       const x = Math.floor((this.cols - msg.length) / 2);
       const y = Math.floor(this.rows / 2);
-      output += ansi.moveTo(y, x) + `${semantic.warning}${msg}${ansi.reset}`;
+      output += `${ansi.moveTo(y, x)}${semantic.warning}${msg}${ansi.reset}`;
     } else {
-      const indicesToRender = this.viewMode === 'single'
-        ? [this.selectedIndex]
-        : this.panes.map((_, i) => i);
+      const indicesToRender = this.viewMode === "single" ? [this.selectedIndex] : this.panes.map((_, i) => i);
 
       for (const idx of indicesToRender) {
         output += this.renderPane(idx);
@@ -505,35 +502,35 @@ export class OrchestratorTUI {
 
   private renderPane(index: number): string {
     const pane = this.panes[index];
-    if (!pane) return '';
+    if (!pane) return "";
 
     const region = this.getPaneRegion(index);
     const isFocused = index === this.focusedIndex;
     const isSelected = index === this.selectedIndex && this.focusedIndex === null;
 
     // Color based on status and selection
-    let borderColor = getBorderColor('default');
-    if (pane.status === 'error') {
-      borderColor = getBorderColor('error');
+    let borderColor = getBorderColor("default");
+    if (pane.status === "error") {
+      borderColor = getBorderColor("error");
     } else if (isFocused) {
-      borderColor = getBorderColor('focused');
+      borderColor = getBorderColor("focused");
     } else if (isSelected) {
-      borderColor = getBorderColor('selected');
-    } else if (pane.status === 'running') {
-      borderColor = getBorderColor('running');
+      borderColor = getBorderColor("selected");
+    } else if (pane.status === "running") {
+      borderColor = getBorderColor("running");
     }
 
-    let output = '';
+    let output = "";
 
     // Status indicator
-    const statusIcon = pane.status === 'running' ? '●' : pane.status === 'error' ? '✗' : '○';
-    const focusStatus = isFocused ? ' (focused)' : isSelected ? ' (selected)' : '';
+    const statusIcon = pane.status === "running" ? "●" : pane.status === "error" ? "✗" : "○";
+    const focusStatus = isFocused ? " (focused)" : isSelected ? " (selected)" : "";
     const titleText = `─ ${statusIcon} ${pane.config.name}${focusStatus} `;
     const remainingWidth = region.w - titleText.length - 2;
 
     output += ansi.moveTo(region.y, region.x + 1);
     output += `${CSI}${borderColor}m`;
-    output += '╭' + titleText + '─'.repeat(Math.max(0, remainingWidth)) + '╮';
+    output += `╭${titleText}${"─".repeat(Math.max(0, remainingWidth))}╮`;
 
     // Content from xterm buffer
     const contentH = region.h - 2;
@@ -555,8 +552,8 @@ export class OrchestratorTUI {
             const width = cell.getWidth();
             if (width === 0) continue;
 
-            const char = cell.getChars() || ' ';
-            let cellOutput = '';
+            const char = cell.getChars() || " ";
+            let cellOutput = "";
 
             if (cell.isBold()) cellOutput += ansi.bold;
             if (cell.isDim()) cellOutput += ansi.dim;
@@ -572,14 +569,14 @@ export class OrchestratorTUI {
             output += cellOutput;
             colsRendered += width;
           } else {
-            output += ' ';
+            output += " ";
             colsRendered++;
           }
         }
       }
 
       if (colsRendered < contentW) {
-        output += ' '.repeat(contentW - colsRendered);
+        output += " ".repeat(contentW - colsRendered);
       }
 
       output += `${CSI}${borderColor}m│${ansi.reset}`;
@@ -588,7 +585,7 @@ export class OrchestratorTUI {
     // Bottom border
     output += ansi.moveTo(region.y + region.h - 1, region.x + 1);
     output += `${CSI}${borderColor}m`;
-    output += '╰' + '─'.repeat(region.w - 2) + '╯';
+    output += `╰${"─".repeat(region.w - 2)}╯`;
     output += ansi.reset;
 
     return output;
@@ -623,17 +620,17 @@ function getAllAgents(tasks: Task[]): Set<string> {
 
 async function main() {
   const args = process.argv.slice(2);
-  let tasksFile = 'tasks.yaml';
+  let tasksFile = "tasks.yaml";
 
   // Parse -f flag
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '-f' || args[i] === '--file') {
+    if (args[i] === "-f" || args[i] === "--file") {
       tasksFile = args[i + 1] || tasksFile;
       break;
     }
   }
 
-  const BLOOM_DIR = resolve(import.meta.dirname ?? '.');
+  const BLOOM_DIR = resolve(import.meta.dirname ?? ".");
   const tasksPath = resolve(tasksFile);
 
   // Load agents from tasks file
@@ -645,36 +642,37 @@ async function main() {
 
     // Create config for each agent
     for (const agentName of [...agents].sort()) {
-      const fileArg = tasksFile !== 'tasks.yaml' ? `-f "${tasksPath}"` : '';
+      const fileArg = tasksFile !== "tasks.yaml" ? `-f "${tasksPath}"` : "";
       agentConfigs.push({
         name: agentName,
-        command: ['bun', join(BLOOM_DIR, 'index.ts'), fileArg, 'agent', 'run', agentName].filter(Boolean),
+        command: ["bun", join(BLOOM_DIR, "index.ts"), fileArg, "agent", "run", agentName].filter(Boolean),
         cwd: BLOOM_DIR,
       });
     }
 
     // Add floating agent
-    const fileArg = tasksFile !== 'tasks.yaml' ? `-f "${tasksPath}"` : '';
+    const fileArg = tasksFile !== "tasks.yaml" ? `-f "${tasksPath}"` : "";
     agentConfigs.push({
-      name: 'floating',
-      command: ['bun', join(BLOOM_DIR, 'index.ts'), fileArg, 'agent', 'run', 'floating'].filter(Boolean),
+      name: "floating",
+      command: ["bun", join(BLOOM_DIR, "index.ts"), fileArg, "agent", "run", "floating"].filter(Boolean),
       cwd: BLOOM_DIR,
     });
 
     // Add dashboard pane
     agentConfigs.unshift({
-      name: 'dashboard',
-      command: ['bun', join(BLOOM_DIR, 'task-cli.ts'), fileArg, 'dashboard'].filter(Boolean),
+      name: "dashboard",
+      command: ["bun", join(BLOOM_DIR, "task-cli.ts"), fileArg, "dashboard"].filter(Boolean),
       cwd: BLOOM_DIR,
     });
-
-  } catch (err) {
+  } catch (_err) {
     console.log(`Note: Could not load ${tasksFile}, starting with dashboard only`);
-    agentConfigs = [{
-      name: 'dashboard',
-      command: ['bun', join(BLOOM_DIR, 'task-cli.ts'), 'dashboard'],
-      cwd: BLOOM_DIR,
-    }];
+    agentConfigs = [
+      {
+        name: "dashboard",
+        command: ["bun", join(BLOOM_DIR, "task-cli.ts"), "dashboard"],
+        cwd: BLOOM_DIR,
+      },
+    ];
   }
 
   const tui = new OrchestratorTUI(agentConfigs);
@@ -683,7 +681,7 @@ async function main() {
 
 // Only run main() if this file is executed directly, not when imported
 if (import.meta.main) {
-  main().catch(err => {
+  main().catch((err) => {
     console.error(err);
     process.exit(1);
   });

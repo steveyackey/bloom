@@ -10,10 +10,24 @@
     "start": "bun src/index.ts run",
     "plan": "bun src/index.ts plan",
     "dashboard": "bun src/index.ts dashboard",
-    "test": "bun test"
+    "test": "bun test",
+    "lint": "biome lint ./src ./tests",
+    "lint:fix": "biome lint --write ./src ./tests",
+    "format": "biome format ./src ./tests",
+    "format:fix": "biome format --write ./src ./tests",
+    "check": "biome check ./src ./tests",
+    "fix": "biome check --write ./src ./tests",
+    "typecheck": "tsc --noEmit",
+    "validate": "bun run check && bun run typecheck && bun run test",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bun run fix && git add -u"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@biomejs/biome": "^2.3.11",
+    "@types/bun": "latest",
+    "simple-git-hooks": "^2.13.1"
   },
   "peerDependencies": {
     "typescript": "^5"

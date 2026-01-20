@@ -4,68 +4,50 @@
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import YAML from "yaml";
 
-import { ClaudeAgentProvider, getActiveSession } from "./agents";
+import { ClaudeAgentProvider } from "./agents";
+import { ansi, semantic } from "./colors";
+import { createWorktree, getWorktreePath, worktreeExists } from "./git";
 import {
-  loadTasks,
-  saveTasks,
-  findTask,
-  updateTaskStatus,
-  getAllAgents,
-  getAvailableTasks,
-  getTasksByStatus,
-  getTasksByAgent,
-  formatTask,
-  getStatusIcon,
-  primeTasks,
-  resetStuckTasks,
-} from "./tasks";
-import { type Task, type TasksFile, type TaskStatus } from "./task-schema";
-import { OrchestratorTUI } from "./orchestrator-tui";
-import { runPlanningSession } from "./plan-session";
-import { logger, createLogger, setLogLevel, type LogLevel } from "./logger";
-import {
-  askQuestion,
   answerQuestion,
-  getQuestion,
-  listQuestions,
-  waitForAnswer,
+  askQuestion,
   clearAnsweredQuestions,
-  watchQueue,
-  createInterjection,
-  getInterjection,
-  listInterjections,
-  markInterjectionResumed,
   dismissInterjection,
   getActionResult,
+  getInterjection,
+  getQuestion,
+  listInterjections,
+  listQuestions,
   markActionExecuted,
+  markInterjectionResumed,
   type Question,
-  type QuestionType,
   type QuestionAction,
+  type QuestionType,
+  waitForAnswer,
+  watchQueue,
 } from "./human-queue";
-import { ansi, semantic } from "./colors";
+import { type LogLevel, logger, setLogLevel } from "./logger";
+import { OrchestratorTUI } from "./orchestrator-tui";
+import { runPlanningSession } from "./plan-session";
 import { loadAgentPrompt } from "./prompts";
-import { setupRepos, worktreeExists, createWorktree, getWorktreePath } from "./git";
+import { addWorktree, cloneRepo, listRepos, listWorktrees, removeRepo, removeWorktree, syncRepos } from "./repos";
+import type { Task, TaskStatus } from "./task-schema";
 import {
-  loadUserConfig,
-  saveUserConfig,
-  setGitProtocol,
-  getUserConfigPath,
-} from "./user-config";
-import {
-  cloneRepo,
-  syncRepos,
-  removeRepo,
-  listRepos,
-  addWorktree,
-  removeWorktree,
-  listWorktrees,
-  loadReposFile,
-  getReposFilePath,
-} from "./repos";
+  findTask,
+  formatTask,
+  getAllAgents,
+  getAvailableTasks,
+  getStatusIcon,
+  getTasksByAgent,
+  getTasksByStatus,
+  loadTasks,
+  primeTasks,
+  resetStuckTasks,
+  saveTasks,
+  updateTaskStatus,
+} from "./tasks";
+import { loadUserConfig, setGitProtocol } from "./user-config";
 
 // =============================================================================
 // Constants
@@ -97,15 +79,15 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
   const tasksFile = await loadTasks(TASKS_FILE);
   const available = getAvailableTasks(tasksFile.tasks, agentName);
 
-  if (available.length === 0) {
+  const task = available[0];
+  if (!task) {
     return { available: false };
   }
 
-  const task = available[0];
   updateTaskStatus(tasksFile.tasks, task.id, "in_progress", agentName);
   await saveTasks(TASKS_FILE, tasksFile);
 
-  const taskCli = `bun ${resolve(BLOOM_DIR, "src/index.ts")}` + (TASKS_FILE !== DEFAULT_TASKS_FILE ? ` -f "${TASKS_FILE}"` : "");
+  const taskCli = `bun ${resolve(BLOOM_DIR, "src/index.ts")}${TASKS_FILE !== DEFAULT_TASKS_FILE ? ` -f "${TASKS_FILE}"` : ""}`;
 
   let prompt = `# Task: ${task.title}\n\n## Task ID: ${task.id}\n\n`;
 
@@ -114,15 +96,15 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
   }
 
   if (task.acceptance_criteria.length > 0) {
-    prompt += `## Acceptance Criteria\n${task.acceptance_criteria.map(c => `- ${c}`).join("\n")}\n\n`;
+    prompt += `## Acceptance Criteria\n${task.acceptance_criteria.map((c) => `- ${c}`).join("\n")}\n\n`;
   }
 
   if (task.depends_on.length > 0) {
-    prompt += `## Dependencies (completed)\n${task.depends_on.map(d => `- ${d}`).join("\n")}\n\n`;
+    prompt += `## Dependencies (completed)\n${task.depends_on.map((d) => `- ${d}`).join("\n")}\n\n`;
   }
 
   if (task.ai_notes.length > 0) {
-    prompt += `## Previous Notes\n${task.ai_notes.map(n => `- ${n}`).join("\n")}\n\n`;
+    prompt += `## Previous Notes\n${task.ai_notes.map((n) => `- ${n}`).join("\n")}\n\n`;
   }
 
   prompt += `## Your Mission
@@ -189,11 +171,7 @@ async function runAgentWorkLoop(agentName: string): Promise<void> {
         }
       }
 
-      const systemPrompt = await loadAgentPrompt(
-        agentName,
-        taskResult.taskId!,
-        taskResult.taskCli!
-      );
+      const systemPrompt = await loadAgentPrompt(agentName, taskResult.taskId!, taskResult.taskCli!);
 
       agentLog.info(`Starting Claude session in: ${workingDir}`);
 
@@ -214,7 +192,6 @@ async function runAgentWorkLoop(agentName: string): Promise<void> {
       }
 
       await Bun.sleep(1000);
-
     } catch (err) {
       agentLog.error("Error in work loop:", err);
       await Bun.sleep(POLL_INTERVAL_MS);
@@ -239,11 +216,11 @@ async function startOrchestrator(): Promise<void> {
   if (repos.length === 0) {
     logger.orchestrator.info("No repos configured. Use 'bloom repo clone <url>' to add one.");
   } else {
-    const missingRepos = repos.filter(r => !r.exists);
+    const missingRepos = repos.filter((r) => !r.exists);
     if (missingRepos.length > 0) {
-      logger.orchestrator.warn(`Missing repos: ${missingRepos.map(r => r.name).join(", ")}. Run 'bloom repo sync'.`);
+      logger.orchestrator.warn(`Missing repos: ${missingRepos.map((r) => r.name).join(", ")}. Run 'bloom repo sync'.`);
     } else {
-      logger.orchestrator.info(`Found ${repos.length} repo(s): ${repos.map(r => r.name).join(", ")}`);
+      logger.orchestrator.info(`Found ${repos.length} repo(s): ${repos.map((r) => r.name).join(", ")}`);
     }
   }
 
@@ -267,7 +244,7 @@ async function startOrchestrator(): Promise<void> {
     }
 
     agents = getAllAgents(tasksFile.tasks);
-  } catch (err) {
+  } catch (_err) {
     logger.orchestrator.warn("No tasks.yaml or no agents defined yet. Creating session with dashboard only.");
     agents = new Set();
   }
@@ -341,7 +318,9 @@ async function cmdDashboard() {
     const progressBar = "█".repeat(Math.floor(progress / 5)) + "░".repeat(20 - Math.floor(progress / 5));
 
     console.log(`Progress: [${progressBar}] ${progress}% (${stats.done}/${total} done)`);
-    console.log(`Status:   ${stats.in_progress} in_progress, ${stats.assigned} assigned, ${stats.ready_for_agent} ready, ${stats.todo} todo, ${stats.blocked} blocked\n`);
+    console.log(
+      `Status:   ${stats.in_progress} in_progress, ${stats.assigned} assigned, ${stats.ready_for_agent} ready, ${stats.todo} todo, ${stats.blocked} blocked\n`
+    );
 
     const activeAgents = new Map<string, { task: string; worktree?: string }[]>();
     function collectActive(tasks: Task[]) {
@@ -359,7 +338,7 @@ async function cmdDashboard() {
     if (activeAgents.size > 0) {
       console.log("Active Agents:");
       for (const [agent, tasks] of [...activeAgents.entries()].sort()) {
-        const taskList = tasks.map(t => t.task).join(", ");
+        const taskList = tasks.map((t) => t.task).join(", ");
         const worktree = tasks[0]?.worktree ? ` [${tasks[0].worktree}]` : "";
         console.log(`  ${agent}: ${taskList}${worktree}`);
       }
@@ -367,7 +346,7 @@ async function cmdDashboard() {
     }
 
     console.log("Tasks:");
-    const byPhase = Map.groupBy(tasksFile.tasks, t => t.phase ?? 0);
+    const byPhase = Map.groupBy(tasksFile.tasks, (t) => t.phase ?? 0);
     for (const [phase, tasks] of [...byPhase.entries()].sort((a, b) => a[0] - b[0])) {
       console.log(`\n  Phase ${phase}:`);
       for (const task of tasks!) {
@@ -384,7 +363,7 @@ async function cmdDashboard() {
       }
     }
 
-    const blocked = allTasks.filter(t => t.status === "blocked");
+    const blocked = allTasks.filter((t) => t.status === "blocked");
     if (blocked.length > 0) {
       console.log("\n  Blocked Tasks:");
       for (const task of blocked) {
@@ -395,7 +374,9 @@ async function cmdDashboard() {
 
   await renderDashboard();
   setInterval(async () => {
-    try { await renderDashboard(); } catch {}
+    try {
+      await renderDashboard();
+    } catch {}
   }, 10000);
 }
 
@@ -411,7 +392,7 @@ async function cmdList(status?: TaskStatus) {
     return;
   }
 
-  const byPhase = Map.groupBy(tasksFile.tasks, t => t.phase ?? 0);
+  const byPhase = Map.groupBy(tasksFile.tasks, (t) => t.phase ?? 0);
   for (const [phase, tasks] of [...byPhase.entries()].sort((a, b) => a[0] - b[0])) {
     console.log(`Phase ${phase}:`);
     for (const task of tasks!) {
@@ -483,9 +464,9 @@ async function cmdAgents() {
   console.log("Agents:");
   for (const agent of [...agents].sort()) {
     const tasks = getTasksByAgent(tasksFile.tasks, agent);
-    const inProgress = tasks.filter(t => t.status === "in_progress").length;
-    const assigned = tasks.filter(t => t.status === "assigned").length;
-    const done = tasks.filter(t => t.status === "done").length;
+    const inProgress = tasks.filter((t) => t.status === "in_progress").length;
+    const assigned = tasks.filter((t) => t.status === "assigned").length;
+    const done = tasks.filter((t) => t.status === "done").length;
     console.log(`  ${agent}: ${inProgress} in_progress, ${assigned} assigned, ${done} done`);
   }
 }
@@ -632,7 +613,9 @@ async function cmdQuestions(showAll = false) {
 
     if (q.options && q.options.length > 0) {
       console.log(`  Options:`);
-      q.options.forEach((opt, i) => console.log(`    ${i + 1}. ${opt}`));
+      for (const [i, opt] of q.options.entries()) {
+        console.log(`    ${i + 1}. ${opt}`);
+      }
     }
 
     if (q.status === "answered") {
@@ -865,7 +848,9 @@ async function cmdQuestionsDashboard() {
 
         if (selectedQ.options && selectedQ.options.length > 0) {
           console.log("\nSuggested options:");
-          selectedQ.options.forEach((opt, i) => console.log(`  ${i + 1}. ${opt}`));
+          for (const [i, opt] of selectedQ.options.entries()) {
+            console.log(`  ${i + 1}. ${opt}`);
+          }
         }
         console.log("──────────────────────────────────────────\n");
 
@@ -910,7 +895,6 @@ async function cmdQuestionsDashboard() {
         await executeAction(selectedQ, answer.trim());
 
         await Bun.sleep(1000);
-
       } catch (err: unknown) {
         if (err && typeof err === "object" && "name" in err && err.name === "ExitPromptError") {
           console.log("\nExiting questions dashboard...");
@@ -986,7 +970,7 @@ async function cmdValidate() {
   collectWorktrees(tasksFile.tasks);
 
   for (const [worktree, agents] of worktreeAgents) {
-    const uniqueAgents = new Set(agents.map(a => a.agent));
+    const uniqueAgents = new Set(agents.map((a) => a.agent));
     if (uniqueAgents.size > 1) {
       hasErrors = true;
       console.error(`ERROR: Multiple agents in worktree '${worktree}':`);
@@ -1413,7 +1397,10 @@ async function main(): Promise<void> {
       break;
 
     case "show":
-      if (!args[1]) { console.error("Usage: bloom show <taskid>"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom show <taskid>");
+        process.exit(1);
+      }
       await cmdShow(args[1]);
       break;
 
@@ -1430,48 +1417,75 @@ async function main(): Promise<void> {
       break;
 
     case "done":
-      if (!args[1]) { console.error("Usage: bloom done <taskid>"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom done <taskid>");
+        process.exit(1);
+      }
       await cmdSetStatus(args[1], "done");
       break;
 
     case "block":
-      if (!args[1]) { console.error("Usage: bloom block <taskid>"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom block <taskid>");
+        process.exit(1);
+      }
       await cmdSetStatus(args[1], "blocked");
       break;
 
     case "todo":
-      if (!args[1]) { console.error("Usage: bloom todo <taskid>"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom todo <taskid>");
+        process.exit(1);
+      }
       await cmdSetStatus(args[1], "todo");
       break;
 
     case "ready":
-      if (!args[1]) { console.error("Usage: bloom ready <taskid>"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom ready <taskid>");
+        process.exit(1);
+      }
       await cmdSetStatus(args[1], "ready_for_agent");
       break;
 
     case "start":
-      if (!args[1]) { console.error("Usage: bloom start <taskid> [agent]"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom start <taskid> [agent]");
+        process.exit(1);
+      }
       await cmdSetStatus(args[1], "in_progress");
       break;
 
     case "assign":
-      if (!args[1] || !args[2]) { console.error("Usage: bloom assign <taskid> <agent>"); process.exit(1); }
+      if (!args[1] || !args[2]) {
+        console.error("Usage: bloom assign <taskid> <agent>");
+        process.exit(1);
+      }
       await cmdAssign(args[1], args[2]);
       break;
 
     case "note":
-      if (!args[1] || !args[2]) { console.error("Usage: bloom note <taskid> <note>"); process.exit(1); }
+      if (!args[1] || !args[2]) {
+        console.error("Usage: bloom note <taskid> <note>");
+        process.exit(1);
+      }
       await cmdNote(args[1], args.slice(2).join(" "));
       break;
 
     case "reset":
-      if (!args[1]) { console.error("Usage: bloom reset <taskid|--stuck>"); process.exit(1); }
+      if (!args[1]) {
+        console.error("Usage: bloom reset <taskid|--stuck>");
+        process.exit(1);
+      }
       await cmdReset(args[1]);
       break;
 
     case "agent":
       if (args[1] === "run") {
-        if (!args[2]) { console.error("Usage: bloom agent run <name>"); process.exit(1); }
+        if (!args[2]) {
+          console.error("Usage: bloom agent run <name>");
+          process.exit(1);
+        }
         await runAgentWorkLoop(args[2]);
       } else if (args[1] === "list") {
         await cmdAgents();
@@ -1510,7 +1524,7 @@ async function main(): Promise<void> {
         const onNo = parseOption("--on-no");
         const addNote = args.includes("--add-note");
 
-        const choices = choicesStr ? choicesStr.split(",").map(s => s.trim()) : undefined;
+        const choices = choicesStr ? choicesStr.split(",").map((s) => s.trim()) : undefined;
 
         const optionFlags = ["--task", "--type", "--choices", "--on-yes", "--on-no", "--add-note"];
         const questionParts: string[] = [];
@@ -1592,14 +1606,14 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
 
+export * from "./logger";
+export * from "./repos";
 // Re-export for library use
 export * from "./task-schema";
-export * from "./logger";
 export * from "./tasks";
 export * from "./user-config";
-export * from "./repos";

@@ -2,9 +2,8 @@
 // Task File I/O and Helper Functions
 // =============================================================================
 
-import { resolve } from "node:path";
 import YAML from "yaml";
-import { validateTasksFile, type Task, type TasksFile, type TaskStatus } from "./task-schema";
+import { type Task, type TaskStatus, type TasksFile, validateTasksFile } from "./task-schema";
 
 // =============================================================================
 // File I/O
@@ -80,7 +79,7 @@ export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
         continue;
       }
 
-      const depsComplete = task.depends_on.every(dep => completedIds.has(dep));
+      const depsComplete = task.depends_on.every((dep) => completedIds.has(dep));
       if (!depsComplete) {
         findAvailable(task.subtasks);
         continue;
@@ -131,13 +130,20 @@ export function formatTask(task: Task, indent = ""): string {
 
 export function getStatusIcon(status: TaskStatus): string {
   switch (status) {
-    case "done": return "✓";
-    case "in_progress": return "▶";
-    case "assigned": return "●";
-    case "ready_for_agent": return "○";
-    case "blocked": return "✗";
-    case "todo": return "·";
-    default: return "?";
+    case "done":
+      return "✓";
+    case "in_progress":
+      return "▶";
+    case "assigned":
+      return "●";
+    case "ready_for_agent":
+      return "○";
+    case "blocked":
+      return "✗";
+    case "todo":
+      return "·";
+    default:
+      return "?";
   }
 }
 
@@ -145,7 +151,11 @@ export function getStatusIcon(status: TaskStatus): string {
 // Task Priming
 // =============================================================================
 
-export async function primeTasks(tasksFile: string, tasks: TasksFile, logger: { info: (msg: string) => void }): Promise<number> {
+export async function primeTasks(
+  tasksFile: string,
+  tasks: TasksFile,
+  logger: { info: (msg: string) => void }
+): Promise<number> {
   const completedIds = new Set<string>();
 
   function collectCompleted(taskList: Task[]) {
@@ -165,8 +175,7 @@ export async function primeTasks(tasksFile: string, tasks: TasksFile, logger: { 
         continue;
       }
 
-      const depsComplete = task.depends_on.length === 0 ||
-                           task.depends_on.every(dep => completedIds.has(dep));
+      const depsComplete = task.depends_on.length === 0 || task.depends_on.every((dep) => completedIds.has(dep));
 
       if (depsComplete) {
         task.status = "ready_for_agent";

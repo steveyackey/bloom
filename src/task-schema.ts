@@ -4,14 +4,7 @@ import { z } from "zod";
 // Task Status
 // =============================================================================
 
-export const TaskStatusSchema = z.enum([
-  "todo",
-  "ready_for_agent",
-  "assigned",
-  "in_progress",
-  "done",
-  "blocked",
-]);
+export const TaskStatusSchema = z.enum(["todo", "ready_for_agent", "assigned", "in_progress", "done", "blocked"]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
 // =============================================================================

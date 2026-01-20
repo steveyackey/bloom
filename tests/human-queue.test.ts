@@ -1,23 +1,25 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { join } from "node:path";
-import { existsSync, rmSync, mkdirSync } from "node:fs";
-import {
-  askQuestion,
-  answerQuestion,
-  getQuestion,
-  listQuestions,
-  deleteQuestion,
-  isYesAnswer,
-  isNoAnswer,
-  getActionResult,
-  type Question,
-  type QuestionAction,
-} from "../src/human-queue";
+import { describe, expect, test } from "bun:test";
+import { getActionResult, isNoAnswer, isYesAnswer, type Question } from "../src/human-queue";
 
 describe("Human-Agent Communication", () => {
   describe("Yes/No Answer Detection", () => {
     test("recognizes common affirmative responses", () => {
-      const yesVariants = ["yes", "Yes", "YES", "y", "Y", "yeah", "yep", "sure", "ok", "okay", "approve", "confirmed", "true", "1"];
+      const yesVariants = [
+        "yes",
+        "Yes",
+        "YES",
+        "y",
+        "Y",
+        "yeah",
+        "yep",
+        "sure",
+        "ok",
+        "okay",
+        "approve",
+        "confirmed",
+        "true",
+        "1",
+      ];
 
       for (const answer of yesVariants) {
         expect(isYesAnswer(answer)).toBe(true);

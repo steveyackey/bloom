@@ -1,18 +1,18 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { existsSync, rmSync, mkdirSync } from "node:fs";
+import type { Task, TasksFile } from "../src/task-schema";
 import {
-  loadTasks,
-  saveTasks,
   findTask,
-  updateTaskStatus,
   getAllAgents,
   getAvailableTasks,
   getTasksByStatus,
+  loadTasks,
   primeTasks,
   resetStuckTasks,
+  saveTasks,
+  updateTaskStatus,
 } from "../src/tasks";
-import type { Task, TasksFile } from "../src/task-schema";
 
 const TEST_DIR = join(import.meta.dirname, ".test-data");
 const TEST_TASKS_FILE = join(TEST_DIR, "tasks.yaml");
@@ -22,7 +22,6 @@ function createTask(overrides: Partial<Task> = {}): Task {
     id: `task-${Math.random().toString(36).slice(2, 8)}`,
     title: "Test Task",
     status: "todo",
-    priority: "medium",
     depends_on: [],
     acceptance_criteria: [],
     ai_notes: [],
@@ -63,7 +62,7 @@ describe("Task Persistence", () => {
 
     const loaded = await loadTasks(TEST_TASKS_FILE);
     expect(loaded.tasks).toHaveLength(1);
-    expect(loaded.tasks[0].title).toBe("Persistence Test");
+    expect(loaded.tasks[0]!.title).toBe("Persistence Test");
   });
 
   test("task metadata survives round-trip (notes, criteria, deps)", async () => {
@@ -77,10 +76,10 @@ describe("Task Persistence", () => {
     await saveTasks(TEST_TASKS_FILE, { tasks: [task] });
 
     const loaded = await loadTasks(TEST_TASKS_FILE);
-    expect(loaded.tasks[0].ai_notes).toContain("Note from agent");
-    expect(loaded.tasks[0].acceptance_criteria).toContain("Must pass tests");
-    expect(loaded.tasks[0].depends_on).toContain("other-task");
-    expect(loaded.tasks[0].agent_name).toBe("test-agent");
+    expect(loaded.tasks[0]!.ai_notes).toContain("Note from agent");
+    expect(loaded.tasks[0]!.acceptance_criteria).toContain("Must pass tests");
+    expect(loaded.tasks[0]!.depends_on).toContain("other-task");
+    expect(loaded.tasks[0]!.agent_name).toBe("test-agent");
   });
 });
 
@@ -111,7 +110,7 @@ describe("Agent Work Assignment", () => {
 
     const aliceTasks = getAvailableTasks(tasks, "alice");
     expect(aliceTasks).toHaveLength(2);
-    expect(aliceTasks.every(t => t.agent_name === "alice")).toBe(true);
+    expect(aliceTasks.every((t) => t.agent_name === "alice")).toBe(true);
   });
 
   test("floating agent picks up unassigned tasks", () => {
@@ -122,7 +121,7 @@ describe("Agent Work Assignment", () => {
 
     const floatingTasks = getAvailableTasks(tasks, "floating");
     expect(floatingTasks).toHaveLength(1);
-    expect(floatingTasks[0].id).toBe("unassigned");
+    expect(floatingTasks[0]!.id).toBe("unassigned");
   });
 
   test("agents see todo and ready_for_agent tasks, but not done or blocked", () => {
@@ -137,7 +136,7 @@ describe("Agent Work Assignment", () => {
 
     const available = getAvailableTasks(tasks, "alice");
     expect(available).toHaveLength(2);
-    expect(available.map(t => t.id).sort()).toEqual(["ready", "todo"]);
+    expect(available.map((t) => t.id).sort()).toEqual(["ready", "todo"]);
   });
 
   test("starting work on a task claims it for the agent", () => {
@@ -145,8 +144,8 @@ describe("Agent Work Assignment", () => {
 
     updateTaskStatus(tasks, "work", "in_progress", "worker-agent");
 
-    expect(tasks[0].status).toBe("in_progress");
-    expect(tasks[0].agent_name).toBe("worker-agent");
+    expect(tasks[0]!.status).toBe("in_progress");
+    expect(tasks[0]!.agent_name).toBe("worker-agent");
   });
 });
 
@@ -197,7 +196,7 @@ describe("Task Workflow", () => {
     const resetCount = resetStuckTasks(tasksFile, noOpLogger);
 
     expect(resetCount).toBe(1);
-    expect(tasksFile.tasks[0].status).toBe("ready_for_agent");
+    expect(tasksFile.tasks[0]!.status).toBe("ready_for_agent");
   });
 });
 
@@ -239,6 +238,6 @@ describe("Task Filtering", () => {
     const done = getTasksByStatus(tasks, "done");
 
     expect(done).toHaveLength(2);
-    expect(done.map(t => t.id).sort()).toEqual(["a", "c"]);
+    expect(done.map((t) => t.id).sort()).toEqual(["a", "c"]);
   });
 });

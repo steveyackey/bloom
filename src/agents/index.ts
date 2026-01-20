@@ -2,6 +2,6 @@
 // Agent Providers - Re-exports
 // =============================================================================
 
+export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
 export * from "./core";
-export { ClaudeAgentProvider, interjectSession, getActiveSession } from "./claude";
 export { OpenCodeAgentProvider } from "./opencode";
