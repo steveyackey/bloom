@@ -2,7 +2,7 @@
 // Init Command - Initialize a new Bloom workspace
 // =============================================================================
 
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BLOOM_DIR, isInGitRepo } from "./context";
@@ -46,6 +46,23 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
   } else {
     mkdirSync(reposDir, { recursive: true });
     result.created.push("repos/");
+  }
+
+  // Add repos/ to .gitignore (create or append)
+  const gitignorePath = join(dir, ".gitignore");
+  const reposIgnoreEntry = "repos/";
+  if (existsSync(gitignorePath)) {
+    const gitignoreContent = readFileSync(gitignorePath, "utf-8");
+    if (!gitignoreContent.includes(reposIgnoreEntry)) {
+      const newline = gitignoreContent.endsWith("\n") ? "" : "\n";
+      appendFileSync(gitignorePath, `${newline}${reposIgnoreEntry}\n`);
+      result.created.push(".gitignore (added repos/)");
+    } else {
+      result.skipped.push(".gitignore (repos/ already present)");
+    }
+  } else {
+    await Bun.write(gitignorePath, `${reposIgnoreEntry}\n`);
+    result.created.push(".gitignore");
   }
 
   // Create template directory and copy template files
