@@ -11,7 +11,7 @@ Working directory: {{WORKING_DIR}}
 ## Your Task
 
 1. **Read the project context first** - Before doing anything else, read these files:
-   - {{WORKING_DIR}}/template/PRD.md - The product requirements (REQUIRED if exists)
+   - {{WORKING_DIR}}/PRD.md OR {{WORKING_DIR}}/project/PRD.md - The product requirements (REQUIRED if exists)
    - Any research documents, designs, or other context in {{WORKING_DIR}}
 2. **Understand the scope** - What needs to be built based on the PRD?
 3. **Ask about preferences** - Checkpoint frequency, merge strategy, etc.

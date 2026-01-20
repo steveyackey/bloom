@@ -38,7 +38,8 @@ describe("create command", () => {
     it("should provide a PRD template to guide project definition", async () => {
       const result = await createProject("my-project", TEST_DIR);
 
-      const prdPath = join(result.projectDir, "template", "PRD.md");
+      // PRD.md should be at project root
+      const prdPath = join(result.projectDir, "PRD.md");
       expect(existsSync(prdPath)).toBe(true);
 
       const content = await Bun.file(prdPath).text();
@@ -76,8 +77,9 @@ describe("create command", () => {
 
       expect(result.success).toBe(true);
       expect(result.created.length).toBeGreaterThan(0);
-      expect(result.created).toContain("template/PRD.md");
-      expect(result.created).toContain("CLAUDE.md");
+      // Files should be copied from template folder
+      expect(result.created.some((f) => f.includes("PRD.md"))).toBe(true);
+      expect(result.created.some((f) => f.includes("CLAUDE.md"))).toBe(true);
     });
   });
 });

@@ -13,7 +13,7 @@ Tasks file: {{TASKS_FILE}}
 
 1. **Read the project context first** - Before generating tasks, read these files:
    - {{WORKING_DIR}}/plan.md - The implementation plan (REQUIRED)
-   - {{WORKING_DIR}}/template/PRD.md - The product requirements (if exists)
+   - {{WORKING_DIR}}/PRD.md OR {{WORKING_DIR}}/project/PRD.md - The product requirements (if exists)
    - Any other relevant context files in the working directory
 2. **Generate tasks** - Convert each task from the plan into the proper YAML format
 3. **Write tasks.yaml** - Save to: {{TASKS_FILE}}

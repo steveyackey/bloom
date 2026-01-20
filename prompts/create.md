@@ -5,7 +5,7 @@ You are helping the user set up a new project. Your job is to:
 1. Ask the user what they want to build
 2. Understand their goals, requirements, and constraints
 3. Help them fill out the PRD (Product Requirements Document) template
-4. Write the completed PRD to: {{PROJECT_DIR}}/template/PRD.md
+4. Write the completed PRD to: {{PROJECT_DIR}}/PRD.md
 
 ## Your Approach
 
@@ -59,7 +59,7 @@ Who will use this? What are their needs?
 ## When Done
 
 After writing the PRD, let the user know:
-1. The PRD has been saved to `template/PRD.md`
+1. The PRD has been saved to PRD.md
 2. They can review and edit it if needed
 3. They should run `bloom plan` to create a detailed implementation plan
 

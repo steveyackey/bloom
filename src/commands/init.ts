@@ -2,10 +2,13 @@
 // Init Command - Initialize a new Bloom workspace
 // =============================================================================
 
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import * as YAML from "yaml";
 import { BLOOM_DIR, isInGitRepo } from "./context";
+
+// Path to template folder (relative to this file's package)
+const TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "..", "template");
 
 export interface InitResult {
   success: boolean;
@@ -24,6 +27,7 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
   const configFile = join(dir, "bloom.config.yaml");
   const reposDir = join(dir, "repos");
   const tasksFile = join(dir, "tasks.yaml");
+  const projectDir = join(dir, "project");
 
   // Create bloom.config.yaml (marks this as a bloom project)
   if (existsSync(configFile)) {
@@ -51,6 +55,59 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
   } else {
     await Bun.write(tasksFile, YAML.stringify({ tasks: [] }, { indent: 2 }));
     result.created.push("tasks.yaml");
+  }
+
+  // Create project directory with template files
+  if (existsSync(projectDir)) {
+    result.skipped.push("project/");
+  } else {
+    mkdirSync(projectDir, { recursive: true });
+    result.created.push("project/");
+
+    // Copy template files into project folder
+    if (existsSync(TEMPLATE_DIR)) {
+      const templateFiles = readdirSync(TEMPLATE_DIR);
+      for (const file of templateFiles) {
+        const srcPath = join(TEMPLATE_DIR, file);
+        const destPath = join(projectDir, file);
+        cpSync(srcPath, destPath, { recursive: true });
+        result.created.push(`project/${file}`);
+      }
+    } else {
+      // Fallback: create minimal PRD.md if template doesn't exist
+      const prdContent = `# Product Requirements Document: [Project Name]
+
+## Overview
+Brief description of the project and its purpose.
+
+## Problem Statement
+What problem does this solve? Why does it need to exist?
+
+## Target Users
+Who will use this? What are their needs?
+
+## Goals & Success Criteria
+- Primary goal
+- How will we measure success?
+
+## Core Features
+1. **Feature Name**: Description
+2. **Feature Name**: Description
+
+## Technical Requirements
+- Platform/runtime requirements
+- Key technologies or frameworks
+- Constraints or limitations
+
+## Non-Goals (Out of Scope)
+- What this project will NOT do (for this version)
+
+## Open Questions
+- Any unresolved decisions or unknowns
+`;
+      await Bun.write(join(projectDir, "PRD.md"), prdContent);
+      result.created.push("project/PRD.md");
+    }
   }
 
   return result;

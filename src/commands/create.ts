@@ -3,61 +3,13 @@
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ClaudeAgentProvider } from "../agents";
 import { loadPrompt } from "../prompts";
 
-// =============================================================================
-// Default Templates
-// =============================================================================
-
-const DEFAULT_PRD_TEMPLATE = `# Product Requirements Document: [Project Name]
-
-## Overview
-Brief description of the project and its purpose.
-
-## Problem Statement
-What problem does this solve? Why does it need to exist?
-
-## Target Users
-Who will use this? What are their needs?
-
-## Goals & Success Criteria
-- Primary goal
-- How will we measure success?
-
-## Core Features
-1. **Feature Name**: Description
-2. **Feature Name**: Description
-
-## Technical Requirements
-- Platform/runtime requirements
-- Key technologies or frameworks
-- Constraints or limitations
-
-## Non-Goals (Out of Scope)
-- What this project will NOT do (for this version)
-
-## Open Questions
-- Any unresolved decisions or unknowns
-`;
-
-const DEFAULT_CLAUDE_MD = `# Project Guidelines
-
-## Commit Style
-Always use conventional commits.
-
-## Development Workflow
-1. Review the PRD in \`template/PRD.md\`
-2. Check the plan in \`plan.md\`
-3. Follow the tasks in \`tasks.yaml\`
-
-## Code Standards
-- Write clear, maintainable code
-- Add tests for new functionality
-- Update documentation as needed
-`;
+// Path to template folder (relative to this file's package)
+const TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "..", "template");
 
 // =============================================================================
 // Create Project
@@ -111,20 +63,70 @@ export async function createProject(projectName: string, baseDir?: string): Prom
   }
   result.created.push(".git/");
 
-  // Create template directory
-  const templateDir = join(projectDir, "template");
-  mkdirSync(templateDir, { recursive: true });
-  result.created.push("template/");
+  // Copy template files into project root
+  if (existsSync(TEMPLATE_DIR)) {
+    const templateFiles = readdirSync(TEMPLATE_DIR);
+    for (const file of templateFiles) {
+      const srcPath = join(TEMPLATE_DIR, file);
+      const destPath = join(projectDir, file);
+      cpSync(srcPath, destPath, { recursive: true });
+      result.created.push(file);
+    }
+  } else {
+    // Fallback: create minimal files if template dir doesn't exist
+    const prdContent = `# Product Requirements Document: [Project Name]
 
-  // Create PRD template
-  const prdPath = join(templateDir, "PRD.md");
-  await Bun.write(prdPath, DEFAULT_PRD_TEMPLATE);
-  result.created.push("template/PRD.md");
+## Overview
+Brief description of the project and its purpose.
 
-  // Create CLAUDE.md
-  const claudeMdPath = join(projectDir, "CLAUDE.md");
-  await Bun.write(claudeMdPath, DEFAULT_CLAUDE_MD);
-  result.created.push("CLAUDE.md");
+## Problem Statement
+What problem does this solve? Why does it need to exist?
+
+## Target Users
+Who will use this? What are their needs?
+
+## Goals & Success Criteria
+- Primary goal
+- How will we measure success?
+
+## Core Features
+1. **Feature Name**: Description
+2. **Feature Name**: Description
+
+## Technical Requirements
+- Platform/runtime requirements
+- Key technologies or frameworks
+- Constraints or limitations
+
+## Non-Goals (Out of Scope)
+- What this project will NOT do (for this version)
+
+## Open Questions
+- Any unresolved decisions or unknowns
+`;
+
+    const claudeMdContent = `# Project Guidelines
+
+## Commit Style
+Always use conventional commits.
+
+## Development Workflow
+1. Review the PRD in PRD.md
+2. Check the plan in plan.md
+3. Follow the tasks in tasks.yaml
+
+## Code Standards
+- Write clear, maintainable code
+- Add tests for new functionality
+- Update documentation as needed
+`;
+
+    await Bun.write(join(projectDir, "PRD.md"), prdContent);
+    result.created.push("PRD.md");
+
+    await Bun.write(join(projectDir, "CLAUDE.md"), claudeMdContent);
+    result.created.push("CLAUDE.md");
+  }
 
   return result;
 }
