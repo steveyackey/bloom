@@ -133,9 +133,16 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
   const bareRepoPath = getBareRepoPath(bloomDir, repoName);
   const worktreesDir = getWorktreesDir(bloomDir, repoName);
 
-  // Ensure repos directory exists
+  // Require workspace to be initialized
   if (!existsSync(reposDir)) {
-    mkdirSync(reposDir, { recursive: true });
+    return {
+      success: false,
+      repoName,
+      bareRepoPath,
+      worktreePath: "",
+      defaultBranch: "",
+      error: "Workspace not initialized. Run 'bloom init' first.",
+    };
   }
 
   // Check if already cloned

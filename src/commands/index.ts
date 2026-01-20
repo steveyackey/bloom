@@ -5,6 +5,7 @@
 export * from "./config-cli";
 export * from "./context";
 export * from "./help";
+export * from "./init";
 export * from "./interjections";
 export * from "./orchestrator";
 export * from "./questions";

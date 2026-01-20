@@ -13,6 +13,9 @@ Options:
   -v, --verbose             Enable debug logging
   -q, --quiet               Only show errors
 
+Setup Commands:
+  init                      Initialize workspace (creates repos/, config files)
+
 Repository Commands:
   repo clone <url>          Clone a repo (bare + default branch worktree)
   repo list                 List all configured repos
@@ -71,6 +74,7 @@ Interjection Commands:
   interject dismiss <id>    Dismiss an interjection
 
 Examples:
+  bloom init                        Initialize a new workspace
   bloom repo clone https://github.com/org/repo   Clone a repository
   bloom repo list                   List configured repos
   bloom repo sync                   Clone/update all repos

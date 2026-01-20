@@ -12,6 +12,7 @@ import {
   cmdAssign,
   cmdClearAnswered,
   cmdDashboard,
+  cmdInit,
   cmdInterjectDismiss,
   cmdInterjections,
   cmdInterjectResume,
@@ -153,6 +154,10 @@ export async function main(): Promise<void> {
   const cmd = args[0];
 
   switch (cmd) {
+    case "init":
+      await cmdInit();
+      break;
+
     case "run":
       await startOrchestrator();
       break;

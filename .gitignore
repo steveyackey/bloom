@@ -24,5 +24,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Bun build output
+*.bun-build
+bin/
+out/
+
 # Project specific
 repos/
