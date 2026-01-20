@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.11](https://github.com/steveyackey/bloom/compare/bloom-v0.1.10...bloom-v0.1.11) (2026-01-20)
+
+
+### Bug Fixes
+
+* **agents:** don't use --print flag in interactive mode ([b49b404](https://github.com/steveyackey/bloom/commit/b49b404cb72d6a458407bc3647d843983af5a362))
+* **update:** correctly parse tag_name from GitHub API response ([ab1de6d](https://github.com/steveyackey/bloom/commit/ab1de6d1a11f9fde1adeead49b17471e9f4ace3f))
+
 ## [0.1.10](https://github.com/steveyackey/bloom/compare/bloom-v0.1.9...bloom-v0.1.10) (2026-01-20)
 
 
