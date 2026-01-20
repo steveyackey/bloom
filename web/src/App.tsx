@@ -22,7 +22,6 @@ function App() {
       <nav className="nav">
         <div className="container nav-container">
           <a href="/" className="nav-logo">
-            <img src="/bloom-logo.png" alt="Bloom" className="nav-logo-img" />
             <span>Bloom</span>
           </a>
           <div className="nav-links">
@@ -204,7 +203,7 @@ bloom help`}</code></pre>
       <footer className="footer">
         <div className="container footer-container">
           <div className="footer-brand">
-            <img src="/bloom-logo.png" alt="Bloom" className="footer-logo" />
+            <h3 className="footer-title">Bloom</h3>
             <p className="footer-tagline">Multi-agent task orchestration for AI-powered development.</p>
           </div>
           <div className="footer-links">

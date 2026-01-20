@@ -436,11 +436,11 @@
   max-width: 300px;
 }
 
-.footer-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  margin-bottom: 1rem;
+.footer-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
 }
 
 .footer-tagline {
