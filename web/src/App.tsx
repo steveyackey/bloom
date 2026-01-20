@@ -73,6 +73,11 @@ function App() {
               description="Plan across backend, frontend, and shared libraries in one project. Coordinate cross-repo dependencies automatically."
             />
             <FeatureCard
+              icon={<SearchIcon />}
+              title="Cross-Repo Exploration"
+              description="Use bloom enter to ask questions across all your repos. Debug issues, onboard to codebases, understand system connections."
+            />
+            <FeatureCard
               icon={<AgentsIcon />}
               title="Team & Solo Friendly"
               description="PMs define PRDs, designers add mockups, developers plan, QA validates. Or move fast as a solo dev with AI assistance."
@@ -83,19 +88,14 @@ function App() {
               description="Validate work at phase boundaries. QA and team members review before agents continue. You control the pace."
             />
             <FeatureCard
-              icon={<TerminalIcon />}
-              title="Rich Terminal UI"
-              description="Monitor all agents in real-time with a beautiful tiled interface. Navigate, restart, control."
-            />
-            <FeatureCard
               icon={<WorkflowIcon />}
               title="Git Worktree Isolation"
               description="No merge conflicts. Each agent works in its own worktree for true parallel development."
             />
             <FeatureCard
-              icon={<YamlIcon />}
-              title="YAML-Based Tasks"
-              description="Define tasks with clear instructions, dependencies, and acceptance criteria in simple YAML."
+              icon={<TerminalIcon />}
+              title="Rich Terminal UI"
+              description="Monitor all agents in real-time with a beautiful tiled interface. Navigate, restart, control."
             />
           </div>
         </div>
@@ -330,6 +330,15 @@ function WorkflowIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   )
 }

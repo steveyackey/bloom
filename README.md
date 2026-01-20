@@ -36,6 +36,22 @@ tasks:
     depends_on: [shared-types]
 ```
 
+## Explore Across Repositories
+
+Use `bloom enter` to start an interactive Claude session with visibility into all your repositories. Ask questions, explore code, or debug issues across your entire codebase—no project setup required.
+
+```bash
+# From anywhere in your workspace
+bloom enter
+
+# Ask questions spanning multiple repos
+> "How does the frontend auth flow connect to the backend JWT service?"
+> "What shared types are used between the API and mobile app?"
+> "Find all places where user permissions are checked"
+```
+
+Create a folder just for exploration if you want—no PRD or plan needed. Perfect for onboarding, architecture review, or understanding complex cross-repo interactions.
+
 ## Install
 
 **Linux / macOS:**

@@ -13,6 +13,7 @@ title: Introduction
 Bloom bridges the gap between high-level project planning and AI-powered execution. It supports the entire development lifecycle—from requirements gathering to code generation—with built-in collaboration points for teams of any size.
 
 - **Plan across repositories** — Coordinate work spanning backend, frontend, and shared libraries in a single project
+- **Explore your codebase** — Use `bloom enter` to ask questions across all your repos without setting up a project
 - **Plan thoroughly** — Define requirements in PRDs with mockups, designs, and technical constraints
 - **Collaborate naturally** — PMs, designers, developers, and QA can each contribute at the right stages
 - **Execute in parallel** — Run multiple Claude Code agents simultaneously on different tasks
@@ -40,6 +41,9 @@ init workspace → clone repos → create project → refine PRD → plan → ge
 
 ### Multi-Repository Planning
 Unlike single-repo tools, Bloom coordinates work across multiple repositories in a single project. Build features spanning your backend, frontend, mobile app, and shared libraries—all with proper cross-repo dependency ordering.
+
+### Cross-Repo Exploration
+Use `bloom enter` to start an interactive Claude session with access to all your repositories. Ask questions about how systems connect, debug issues across services, or onboard to a new codebase—no project setup required.
 
 ### Multi-Agent Orchestration
 Run multiple Claude Code agents in parallel, each working on isolated tasks in their own git worktrees. Automatic dependency resolution ensures tasks complete in the right order.
