@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/steveyackey/bloom/compare/bloom-v0.1.6...bloom-v0.1.7) (2026-01-20)
+
+
+### Features
+
+* **init:** generate .gitignore that ignores repos/ folder ([d9a016e](https://github.com/steveyackey/bloom/commit/d9a016e06b28f2a457a4ae7b7c0f568fe045b070))
+* **init:** generate .gitignore that ignores repos/ folder ([ffdb354](https://github.com/steveyackey/bloom/commit/ffdb3543d8b22e928fdab31fd62896883c5af722))
+
 ## [0.1.6](https://github.com/steveyackey/bloom/compare/bloom-v0.1.5...bloom-v0.1.6) (2026-01-20)
 
 
