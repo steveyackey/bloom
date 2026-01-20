@@ -1,0 +1,157 @@
+# =============================================================================
+# AGENT INSTRUCTIONS
+# =============================================================================
+#
+# STOPPING POINTS FOR HUMAN VALIDATION:
+# - When you complete a validation task, STOP and wait for human review
+# - Use `task-cli block <taskid>` with a note explaining what needs review
+# - Mark your task as `blocked` when you need human input or approval
+# - Never proceed past a phase boundary without human confirmation
+# - If uncertain about requirements, block and ask rather than assume
+#
+# WORKTREE WORKFLOW:
+# - Each agent works in their own git worktree for isolation
+# - NO TWO AGENTS should work in the same worktree simultaneously
+# - Worktree names should match the task group (e.g., "feature-auth", "phase-2")
+# - When a collection of work is complete and validated:
+#   1. Merge your worktree branch into the target branch
+#   2. Clean up the worktree: `git worktree remove <name>`
+#   3. Delete the feature branch if no longer needed
+# - All work for a phase should end up merged into a single worktree/branch
+# - Clean up intermediate worktrees once merged
+# - Run `task-cli validate` to check for worktree conflicts before starting
+#
+# TASK LIFECYCLE:
+# 1. Check `task-cli next <your-agent-name>` for available work
+# 2. `task-cli start <taskid>` to begin
+# 3. Work in your assigned worktree
+# 4. Add notes with `task-cli note <taskid> "progress update"`
+# 5. `task-cli done <taskid>` when acceptance criteria met
+# 6. If blocked, use `task-cli block <taskid>` and add a note explaining why
+# 7. STOP at validation tasks - wait for human to verify before continuing
+#
+# =============================================================================
+
+tasks:
+  # ===========================================================================
+  # Phase 1: Setup
+  # ===========================================================================
+  - id: setup-project-structure
+    title: Initialize project structure
+    status: todo
+    phase: 1
+    depends_on: []
+    repo: ./repos/backend
+    worktree: phase-1-setup
+    instructions: Create base directory layout and config files
+    acceptance_criteria:
+      - src/ directory exists with index.ts
+      - tsconfig.json configured for strict mode
+    ai_notes: []
+
+  - id: setup-dependencies
+    title: Install core dependencies
+    status: todo
+    phase: 1
+    depends_on:
+      - setup-project-structure
+    repo: ./repos/backend
+    worktree: phase-1-setup
+    instructions: Add zod and yaml packages
+    acceptance_criteria:
+      - zod installed for schema validation
+      - yaml installed for file parsing
+    validation_task_id: validate-phase-1
+
+  # VALIDATION TASK - Human must verify before phase 2
+  - id: validate-phase-1
+    title: "[CHECKPOINT] Validate phase 1 setup"
+    status: todo
+    phase: 1
+    depends_on:
+      - setup-project-structure
+      - setup-dependencies
+    repo: ./repos/backend
+    worktree: phase-1-setup
+    instructions: |
+      VALIDATION CHECKPOINT - Human review required.
+
+      Run these checks:
+      - bun install succeeds
+      - tsc --noEmit passes
+      - Project structure matches expected layout
+
+      After validation:
+      1. Merge phase-1-setup worktree into main
+      2. Clean up: git worktree remove phase-1-setup
+      3. Mark this task done to unblock phase 2
+
+      STOP HERE and wait for human confirmation before proceeding.
+    acceptance_criteria:
+      - bun install succeeds
+      - tsc --noEmit passes
+      - Project structure matches expected layout
+      - Human has reviewed and approved
+
+  # ===========================================================================
+  # Phase 2: Core Implementation
+  # ===========================================================================
+  - id: implement-core-feature
+    title: Implement core feature
+    status: todo
+    phase: 2
+    depends_on:
+      - validate-phase-1
+    repo: ./repos/backend
+    worktree: phase-2-core
+    agent_name: claude-code
+    instructions: |
+      Implement the main feature logic.
+      Work in the phase-2-core worktree.
+    acceptance_criteria:
+      - Feature works as specified
+      - Tests pass
+    validation_task_id: validate-phase-2
+    subtasks:
+      - id: implement-data-model
+        title: Create data model
+        status: todo
+        acceptance_criteria:
+          - Types defined
+          - Validation works
+      - id: implement-business-logic
+        title: Add business logic
+        status: todo
+        depends_on:
+          - implement-data-model
+        acceptance_criteria:
+          - Core functions implemented
+          - Edge cases handled
+
+  # VALIDATION TASK - Human must verify before phase 3
+  - id: validate-phase-2
+    title: "[CHECKPOINT] Validate phase 2 implementation"
+    status: todo
+    phase: 2
+    depends_on:
+      - implement-core-feature
+    repo: ./repos/backend
+    worktree: phase-2-core
+    instructions: |
+      VALIDATION CHECKPOINT - Human review required.
+
+      Run these checks:
+      - tsc --noEmit passes with no errors
+      - bun test passes for all tests
+      - Feature works as expected
+
+      After validation:
+      1. Merge phase-2-core worktree into main
+      2. Clean up: git worktree remove phase-2-core
+      3. Mark this task done to unblock phase 3
+
+      STOP HERE and wait for human confirmation before proceeding.
+    acceptance_criteria:
+      - tsc --noEmit passes with no errors
+      - bun test passes for all tests
+      - Human has reviewed and approved

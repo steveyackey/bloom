@@ -1,0 +1,442 @@
+tasks:
+  - id: setup-backend-project
+    title: Initialize Bun + Hono backend project
+    status: done
+    phase: 1
+    depends_on: []
+    repo: ./repos/backend
+    worktree: phase-1-setup
+    agent_name: floating
+    instructions: |
+      Initialize the backend project with Bun and Hono:
+      1. Run `bun init` in the repo
+      2. Install dependencies: `bun add hono`
+      3. Create src/ directory structure:
+         - src/index.ts (entry point)
+         - src/routes/ (API routes)
+         - src/middleware/ (middleware)
+         - src/lib/ (utilities including logger)
+      4. Create basic Hono app in src/index.ts
+      5. Add tsconfig.json with strict mode
+    acceptance_criteria:
+      - package.json exists with hono dependency
+      - src/index.ts starts a Hono server on port 3000
+      - "`bun run src/index.ts` starts without errors"
+      - 'GET /health returns { status: "ok" }'
+    ai_notes: []
+    subtasks: []
+  - id: create-logger-core
+    title: Create structured logger module
+    status: done
+    phase: 1
+    depends_on:
+      - setup-backend-project
+    repo: ./repos/backend
+    worktree: phase-1-setup
+    agent_name: floating
+    instructions: |
+      Create src/lib/logger.ts with:
+
+      1. Log levels: debug, info, warn, error, fatal
+      2. Structured JSON output format:
+         {
+           "timestamp": "ISO8601",
+           "level": "info",
+           "message": "...",
+           "context": "module-name",
+           "requestId": "optional-correlation-id",
+           "duration": "optional-ms",
+           "error": { "message", "stack", "code" },
+           "meta": { ...additional fields }
+         }
+      3. Environment-aware formatting:
+         - Development: pretty-print with colors
+         - Production: single-line JSON (for log aggregators)
+      4. createLogger(context) factory function
+      5. Child logger support for adding context
+      6. Configurable log level via LOG_LEVEL env var
+    acceptance_criteria:
+      - Logger exports createLogger function
+      - Logs output valid JSON in production mode
+      - Logs are colored/pretty in development
+      - Log level filtering works correctly
+      - Child loggers inherit parent context
+    ai_notes: []
+    subtasks: []
+  - id: validate-phase-1
+    title: "[CHECKPOINT] Validate phase 1 setup"
+    status: in_progress
+    phase: 1
+    depends_on:
+      - setup-backend-project
+      - create-logger-core
+    repo: ./repos/backend
+    worktree: phase-1-setup
+    agent_name: floating
+    instructions: |
+      VALIDATION CHECKPOINT - Human review required.
+
+      Run these checks:
+      - bun install succeeds
+      - bun run src/index.ts starts server
+      - curl http://localhost:3000/health returns OK
+      - Logger produces valid JSON output
+
+      After validation, merge worktree to main.
+    acceptance_criteria:
+      - Server starts and responds to health check
+      - Logger module is functional
+      - Human has reviewed and approved
+    ai_notes:
+      - "All validation checks passed: bun install succeeds, server starts on port 3000, health endpoint returns {status:ok}, logger produces valid JSON in production mode, 15/15 tests pass. Awaiting human approval to merge worktree to main."
+    subtasks: []
+  - id: create-request-logger-middleware
+    title: Create HTTP request logging middleware
+    status: todo
+    phase: 2
+    depends_on:
+      - validate-phase-1
+    repo: ./repos/backend
+    worktree: phase-2-middleware
+    instructions: |
+      Create src/middleware/request-logger.ts:
+
+      1. Generate unique requestId (nanoid or uuid) for each request
+      2. Store requestId in Hono context (c.set('requestId', id))
+      3. Log request start:
+         - method, path, query params
+         - user-agent, ip address
+         - requestId for correlation
+      4. Log request end:
+         - status code
+         - response time in ms
+         - response size (if available)
+      5. Use appropriate log levels:
+         - 2xx: info
+         - 4xx: warn
+         - 5xx: error
+      6. Skip logging for health check endpoints (configurable)
+    acceptance_criteria:
+      - Every request gets a unique requestId
+      - Request/response logged with timing
+      - Log level matches response status
+      - requestId available in route handlers
+    ai_notes: []
+    subtasks: []
+  - id: create-correlation-context
+    title: Add async context for request correlation
+    status: todo
+    phase: 2
+    depends_on:
+      - create-request-logger-middleware
+    repo: ./repos/backend
+    worktree: phase-2-middleware
+    instructions: |
+      Create src/lib/context.ts for request-scoped logging:
+
+      1. Use AsyncLocalStorage to store request context
+      2. Middleware sets context at request start
+      3. Logger automatically includes requestId from context
+      4. Export getRequestId() helper for use anywhere
+      5. Ensure context is cleaned up after request
+
+      This allows any code (services, utils) to log with
+      the current requestId without passing it explicitly.
+    acceptance_criteria:
+      - AsyncLocalStorage context works across async calls
+      - Logs from anywhere include current requestId
+      - No memory leaks from context storage
+      - Works with concurrent requests
+    ai_notes: []
+    subtasks: []
+  - id: validate-phase-2
+    title: "[CHECKPOINT] Validate phase 2 middleware"
+    status: todo
+    phase: 2
+    depends_on:
+      - create-request-logger-middleware
+      - create-correlation-context
+    repo: ./repos/backend
+    worktree: phase-2-middleware
+    instructions: |
+      VALIDATION CHECKPOINT - Human review required.
+
+      Test scenarios:
+      - Make multiple concurrent requests
+      - Verify each has unique requestId
+      - Check requestId appears in all related logs
+      - Verify timing accuracy
+      - Test different response status codes
+
+      After validation, merge worktree to main.
+    acceptance_criteria:
+      - Request logging works correctly
+      - Correlation IDs trace through logs
+      - Human has reviewed and approved
+    ai_notes: []
+    subtasks: []
+  - id: create-error-handler
+    title: Create centralized error handling middleware
+    status: todo
+    phase: 3
+    depends_on:
+      - validate-phase-2
+    repo: ./repos/backend
+    worktree: phase-3-errors
+    instructions: |
+      Create src/middleware/error-handler.ts:
+
+      1. Catch all unhandled errors from routes
+      2. Log errors with full context:
+         - Error message and stack trace
+         - Request details (method, path, body if safe)
+         - requestId for correlation
+         - Error code/type classification
+      3. Create AppError base class with:
+         - statusCode
+         - code (machine-readable)
+         - isOperational flag (expected vs unexpected)
+      4. Return appropriate error responses:
+         - Development: include stack trace
+         - Production: generic message, log details server-side
+      5. Handle different error types:
+         - Validation errors (400)
+         - Auth errors (401, 403)
+         - Not found (404)
+         - Internal errors (500)
+    acceptance_criteria:
+      - All errors are caught and logged
+      - Stack traces logged server-side
+      - Client gets safe error response
+      - Operational vs unexpected errors handled differently
+      - requestId included in error logs
+    ai_notes: []
+    subtasks: []
+  - id: add-error-context-helpers
+    title: Add error context enrichment utilities
+    status: todo
+    phase: 3
+    depends_on:
+      - create-error-handler
+    repo: ./repos/backend
+    worktree: phase-3-errors
+    instructions: |
+      Create src/lib/errors.ts with utilities:
+
+      1. AppError class hierarchy:
+         - ValidationError
+         - AuthenticationError
+         - AuthorizationError
+         - NotFoundError
+         - ConflictError
+         - InternalError
+      2. Error wrapping utility:
+         - wrapError(originalError, context)
+         - Preserves original stack
+         - Adds context metadata
+      3. Safe error serialization:
+         - Handles circular references
+         - Redacts sensitive fields
+         - Limits stack trace depth
+    acceptance_criteria:
+      - Error classes cover common HTTP errors
+      - Original error context preserved
+      - Sensitive data not leaked in logs
+      - Circular references handled
+    ai_notes: []
+    subtasks: []
+  - id: validate-phase-3
+    title: "[CHECKPOINT] Validate phase 3 error handling"
+    status: todo
+    phase: 3
+    depends_on:
+      - create-error-handler
+      - add-error-context-helpers
+    repo: ./repos/backend
+    worktree: phase-3-errors
+    instructions: |
+      VALIDATION CHECKPOINT - Human review required.
+
+      Test scenarios:
+      - Throw various error types in routes
+      - Verify error logs contain full context
+      - Check client responses are safe
+      - Test unhandled promise rejections
+      - Verify requestId in error logs
+
+      After validation, merge worktree to main.
+    acceptance_criteria:
+      - Error handling is comprehensive
+      - Logs are useful for debugging
+      - Client responses are appropriate
+      - Human has reviewed and approved
+    ai_notes: []
+    subtasks: []
+  - id: add-debug-tracing
+    title: Add debug-level operation tracing
+    status: todo
+    phase: 4
+    depends_on:
+      - validate-phase-3
+    repo: ./repos/backend
+    worktree: phase-4-tracing
+    instructions: |
+      Create src/lib/trace.ts for detailed tracing:
+
+      1. trace(name, fn) wrapper that logs:
+         - Operation start (debug level)
+         - Operation end with duration
+         - Any thrown errors
+      2. Nested trace support:
+         - Parent-child relationship
+         - Indented or hierarchical output
+      3. Conditional tracing:
+         - Only active when LOG_LEVEL=debug
+         - Zero overhead when disabled
+      4. Trace metadata:
+         - Input parameters (sanitized)
+         - Output summary
+         - Performance metrics
+    acceptance_criteria:
+      - trace() wrapper logs operation timing
+      - Nested traces show hierarchy
+      - No performance impact when disabled
+      - Sensitive data is sanitized
+    ai_notes: []
+    subtasks: []
+  - id: add-database-query-logging
+    title: Add database query logging hooks
+    status: todo
+    phase: 4
+    depends_on:
+      - add-debug-tracing
+    repo: ./repos/backend
+    worktree: phase-4-tracing
+    instructions: |
+      Create src/lib/db-logger.ts (generic, DB-agnostic):
+
+      1. Query logging interface:
+         - logQuery(sql, params, duration)
+         - logQueryError(sql, params, error)
+      2. Slow query detection:
+         - Configurable threshold (default 100ms)
+         - Warn level for slow queries
+      3. Query sanitization:
+         - Redact sensitive parameter values
+         - Truncate long queries in logs
+      4. Integration examples for:
+         - Drizzle ORM
+         - Prisma
+         - Raw SQL
+
+      Note: Actual DB setup is out of scope, just create
+      the logging utilities that can be integrated later.
+    acceptance_criteria:
+      - Query logging interface is defined
+      - Slow query warnings work
+      - Sensitive data is redacted
+      - Easy to integrate with any ORM
+    ai_notes: []
+    subtasks: []
+  - id: validate-phase-4
+    title: "[CHECKPOINT] Validate phase 4 tracing"
+    status: todo
+    phase: 4
+    depends_on:
+      - add-debug-tracing
+      - add-database-query-logging
+    repo: ./repos/backend
+    worktree: phase-4-tracing
+    instructions: |
+      VALIDATION CHECKPOINT - Human review required.
+
+      Test scenarios:
+      - Enable debug logging
+      - Verify trace output is readable
+      - Check nested traces display correctly
+      - Test slow query warnings
+      - Verify no overhead when tracing disabled
+
+      After validation, merge worktree to main.
+    acceptance_criteria:
+      - Debug tracing provides useful insights
+      - Performance impact is minimal
+      - Human has reviewed and approved
+    ai_notes: []
+    subtasks: []
+  - id: create-example-routes
+    title: Create example routes demonstrating logging
+    status: todo
+    phase: 5
+    depends_on:
+      - validate-phase-4
+    repo: ./repos/backend
+    worktree: phase-5-integration
+    instructions: |
+      Create src/routes/example.ts with demo endpoints:
+
+      1. GET /api/example - basic request logging
+      2. GET /api/example/:id - with path params
+      3. POST /api/example - with body logging
+      4. GET /api/example/error - demonstrates error handling
+      5. GET /api/example/slow - demonstrates slow operation warning
+
+      Each route should showcase different logging features.
+      Include comments explaining what to observe in logs.
+    acceptance_criteria:
+      - Example routes cover all logging features
+      - Comments explain expected log output
+      - Easy to use for testing/demo
+    ai_notes: []
+    subtasks: []
+  - id: add-log-configuration
+    title: Add centralized logging configuration
+    status: todo
+    phase: 5
+    depends_on:
+      - create-example-routes
+    repo: ./repos/backend
+    worktree: phase-5-integration
+    instructions: |
+      Create src/config/logger.config.ts:
+
+      1. Environment variables:
+         - LOG_LEVEL (debug|info|warn|error)
+         - LOG_FORMAT (json|pretty)
+         - LOG_REQUESTS (true|false)
+         - LOG_SLOW_THRESHOLD_MS (default 100)
+      2. Validation with defaults
+      3. Export typed config object
+      4. Update all logging to use config
+    acceptance_criteria:
+      - All log settings configurable via env
+      - Defaults work without any env vars
+      - Config is typed and validated
+    ai_notes: []
+    subtasks: []
+  - id: final-validation
+    title: "[CHECKPOINT] Final validation and documentation"
+    status: todo
+    phase: 5
+    depends_on:
+      - create-example-routes
+      - add-log-configuration
+    repo: ./repos/backend
+    worktree: phase-5-integration
+    instructions: |
+      FINAL VALIDATION CHECKPOINT - Human review required.
+
+      1. Review all logging output
+      2. Test in both development and production modes
+      3. Verify JSON logs parse correctly
+      4. Check correlation IDs work end-to-end
+      5. Review code quality and patterns
+
+      After validation, merge to main and tag v1.0.0.
+    acceptance_criteria:
+      - All logging features work correctly
+      - Code is clean and well-organized
+      - Ready for production use
+      - Human has reviewed and approved
+    ai_notes: []
+    subtasks: []

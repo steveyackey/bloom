@@ -1,0 +1,13 @@
+tasks:
+  - id: print-hello-world
+    title: Print hello world
+    status: done
+    phase: 1
+    depends_on: []
+    agent_name: floating
+    instructions: |
+      Create a simple script that prints "hello world" to the console.
+    acceptance_criteria:
+      - Script outputs "hello world" when run
+    ai_notes: []
+    subtasks: []

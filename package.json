@@ -1,0 +1,29 @@
+{
+  "name": "bloom",
+  "private": true,
+  "description": "Multi-agent task orchestrator with YAML-based task management",
+  "bin": {
+    "bloom": "./bloom.ts"
+  },
+  "scripts": {
+    "bloom": "bun bloom.ts",
+    "start": "bun bloom.ts run",
+    "plan": "bun bloom.ts plan",
+    "dashboard": "bun bloom.ts dashboard"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@inquirer/confirm": "^6.0.4",
+    "@inquirer/input": "^5.0.4",
+    "@inquirer/search": "^4.1.0",
+    "@inquirer/select": "^5.0.4",
+    "@xterm/headless": "^6.0.0",
+    "yaml": "^2.8.2",
+    "zod": "^4.3.5"
+  }
+}
