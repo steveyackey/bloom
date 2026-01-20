@@ -32,10 +32,14 @@ export async function runGenerateSession(workingDir: string, tasksFile: string):
 
   console.log(`Generate session - tasks will be written to: ${tasksFile}\n`);
 
+  const initialPrompt = `Please read the plan.md and generate a tasks.yaml file. Start by reading the plan, then create the task definitions.
+
+IMPORTANT: After writing tasks.yaml, you MUST validate it by running \`bloom validate\`. If validation fails (especially YAML parsing errors with strings containing special characters like backticks, quotes, or colons), fix the quoting issues and re-validate until it passes.`;
+
   // Run Claude from git root but tell it about the working directory
   await agent.run({
     systemPrompt,
-    prompt: "",
+    prompt: initialPrompt,
     startingDirectory: gitRoot,
   });
 }

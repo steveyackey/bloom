@@ -61,10 +61,12 @@ export async function runPlanSession(workingDir: string, planFile: string): Prom
 
   console.log(`Planning session - plan will be written to: ${planFile}\n`);
 
+  const initialPrompt = `Please read the PRD.md and help me create an implementation plan. Start by reading the PRD, then ask any clarifying questions before drafting the plan.`;
+
   // Run Claude from git root but tell it about the working directory
   await agent.run({
     systemPrompt,
-    prompt: "",
+    prompt: initialPrompt,
     startingDirectory: gitRoot,
   });
 }

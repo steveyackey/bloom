@@ -189,6 +189,7 @@ export async function startOrchestrator(): Promise<void> {
 
   let agents: Set<string>;
   try {
+    logger.orchestrator.info("Validating tasks.yaml...");
     const tasksFile = await loadTasks(getTasksFile());
 
     logger.orchestrator.info("Checking for stuck tasks...");
@@ -207,7 +208,14 @@ export async function startOrchestrator(): Promise<void> {
     }
 
     agents = getAllAgents(tasksFile.tasks);
-  } catch (_err) {
+  } catch (err) {
+    // Check if it's a YAML parsing error
+    if (err instanceof Error && (err.name === "YAMLParseError" || err.message.includes("YAML"))) {
+      logger.orchestrator.error("Failed to parse tasks.yaml - likely a YAML syntax error.");
+      logger.orchestrator.error("Run 'bloom validate' for details, then fix the issues.");
+      logger.orchestrator.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
     logger.orchestrator.warn("No tasks.yaml or no agents defined yet. Creating session with dashboard only.");
     agents = new Set();
   }
