@@ -23,6 +23,13 @@ describe("prompts", () => {
       expect(prompt).toContain("Technical Requirements");
     });
 
+    it("should write PRD to project root", async () => {
+      const prompt = await loadPrompt("create", { PROJECT_DIR: "/test/project" });
+
+      // PRD should be saved to project root, not a subfolder
+      expect(prompt).toContain("/test/project/PRD.md");
+    });
+
     it("should tell user about next steps", async () => {
       const prompt = await loadPrompt("create", { PROJECT_DIR: "/test/project" });
 
@@ -31,15 +38,29 @@ describe("prompts", () => {
   });
 
   describe("plan prompt", () => {
-    it("should help create implementation plan", async () => {
+    it("should instruct Claude to read PRD before planning", async () => {
       const prompt = await loadPrompt("plan", {
         WORKING_DIR: "/test/project",
         PLAN_FILE: "/test/project/plan.md",
         REPOS_CONTEXT: "No repos configured",
       });
 
-      expect(prompt).toContain("plan");
-      expect(prompt).toContain("implementation");
+      // Must read context FIRST before doing anything else
+      expect(prompt).toContain("Read the project context first");
+      expect(prompt).toContain("PRD.md");
+      expect(prompt).toContain("IMPORTANT");
+    });
+
+    it("should check both possible PRD locations", async () => {
+      const prompt = await loadPrompt("plan", {
+        WORKING_DIR: "/test/project",
+        PLAN_FILE: "/test/project/plan.md",
+        REPOS_CONTEXT: "No repos configured",
+      });
+
+      // Should check both root and project/ folder
+      expect(prompt).toContain("/test/project/PRD.md");
+      expect(prompt).toContain("/test/project/project/PRD.md");
     });
 
     it("should ask about checkpoint preferences", async () => {
@@ -53,18 +74,20 @@ describe("prompts", () => {
       expect(prompt).toContain("Checkpoint");
     });
 
-    it("should ask about merge strategy", async () => {
+    it("should ask about merge strategy options", async () => {
       const prompt = await loadPrompt("plan", {
         WORKING_DIR: "/test/project",
         PLAN_FILE: "/test/project/plan.md",
         REPOS_CONTEXT: "No repos configured",
       });
 
-      expect(prompt).toContain("merge");
       expect(prompt).toContain("Merge Strategy");
+      expect(prompt).toContain("Feature branches");
+      expect(prompt).toContain("Phase branches");
+      expect(prompt).toContain("Trunk-based");
     });
 
-    it("should include repos context", async () => {
+    it("should include repos context for target codebase awareness", async () => {
       const prompt = await loadPrompt("plan", {
         WORKING_DIR: "/test/project",
         PLAN_FILE: "/test/project/plan.md",
@@ -73,6 +96,16 @@ describe("prompts", () => {
 
       expect(prompt).toContain("Configured Repositories");
       expect(prompt).toContain("backend");
+    });
+
+    it("should output plan.md file", async () => {
+      const prompt = await loadPrompt("plan", {
+        WORKING_DIR: "/test/project",
+        PLAN_FILE: "/test/project/plan.md",
+        REPOS_CONTEXT: "No repos configured",
+      });
+
+      expect(prompt).toContain("/test/project/plan.md");
     });
 
     it("should tell user about next steps", async () => {
@@ -87,15 +120,38 @@ describe("prompts", () => {
   });
 
   describe("generate prompt", () => {
-    it("should convert plan to tasks.yaml", async () => {
+    it("should instruct Claude to read plan.md first", async () => {
       const prompt = await loadPrompt("generate", {
         WORKING_DIR: "/test/project",
         TASKS_FILE: "/test/project/tasks.yaml",
         REPOS_CONTEXT: "No repos configured",
       });
 
-      expect(prompt).toContain("tasks.yaml");
-      expect(prompt).toContain("plan");
+      // Must read context FIRST
+      expect(prompt).toContain("Read the project context first");
+      expect(prompt).toContain("plan.md");
+      expect(prompt).toContain("REQUIRED");
+      expect(prompt).toContain("IMPORTANT");
+    });
+
+    it("should also read PRD for context", async () => {
+      const prompt = await loadPrompt("generate", {
+        WORKING_DIR: "/test/project",
+        TASKS_FILE: "/test/project/tasks.yaml",
+        REPOS_CONTEXT: "No repos configured",
+      });
+
+      expect(prompt).toContain("PRD.md");
+    });
+
+    it("should not ask user what to generate - plan has that info", async () => {
+      const prompt = await loadPrompt("generate", {
+        WORKING_DIR: "/test/project",
+        TASKS_FILE: "/test/project/tasks.yaml",
+        REPOS_CONTEXT: "No repos configured",
+      });
+
+      expect(prompt).toContain("Do not ask the user what to generate");
     });
 
     it("should include task schema documentation", async () => {
@@ -111,7 +167,7 @@ describe("prompts", () => {
       expect(prompt).toContain("acceptance_criteria:");
     });
 
-    it("should explain agent naming strategy", async () => {
+    it("should explain agent naming for parallelization", async () => {
       const prompt = await loadPrompt("generate", {
         WORKING_DIR: "/test/project",
         TASKS_FILE: "/test/project/tasks.yaml",
@@ -121,6 +177,17 @@ describe("prompts", () => {
       expect(prompt).toContain("agent_name");
       expect(prompt).toContain("parallel");
       expect(prompt).toContain("sequential");
+      expect(prompt).toContain("Same name = Same agent");
+    });
+
+    it("should output tasks.yaml file", async () => {
+      const prompt = await loadPrompt("generate", {
+        WORKING_DIR: "/test/project",
+        TASKS_FILE: "/test/project/tasks.yaml",
+        REPOS_CONTEXT: "No repos configured",
+      });
+
+      expect(prompt).toContain("/test/project/tasks.yaml");
     });
 
     it("should tell user about next steps", async () => {
