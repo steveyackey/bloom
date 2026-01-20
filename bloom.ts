@@ -23,8 +23,6 @@ import {
   dismissInterjection,
   getActionResult,
   markActionExecuted,
-  isYesAnswer,
-  isNoAnswer,
   type Question,
   type QuestionType,
   type QuestionAction,

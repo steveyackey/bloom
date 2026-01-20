@@ -2,22 +2,23 @@
 // Human Question Queue - File-based queue for agent-human interaction
 // =============================================================================
 
-import { existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, unlinkSync, watch, type FSWatcher } from "node:fs";
 import { join, resolve } from "node:path";
 import { createLogger } from "./logger";
 
 const logger = createLogger("human-queue");
 
+// =============================================================================
+// Types
+// =============================================================================
+
 export type QuestionType = "yes_no" | "open" | "choice";
 
 export interface QuestionAction {
   type: "set_status" | "add_note" | "custom";
-  // For set_status: the status to set on the task when answered "yes"
-  // For add_note: the note template (answer will be appended)
   payload?: string;
-  // For yes_no: what to do on "yes" vs "no"
-  onYes?: string;  // e.g., "done", "ready_for_agent"
-  onNo?: string;   // e.g., "blocked", "todo"
+  onYes?: string;
+  onNo?: string;
 }
 
 export interface Question {
@@ -25,14 +26,14 @@ export interface Question {
   agentName: string;
   taskId?: string;
   question: string;
-  questionType?: QuestionType;  // Type of question (yes_no, open, choice)
-  options?: string[];  // Optional multiple choice options
-  action?: QuestionAction;  // What to do when answered
+  questionType?: QuestionType;
+  options?: string[];
+  action?: QuestionAction;
   createdAt: string;
   status: "pending" | "answered";
   answer?: string;
   answeredAt?: string;
-  actionExecuted?: boolean;  // Whether the programmatic action was executed
+  actionExecuted?: boolean;
 }
 
 export interface Interjection {
@@ -47,28 +48,73 @@ export interface Interjection {
   resumedAt?: string;
 }
 
-// Queue directories - stored alongside tasks
+// =============================================================================
+// Constants & Helpers
+// =============================================================================
+
 const BLOOM_DIR = resolve(import.meta.dirname ?? ".");
 const QUEUE_DIR = join(BLOOM_DIR, ".questions");
 const INTERJECT_DIR = join(BLOOM_DIR, ".interjections");
 
-function ensureQueueDir(): void {
-  if (!existsSync(QUEUE_DIR)) {
-    mkdirSync(QUEUE_DIR, { recursive: true });
-  }
+const YES_ANSWERS = new Set(["yes", "y", "yeah", "yep", "sure", "ok", "okay", "approve", "approved", "confirm", "confirmed", "true", "1"]);
+const NO_ANSWERS = new Set(["no", "n", "nope", "nah", "reject", "rejected", "deny", "denied", "false", "0"]);
+
+function ensureDir(dir: string): void {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
-function generateId(): string {
-  return `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function generateId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+async function readJson<T>(path: string): Promise<T | null> {
+  if (!existsSync(path)) return null;
+  return JSON.parse(await Bun.file(path).text());
+}
+
+async function writeJson(path: string, data: unknown): Promise<void> {
+  await Bun.write(path, JSON.stringify(data, null, 2));
+}
+
+async function listJsonFiles<T>(dir: string, filter?: (item: T) => boolean): Promise<T[]> {
+  ensureDir(dir);
+  const files = readdirSync(dir).filter(f => f.endsWith(".json"));
+  const items: T[] = [];
+
+  for (const file of files) {
+    try {
+      const item = await readJson<T>(join(dir, file));
+      if (item && (!filter || filter(item))) items.push(item);
+    } catch { /* skip invalid files */ }
+  }
+
+  return items;
+}
+
+// =============================================================================
+// Question Operations
+// =============================================================================
 
 function getQuestionPath(id: string): string {
   return join(QUEUE_DIR, `${id}.json`);
 }
 
-// =============================================================================
-// Queue Operations
-// =============================================================================
+function detectQuestionType(question: string, hasChoices: boolean): QuestionType {
+  if (hasChoices) return "choice";
+
+  const lower = question.toLowerCase();
+  const isYesNo = lower.includes("yes or no") ||
+    lower.includes("yes/no") ||
+    (lower.endsWith("?") && (
+      lower.includes("should i") ||
+      lower.includes("do you want") ||
+      lower.includes("is this") ||
+      lower.includes("can i") ||
+      lower.includes("ready to")
+    ));
+
+  return isYesNo ? "yes_no" : "open";
+}
 
 export async function askQuestion(
   agentName: string,
@@ -80,31 +126,10 @@ export async function askQuestion(
     action?: QuestionAction;
   }
 ): Promise<string> {
-  ensureQueueDir();
+  ensureDir(QUEUE_DIR);
 
-  const id = generateId();
-
-  // Auto-detect question type if not specified
-  let questionType = options?.questionType;
-  if (!questionType) {
-    if (options?.choices && options.choices.length > 0) {
-      questionType = "choice";
-    } else if (
-      question.toLowerCase().includes("yes or no") ||
-      question.toLowerCase().includes("yes/no") ||
-      question.toLowerCase().endsWith("?") && (
-        question.toLowerCase().includes("should i") ||
-        question.toLowerCase().includes("do you want") ||
-        question.toLowerCase().includes("is this") ||
-        question.toLowerCase().includes("can i") ||
-        question.toLowerCase().includes("ready to")
-      )
-    ) {
-      questionType = "yes_no";
-    } else {
-      questionType = "open";
-    }
-  }
+  const id = generateId("q");
+  const questionType = options?.questionType ?? detectQuestionType(question, !!options?.choices?.length);
 
   const q: Question = {
     id,
@@ -118,75 +143,44 @@ export async function askQuestion(
     status: "pending",
   };
 
-  await Bun.write(getQuestionPath(id), JSON.stringify(q, null, 2));
+  await writeJson(getQuestionPath(id), q);
   logger.info(`Question created: ${id} from ${agentName} (type: ${questionType})`);
-
   return id;
 }
 
 export async function answerQuestion(id: string, answer: string): Promise<boolean> {
   const path = getQuestionPath(id);
+  const q = await readJson<Question>(path);
 
-  if (!existsSync(path)) {
+  if (!q) {
     logger.error(`Question not found: ${id}`);
     return false;
   }
-
-  const content = await Bun.file(path).text();
-  const q: Question = JSON.parse(content);
 
   q.status = "answered";
   q.answer = answer;
   q.answeredAt = new Date().toISOString();
 
-  await Bun.write(path, JSON.stringify(q, null, 2));
+  await writeJson(path, q);
   logger.info(`Question answered: ${id}`);
-
   return true;
 }
 
 export async function getQuestion(id: string): Promise<Question | null> {
-  const path = getQuestionPath(id);
-
-  if (!existsSync(path)) {
-    return null;
-  }
-
-  const content = await Bun.file(path).text();
-  return JSON.parse(content);
+  return readJson<Question>(getQuestionPath(id));
 }
 
 export async function listQuestions(status?: "pending" | "answered"): Promise<Question[]> {
-  ensureQueueDir();
-
-  const files = readdirSync(QUEUE_DIR).filter(f => f.endsWith(".json"));
-  const questions: Question[] = [];
-
-  for (const file of files) {
-    try {
-      const content = await Bun.file(join(QUEUE_DIR, file)).text();
-      const q: Question = JSON.parse(content);
-      if (!status || q.status === status) {
-        questions.push(q);
-      }
-    } catch {
-      // Skip invalid files
-    }
-  }
-
-  // Sort by creation time, oldest first
-  return questions.sort((a, b) =>
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  const questions = await listJsonFiles<Question>(
+    QUEUE_DIR,
+    status ? q => q.status === status : undefined
   );
+  return questions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
 export async function deleteQuestion(id: string): Promise<boolean> {
   const path = getQuestionPath(id);
-
-  if (!existsSync(path)) {
-    return false;
-  }
-
+  if (!existsSync(path)) return false;
   unlinkSync(path);
   logger.info(`Question deleted: ${id}`);
   return true;
@@ -195,21 +189,15 @@ export async function deleteQuestion(id: string): Promise<boolean> {
 export async function clearAnsweredQuestions(): Promise<number> {
   const answered = await listQuestions("answered");
   let count = 0;
-
   for (const q of answered) {
-    if (await deleteQuestion(q.id)) {
-      count++;
-    }
+    if (await deleteQuestion(q.id)) count++;
   }
-
   return count;
 }
 
 // =============================================================================
-// File watching for event-driven updates
+// Queue Watching
 // =============================================================================
-
-import { watch, type FSWatcher } from "node:fs";
 
 export type QueueEventType = "question_added" | "question_answered" | "question_deleted";
 
@@ -222,51 +210,29 @@ export interface QueueEvent {
 export type QueueEventHandler = (event: QueueEvent) => void;
 
 let activeWatcher: FSWatcher | null = null;
-const eventHandlers: Set<QueueEventHandler> = new Set();
+const eventHandlers = new Set<QueueEventHandler>();
 
 export function watchQueue(handler: QueueEventHandler): () => void {
-  ensureQueueDir();
-
+  ensureDir(QUEUE_DIR);
   eventHandlers.add(handler);
 
-  // Start watcher if not already running
   if (!activeWatcher) {
-    activeWatcher = watch(QUEUE_DIR, async (eventType, filename) => {
-      if (!filename || !filename.endsWith(".json")) return;
+    activeWatcher = watch(QUEUE_DIR, async (_, filename) => {
+      if (!filename?.endsWith(".json")) return;
 
       const questionId = filename.replace(".json", "");
-      const path = getQuestionPath(questionId);
+      const q = await readJson<Question>(getQuestionPath(questionId));
 
-      let event: QueueEvent;
+      const event: QueueEvent = q
+        ? { type: q.status === "answered" ? "question_answered" : "question_added", questionId, question: q }
+        : { type: "question_deleted", questionId };
 
-      if (!existsSync(path)) {
-        event = { type: "question_deleted", questionId };
-      } else {
-        try {
-          const content = await Bun.file(path).text();
-          const q: Question = JSON.parse(content);
-          event = {
-            type: q.status === "answered" ? "question_answered" : "question_added",
-            questionId,
-            question: q,
-          };
-        } catch {
-          return; // Ignore parse errors (file being written)
-        }
-      }
-
-      // Notify all handlers
       for (const h of eventHandlers) {
-        try {
-          h(event);
-        } catch (err) {
-          logger.error("Error in queue event handler:", err);
-        }
+        try { h(event); } catch (err) { logger.error("Error in queue event handler:", err); }
       }
     });
   }
 
-  // Return unsubscribe function
   return () => {
     eventHandlers.delete(handler);
     if (eventHandlers.size === 0 && activeWatcher) {
@@ -276,15 +242,7 @@ export function watchQueue(handler: QueueEventHandler): () => void {
   };
 }
 
-// =============================================================================
-// Event-driven waiting for agents
-// =============================================================================
-
-export async function waitForAnswer(
-  id: string,
-  timeoutMs = 300000  // 5 minute default timeout
-): Promise<string | null> {
-  // Check if already answered
+export async function waitForAnswer(id: string, timeoutMs = 300000): Promise<string | null> {
   const existing = await getQuestion(id);
   if (!existing) {
     logger.error(`Question ${id} not found`);
@@ -322,170 +280,104 @@ export async function waitForAnswer(
 // Interjection Operations
 // =============================================================================
 
-function ensureInterjectDir(): void {
-  if (!existsSync(INTERJECT_DIR)) {
-    mkdirSync(INTERJECT_DIR, { recursive: true });
-  }
-}
-
 function getInterjectionPath(id: string): string {
   return join(INTERJECT_DIR, `${id}.json`);
 }
 
 export async function createInterjection(
   agentName: string,
-  options: {
-    taskId?: string;
-    sessionId?: string;
-    workingDirectory: string;
-    reason?: string;
-  }
+  options: { taskId?: string; sessionId?: string; workingDirectory: string; reason?: string }
 ): Promise<string> {
-  ensureInterjectDir();
+  ensureDir(INTERJECT_DIR);
 
-  const id = `i-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = generateId("i");
   const interjection: Interjection = {
     id,
     agentName,
-    taskId: options.taskId,
-    sessionId: options.sessionId,
-    workingDirectory: options.workingDirectory,
-    reason: options.reason,
+    ...options,
     createdAt: new Date().toISOString(),
     status: "pending",
   };
 
-  await Bun.write(getInterjectionPath(id), JSON.stringify(interjection, null, 2));
+  await writeJson(getInterjectionPath(id), interjection);
   logger.info(`Interjection created: ${id} for ${agentName}`);
-
   return id;
 }
 
 export async function getInterjection(id: string): Promise<Interjection | null> {
-  const path = getInterjectionPath(id);
-
-  if (!existsSync(path)) {
-    return null;
-  }
-
-  const content = await Bun.file(path).text();
-  return JSON.parse(content);
+  return readJson<Interjection>(getInterjectionPath(id));
 }
 
 export async function listInterjections(status?: "pending" | "resumed" | "dismissed"): Promise<Interjection[]> {
-  ensureInterjectDir();
-
-  const files = readdirSync(INTERJECT_DIR).filter(f => f.endsWith(".json"));
-  const interjections: Interjection[] = [];
-
-  for (const file of files) {
-    try {
-      const content = await Bun.file(join(INTERJECT_DIR, file)).text();
-      const i: Interjection = JSON.parse(content);
-      if (!status || i.status === status) {
-        interjections.push(i);
-      }
-    } catch {
-      // Skip invalid files
-    }
-  }
-
-  return interjections.sort((a, b) =>
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const interjections = await listJsonFiles<Interjection>(
+    INTERJECT_DIR,
+    status ? i => i.status === status : undefined
   );
+  return interjections.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function markInterjectionResumed(id: string): Promise<boolean> {
   const path = getInterjectionPath(id);
+  const i = await readJson<Interjection>(path);
 
-  if (!existsSync(path)) {
-    return false;
-  }
-
-  const content = await Bun.file(path).text();
-  const i: Interjection = JSON.parse(content);
+  if (!i) return false;
 
   i.status = "resumed";
   i.resumedAt = new Date().toISOString();
 
-  await Bun.write(path, JSON.stringify(i, null, 2));
+  await writeJson(path, i);
   logger.info(`Interjection resumed: ${id}`);
-
   return true;
 }
 
 export async function dismissInterjection(id: string): Promise<boolean> {
   const path = getInterjectionPath(id);
-
-  if (!existsSync(path)) {
-    return false;
-  }
-
+  if (!existsSync(path)) return false;
   unlinkSync(path);
   logger.info(`Interjection dismissed: ${id}`);
   return true;
 }
 
 // =============================================================================
-// Action Helpers - Parse answer for yes/no and determine action
+// Answer Helpers
 // =============================================================================
 
 export function isYesAnswer(answer: string): boolean {
-  const normalized = answer.toLowerCase().trim();
-  return ["yes", "y", "yeah", "yep", "sure", "ok", "okay", "approve", "approved", "confirm", "confirmed", "true", "1"].includes(normalized);
+  return YES_ANSWERS.has(answer.toLowerCase().trim());
 }
 
 export function isNoAnswer(answer: string): boolean {
-  const normalized = answer.toLowerCase().trim();
-  return ["no", "n", "nope", "nah", "reject", "rejected", "deny", "denied", "false", "0"].includes(normalized);
+  return NO_ANSWERS.has(answer.toLowerCase().trim());
 }
 
-/**
- * Determine the action result based on the question type and answer
- */
 export function getActionResult(question: Question): { shouldExecute: boolean; status?: string; note?: string } {
   if (!question.action || !question.answer) {
     return { shouldExecute: false };
   }
 
-  const action = question.action;
+  const { action, answer, questionType } = question;
 
-  if (question.questionType === "yes_no") {
-    if (isYesAnswer(question.answer)) {
-      return { shouldExecute: true, status: action.onYes };
-    } else if (isNoAnswer(question.answer)) {
-      return { shouldExecute: true, status: action.onNo };
-    }
-    // Answer wasn't a clear yes/no
+  if (questionType === "yes_no") {
+    if (isYesAnswer(answer)) return { shouldExecute: true, status: action.onYes };
+    if (isNoAnswer(answer)) return { shouldExecute: true, status: action.onNo };
     return { shouldExecute: false };
   }
 
-  // For open questions, add the answer as a note
   if (action.type === "add_note") {
-    const notePrefix = action.payload || "Human response:";
-    return { shouldExecute: true, note: `${notePrefix} ${question.answer}` };
+    return { shouldExecute: true, note: `${action.payload || "Human response:"} ${answer}` };
   }
 
   return { shouldExecute: false };
 }
 
-/**
- * Mark a question's action as executed
- */
 export async function markActionExecuted(id: string): Promise<boolean> {
   const path = getQuestionPath(id);
+  const q = await readJson<Question>(path);
 
-  if (!existsSync(path)) {
-    return false;
-  }
-
-  const content = await Bun.file(path).text();
-  const q: Question = JSON.parse(content);
+  if (!q) return false;
 
   q.actionExecuted = true;
-
-  await Bun.write(path, JSON.stringify(q, null, 2));
+  await writeJson(path, q);
   logger.info(`Question action executed: ${id}`);
-
   return true;
 }

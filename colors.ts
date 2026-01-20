@@ -2,8 +2,7 @@
 // Centralized ANSI Color Codes for Bloom
 // =============================================================================
 
-// Base escape sequences
-export const ESC = '\x1b';
+const ESC = '\x1b';
 export const CSI = `${ESC}[`;
 
 // =============================================================================
@@ -15,7 +14,6 @@ export const ansi = {
   enterAltScreen: `${CSI}?1049h`,
   leaveAltScreen: `${CSI}?1049l`,
   clearScreen: `${CSI}2J${CSI}H`,
-  clearScrollback: `${CSI}3J`,
   hideCursor: `${CSI}?25l`,
   showCursor: `${CSI}?25h`,
   moveTo: (row: number, col: number) => `${CSI}${row};${col}H`,
@@ -50,81 +48,50 @@ export const enum ColorMode {
 }
 
 // =============================================================================
-// Standard Color Codes
+// Standard Colors (only defining what's actually used)
 // =============================================================================
 
-export const colors = {
-  // Basic foreground colors (30-37)
-  black: `${CSI}30m`,
-  red: `${CSI}31m`,
-  green: `${CSI}32m`,
-  yellow: `${CSI}33m`,
+const colors = {
   blue: `${CSI}34m`,
-  magenta: `${CSI}35m`,
-  cyan: `${CSI}36m`,
-  white: `${CSI}37m`,
-
-  // Bright foreground colors (90-97)
-  brightBlack: `${CSI}90m`,   // Gray
+  brightBlack: `${CSI}90m`,
   brightRed: `${CSI}91m`,
   brightGreen: `${CSI}92m`,
   brightYellow: `${CSI}93m`,
   brightBlue: `${CSI}94m`,
-  brightMagenta: `${CSI}95m`,
   brightCyan: `${CSI}96m`,
   brightWhite: `${CSI}97m`,
-
-  // Basic background colors (40-47)
-  bgBlack: `${CSI}40m`,
-  bgRed: `${CSI}41m`,
-  bgGreen: `${CSI}42m`,
-  bgYellow: `${CSI}43m`,
-  bgBlue: `${CSI}44m`,
-  bgMagenta: `${CSI}45m`,
-  bgCyan: `${CSI}46m`,
-  bgWhite: `${CSI}47m`,
-
-  // Bright background colors (100-107)
-  bgBrightBlack: `${CSI}100m`,
-  bgBrightRed: `${CSI}101m`,
-  bgBrightGreen: `${CSI}102m`,
-  bgBrightYellow: `${CSI}103m`,
-  bgBrightBlue: `${CSI}104m`,
-  bgBrightMagenta: `${CSI}105m`,
-  bgBrightCyan: `${CSI}106m`,
-  bgBrightWhite: `${CSI}107m`,
 };
 
 // =============================================================================
-// Semantic Colors (Application-specific color meanings)
+// Semantic Colors (Application-specific meanings)
 // =============================================================================
 
 export const semantic = {
-  // Status colors
+  // Status
   error: colors.brightRed,
   warning: colors.brightYellow,
   success: colors.brightGreen,
   info: colors.brightCyan,
-  muted: colors.brightBlack,  // Gray
+  muted: colors.brightBlack,
 
-  // UI element colors
+  // UI elements
   header: {
-    bg: `${CSI}48;5;19m`,    // Dark blue background
+    bg: `${CSI}48;5;19m`,
     fg: colors.brightWhite,
     style: ansi.bold,
   },
   separator: colors.blue,
 
-  // Border colors based on state
+  // Border states (color codes for CSI)
   border: {
-    default: '90',   // Gray
-    error: '31',     // Red
-    focused: '32',   // Green
-    selected: '33',  // Yellow
-    running: '36',   // Cyan
+    default: '90',
+    error: '31',
+    focused: '32',
+    selected: '33',
+    running: '36',
   },
 
-  // Agent/streaming output colors
+  // Agent output
   tool: colors.brightCyan,
   toolResult: colors.brightBlack,
   session: colors.brightBlack,
@@ -145,53 +112,43 @@ export const logColors = {
 };
 
 // =============================================================================
-// Helper Functions for xterm Cell Color Conversion
+// xterm Cell Color Conversion
 // =============================================================================
 
-export function cellFgToAnsi(cell: any): string {
+export function cellFgToAnsi(cell: { getFgColorMode(): number; getFgColor(): number }): string {
   const mode = cell.getFgColorMode();
   const color = cell.getFgColor();
-  if (mode === ColorMode.DEFAULT || mode === 0) return '';
-  if (mode === ColorMode.PALETTE_16 || mode === 16) {
+
+  if (mode === ColorMode.DEFAULT) return '';
+  if (mode === ColorMode.PALETTE_16) {
     return color < 8 ? `${CSI}${30 + color}m` : `${CSI}${90 + (color - 8)}m`;
   }
-  if (mode === ColorMode.PALETTE_256 || mode === 256) return ansi.fg(color);
-  if (mode === ColorMode.RGB || mode >= 16777216) {
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-    return ansi.fgRgb(r, g, b);
+  if (mode === ColorMode.PALETTE_256) return ansi.fg(color);
+  if (mode >= ColorMode.RGB) {
+    return ansi.fgRgb((color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
   }
   return '';
 }
 
-export function cellBgToAnsi(cell: any): string {
+export function cellBgToAnsi(cell: { getBgColorMode(): number; getBgColor(): number }): string {
   const mode = cell.getBgColorMode();
   const color = cell.getBgColor();
-  if (mode === ColorMode.DEFAULT || mode === 0) return '';
-  if (mode === ColorMode.PALETTE_16 || mode === 16) {
+
+  if (mode === ColorMode.DEFAULT) return '';
+  if (mode === ColorMode.PALETTE_16) {
     return color < 8 ? `${CSI}${40 + color}m` : `${CSI}${100 + (color - 8)}m`;
   }
-  if (mode === ColorMode.PALETTE_256 || mode === 256) return ansi.bg(color);
-  if (mode === ColorMode.RGB || mode >= 16777216) {
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-    return ansi.bgRgb(r, g, b);
+  if (mode === ColorMode.PALETTE_256) return ansi.bg(color);
+  if (mode >= ColorMode.RGB) {
+    return ansi.bgRgb((color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
   }
   return '';
 }
 
 // =============================================================================
-// Convenience Functions
+// Utility Functions
 // =============================================================================
 
-/** Wrap text in a color and reset */
-export function colorize(text: string, color: string): string {
-  return `${color}${text}${ansi.reset}`;
-}
-
-/** Get border color code by state name */
-export function getBorderColor(state: 'default' | 'error' | 'focused' | 'selected' | 'running'): string {
+export function getBorderColor(state: keyof typeof semantic.border): string {
   return semantic.border[state];
 }
