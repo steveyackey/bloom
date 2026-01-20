@@ -73,6 +73,10 @@ Interjection Commands:
   interject resume <id>     Resume an interjected session interactively
   interject dismiss <id>    Dismiss an interjection
 
+Other Commands:
+  version                   Show bloom version
+  help                      Show this help message
+
 Examples:
   bloom init                        Initialize a new workspace
   bloom repo clone https://github.com/org/repo   Clone a repository

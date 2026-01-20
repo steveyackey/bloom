@@ -39,6 +39,7 @@ import { type LogLevel, setLogLevel } from "./logger";
 import { runPlanningSession } from "./plan-session";
 import { listRepos, syncRepos } from "./repos";
 import type { TaskStatus } from "./task-schema";
+import { VERSION } from "./version";
 
 // =============================================================================
 // CLI Argument Parser
@@ -356,6 +357,12 @@ export async function main(): Promise<void> {
         console.error(`Unknown interject subcommand: ${args[1]}`);
         process.exit(1);
       }
+      break;
+
+    case "version":
+    case "--version":
+    case "-V":
+      console.log(`bloom ${VERSION}`);
       break;
 
     case "help":
