@@ -8,30 +8,63 @@ A multi-agent task orchestration system that uses YAML-based task definitions an
 # Install dependencies
 bun install
 
-# Plan a new project (interactive Claude session)
-bun bloom.ts plan
+# Initialize workspace
+bloom init
+
+# Clone repos you want to work with
+bloom repo clone https://github.com/org/repo
+
+# Plan tasks (interactive Claude session)
+bloom plan
 
 # Start the orchestrator
-bun bloom.ts run
+bloom run
 ```
 
 ## Workflow
 
 ```
-1. PLAN      bun bloom.ts plan         # Break down your project into tasks
-2. VALIDATE  bun bloom.ts validate     # Check for issues
-3. RUN       bun bloom.ts run          # Start agents
-4. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
-5. REVIEW    [CHECKPOINT] tasks        # Human reviews at phase boundaries
+1. INIT      bloom init                # Create workspace (repos/, config files)
+2. REPOS     bloom repo clone <url>    # Add repositories
+3. PLAN      bloom plan                # Break down your project into tasks
+4. VALIDATE  bloom validate            # Check for issues
+5. RUN       bloom run                 # Start agents
+6. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
+7. REVIEW    [CHECKPOINT] tasks        # Human reviews at phase boundaries
 ```
 
 ## Commands
+
+### Setup
+
+```bash
+bloom init                   # Initialize workspace (repos/, bloom.repos.yaml, tasks.yaml)
+bloom setup                  # Sync repos according to config
+```
+
+### Repository Management
+
+```bash
+bloom repo clone <url>       # Clone a repo (bare + default branch worktree)
+bloom repo list              # List all configured repos
+bloom repo sync              # Clone/fetch all repos from bloom.repos.yaml
+bloom repo remove <name>     # Remove a repo and its worktrees
+bloom repo worktree add <repo> <branch>    # Add worktree for branch
+bloom repo worktree remove <repo> <branch> # Remove a worktree
+bloom repo worktree list <repo>            # List worktrees for repo
+```
+
+### Configuration
+
+```bash
+bloom config                 # Show user config (~/.bloom/config.yaml)
+bloom config set-protocol <ssh|https>  # Set git URL preference
+```
 
 ### Orchestrator
 
 ```bash
 bloom run                    # Start TUI with all agents
-bloom setup                  # Just setup repos, don't start
 ```
 
 ### Planning & Monitoring
@@ -116,13 +149,18 @@ tasks:
 
 ```
 bloom/
-├── bloom.ts              # Unified CLI
-├── task-schema.ts        # Zod schemas
-├── plan-session.ts       # Planning with Claude
-├── orchestrator-tui.ts   # Multi-pane TUI
-├── agent-core.ts         # Agent interfaces
-├── agent-provider-claude.ts
-├── tasks.yaml            # Your tasks
-├── example-tasks.yaml    # Template
-└── repos/                # Git repos for work
+├── src/
+│   ├── cli.ts                # Entry point
+│   ├── index.ts              # Main CLI router
+│   ├── task-schema.ts        # Zod schemas
+│   ├── tasks.ts              # Task I/O
+│   ├── repos.ts              # Repository management
+│   ├── plan-session.ts       # Planning with Claude
+│   ├── orchestrator-tui.ts   # Multi-pane TUI
+│   ├── human-queue.ts        # Question/answer system
+│   ├── agents/               # Agent providers
+│   └── commands/             # CLI command handlers
+├── tasks.yaml                # Your tasks
+├── bloom.repos.yaml          # Configured repositories
+└── repos/                    # Git repos for work
 ```
