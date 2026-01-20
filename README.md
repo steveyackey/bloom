@@ -14,6 +14,28 @@ Bloom adapts to how you work:
 
 **For Solo Developers**: Move fast with AI-powered planning. Turn your ideas into structured plans and let multiple agents execute in parallel while you focus on what matters.
 
+## Multi-Repository Planning
+
+Unlike other tools, Bloom enables planning across multiple repositories in a single project. Build features that span your backend, frontend, mobile app, and shared libraries—all coordinated through one plan with proper dependency ordering.
+
+```yaml
+# A single project can orchestrate work across repos
+tasks:
+  - id: api-models
+    repo: ./repos/backend
+    worktree: feature/auth
+
+  - id: shared-types
+    repo: ./repos/shared-types
+    worktree: feature/auth
+    depends_on: [api-models]
+
+  - id: frontend-integration
+    repo: ./repos/frontend
+    worktree: feature/auth
+    depends_on: [shared-types]
+```
+
 ## Install
 
 **Linux / macOS:**

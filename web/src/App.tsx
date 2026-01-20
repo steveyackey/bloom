@@ -68,6 +68,11 @@ function App() {
           </p>
           <div className="features-grid">
             <FeatureCard
+              icon={<GitIcon />}
+              title="Multi-Repo Planning"
+              description="Plan across backend, frontend, and shared libraries in one project. Coordinate cross-repo dependencies automatically."
+            />
+            <FeatureCard
               icon={<AgentsIcon />}
               title="Team & Solo Friendly"
               description="PMs define PRDs, designers add mockups, developers plan, QA validates. Or move fast as a solo dev with AI assistance."
@@ -78,24 +83,19 @@ function App() {
               description="Validate work at phase boundaries. QA and team members review before agents continue. You control the pace."
             />
             <FeatureCard
-              icon={<YamlIcon />}
-              title="YAML-Based Tasks"
-              description="Define tasks with clear instructions, dependencies, and acceptance criteria in simple YAML."
-            />
-            <FeatureCard
-              icon={<GitIcon />}
-              title="Git Worktree Isolation"
-              description="No merge conflicts. Each agent works in its own worktree for true parallel development."
-            />
-            <FeatureCard
               icon={<TerminalIcon />}
               title="Rich Terminal UI"
               description="Monitor all agents in real-time with a beautiful tiled interface. Navigate, restart, control."
             />
             <FeatureCard
               icon={<WorkflowIcon />}
-              title="Complete Workflow"
-              description="From PRD to plan to tasks to execution. Add designs, mockups, and research to guide AI agents."
+              title="Git Worktree Isolation"
+              description="No merge conflicts. Each agent works in its own worktree for true parallel development."
+            />
+            <FeatureCard
+              icon={<YamlIcon />}
+              title="YAML-Based Tasks"
+              description="Define tasks with clear instructions, dependencies, and acceptance criteria in simple YAML."
             />
           </div>
         </div>
