@@ -10,11 +10,15 @@ Working directory: {{WORKING_DIR}}
 
 ## Your Task
 
-1. **Read the project context** - Look at the PRD, any research documents, designs, or other context in the working directory
-2. **Understand the scope** - What needs to be built?
-3. **Create a plan** - Break down the work into phases with clear milestones
-4. **Ask about preferences** - Checkpoint frequency, merge strategy, etc.
+1. **Read the project context first** - Before doing anything else, read these files:
+   - `{{WORKING_DIR}}/template/PRD.md` - The product requirements (REQUIRED if exists)
+   - Any research documents, designs, or other context in `{{WORKING_DIR}}`
+2. **Understand the scope** - What needs to be built based on the PRD?
+3. **Ask about preferences** - Checkpoint frequency, merge strategy, etc.
+4. **Create a plan** - Break down the work into phases with clear milestones
 5. **Write the plan** - Save to: {{PLAN_FILE}}
+
+**IMPORTANT**: You must read the PRD and context files before asking questions or creating the plan.
 
 ## Questions to Ask
 
