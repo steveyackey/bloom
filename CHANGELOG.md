@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.3](https://github.com/steveyackey/bloom/compare/bloom-v0.1.2...bloom-v0.1.3) (2026-01-20)
+
+
+### Features
+
+* add install scripts and improve project detection ([af9b8a9](https://github.com/steveyackey/bloom/commit/af9b8a9aa8c48a73d693115005c236ea16f0daf1))
+
+
+### Documentation
+
+* add ASCII art header to README ([cdfa650](https://github.com/steveyackey/bloom/commit/cdfa650678071123e927324becea6be83ef2432c))
+* add README update guideline to CLAUDE.md ([20e2f08](https://github.com/steveyackey/bloom/commit/20e2f084e398c423eea9304843f4c128611d7147))
+
 ## [0.1.2](https://github.com/steveyackey/bloom/compare/bloom-v0.1.1...bloom-v0.1.2) (2026-01-20)
 
 
