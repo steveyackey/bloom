@@ -94,7 +94,8 @@ repos/
 └── backend-feature-api/      # Worktree for agent 2
 ```
 
-Add worktrees for parallel work:
+When you run `bloom run`, worktrees are **automatically created** as needed based on task definitions—you don't need to manage them manually. The manual commands are only needed if you want to work outside of Bloom:
+
 ```bash
 bloom repo worktree add backend feature-auth
 bloom repo worktree add backend feature-api
