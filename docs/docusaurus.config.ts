@@ -3,9 +3,9 @@ import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'Bloom',
+  title: 'Bloom Docs',
   tagline: 'Multi-agent task orchestration for AI-powered development',
-  favicon: 'img/bloom-logo.png',
+  favicon: 'img/favicon.ico',
 
   future: {
     v4: true,
