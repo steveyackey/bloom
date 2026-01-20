@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/steveyackey/bloom/compare/bloom-v0.1.8...bloom-v0.1.9) (2026-01-20)
+
+
+### Features
+
+* **cli:** add update command for self-updating bloom ([70d4a12](https://github.com/steveyackey/bloom/commit/70d4a127b248d64fb9b2bdd7563fbc6106f51618))
+
 ## [0.1.8](https://github.com/steveyackey/bloom/compare/bloom-v0.1.7...bloom-v0.1.8) (2026-01-20)
 
 
