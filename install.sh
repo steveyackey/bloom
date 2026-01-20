@@ -35,7 +35,7 @@ detect_platform() {
 
 # Get latest release tag
 get_latest_version() {
-  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/'
+  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/'
 }
 
 # Download and install
