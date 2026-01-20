@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/steveyackey/bloom/compare/bloom-v0.1.7...bloom-v0.1.8) (2026-01-20)
+
+
+### Features
+
+* **init:** prompt for SSH/HTTPS preference during workspace setup ([9a13342](https://github.com/steveyackey/bloom/commit/9a13342cb20e949ae1f23773aca5e85a0a0ad307))
+* **repo:** add org/repo shorthand for clone and repo create command ([9ebb579](https://github.com/steveyackey/bloom/commit/9ebb5796a78afb0435b3abcde8c4bfbb5b82573e))
+
 ## [0.1.7](https://github.com/steveyackey/bloom/compare/bloom-v0.1.6...bloom-v0.1.7) (2026-01-20)
 
 
