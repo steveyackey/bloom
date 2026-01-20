@@ -85,5 +85,48 @@ describe("init command", () => {
       expect(result.created.some((f) => f.includes("plan.md"))).toBe(true);
       expect(result.created.some((f) => f.includes("CLAUDE.template.md"))).toBe(true);
     });
+
+    it("should create .gitignore with repos/ entry", async () => {
+      const result = await initWorkspace(TEST_DIR);
+
+      expect(result.success).toBe(true);
+      expect(result.created).toContain(".gitignore");
+
+      const gitignorePath = join(TEST_DIR, ".gitignore");
+      expect(existsSync(gitignorePath)).toBe(true);
+
+      const content = await Bun.file(gitignorePath).text();
+      expect(content).toContain("repos/");
+    });
+
+    it("should add repos/ to existing .gitignore", async () => {
+      const gitignorePath = join(TEST_DIR, ".gitignore");
+      await Bun.write(gitignorePath, "node_modules/\n.env\n");
+
+      const result = await initWorkspace(TEST_DIR);
+
+      expect(result.success).toBe(true);
+      expect(result.created).toContain(".gitignore (added repos/)");
+
+      const content = await Bun.file(gitignorePath).text();
+      expect(content).toContain("node_modules/");
+      expect(content).toContain(".env");
+      expect(content).toContain("repos/");
+    });
+
+    it("should not duplicate repos/ in .gitignore if already present", async () => {
+      const gitignorePath = join(TEST_DIR, ".gitignore");
+      await Bun.write(gitignorePath, "node_modules/\nrepos/\n.env\n");
+
+      const result = await initWorkspace(TEST_DIR);
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toContain(".gitignore (repos/ already present)");
+
+      const content = await Bun.file(gitignorePath).text();
+      // Should only have one occurrence of repos/
+      const matches = content.match(/repos\//g);
+      expect(matches?.length).toBe(1);
+    });
   });
 });
