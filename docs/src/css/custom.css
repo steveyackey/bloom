@@ -365,10 +365,24 @@ th {
 /* Footer */
 [data-theme='dark'] .footer {
   border-top: 1px solid #27272a;
+  background: #09090b;
 }
 
 [data-theme='light'] .footer {
   border-top: 1px solid #e5e5e5;
+  background: #f5f5f5;
+}
+
+[data-theme='light'] .footer__title {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .footer__link-item {
+  color: #525252;
+}
+
+[data-theme='light'] .footer__link-item:hover {
+  color: var(--ifm-color-primary);
 }
 
 .footer__title {
@@ -379,10 +393,6 @@ th {
   color: #fafafa;
 }
 
-[data-theme='light'] .footer__title {
-  color: #1a1a1a;
-}
-
 .footer__link-item {
   font-size: 0.875rem;
 }
@@ -391,12 +401,12 @@ th {
   color: #a1a1aa;
 }
 
-[data-theme='light'] .footer__link-item {
-  color: #525252;
-}
-
 .footer__link-item:hover {
   color: var(--ifm-color-primary);
+}
+
+[data-theme='light'] .footer__copyright {
+  color: #6b7280;
 }
 
 /* Scrollbar styling - dark mode */
