@@ -12,5 +12,6 @@ export * from "./interjections";
 export * from "./orchestrator";
 export * from "./plan-command";
 export * from "./questions";
+export * from "./refine";
 export * from "./repos-cli";
 export * from "./tasks";

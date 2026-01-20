@@ -76,14 +76,12 @@ export async function runPlanSession(workingDir: string, planFile: string): Prom
 export async function cmdPlan(): Promise<void> {
   const workingDir = process.cwd();
   const planFile = join(workingDir, "plan.md");
+  const prdPath = join(workingDir, "PRD.md");
 
-  // Check for PRD or other context
-  const templateDir = join(workingDir, "template");
-  const prdPath = join(templateDir, "PRD.md");
-
+  // Check for PRD in the project directory
   if (!existsSync(prdPath)) {
-    console.log("Note: No PRD found at template/PRD.md");
-    console.log("Consider running 'bloom create <name>' first or adding project context.\n");
+    console.log("Note: No PRD.md found in the current directory.");
+    console.log("Consider running 'bloom create <name>' first or adding a PRD.md.\n");
   }
 
   await runPlanSession(workingDir, planFile);
@@ -91,6 +89,6 @@ export async function cmdPlan(): Promise<void> {
   console.log(`\n---`);
   console.log(`Plan saved to: ${planFile}`);
   console.log(`\nNext steps:`);
-  console.log(`  Review plan.md and make any adjustments`);
+  console.log(`  bloom refine        # Refine the plan if needed`);
   console.log(`  bloom generate      # Generate tasks.yaml for execution`);
 }

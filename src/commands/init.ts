@@ -8,7 +8,7 @@ import * as YAML from "yaml";
 import { BLOOM_DIR, isInGitRepo } from "./context";
 
 // Path to template folder (relative to this file's package)
-const TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "..", "template");
+const PACKAGE_TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "..", "template");
 
 export interface InitResult {
   success: boolean;
@@ -26,7 +26,7 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
 
   const configFile = join(dir, "bloom.config.yaml");
   const reposDir = join(dir, "repos");
-  const tasksFile = join(dir, "tasks.yaml");
+  const templateDir = join(dir, "template");
 
   // Create bloom.config.yaml (marks this as a bloom project)
   if (existsSync(configFile)) {
@@ -48,33 +48,24 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
     result.created.push("repos/");
   }
 
-  // Create tasks.yaml
-  if (existsSync(tasksFile)) {
-    result.skipped.push("tasks.yaml");
+  // Create template directory and copy template files
+  if (existsSync(templateDir)) {
+    result.skipped.push("template/");
   } else {
-    await Bun.write(tasksFile, YAML.stringify({ tasks: [] }, { indent: 2 }));
-    result.created.push("tasks.yaml");
-  }
+    mkdirSync(templateDir, { recursive: true });
+    result.created.push("template/");
 
-  // Copy template files to workspace root
-  if (existsSync(TEMPLATE_DIR)) {
-    const templateFiles = readdirSync(TEMPLATE_DIR);
-    for (const file of templateFiles) {
-      const srcPath = join(TEMPLATE_DIR, file);
-      const destPath = join(dir, file);
-      if (existsSync(destPath)) {
-        result.skipped.push(file);
-      } else {
+    // Copy template files from package to workspace template/
+    if (existsSync(PACKAGE_TEMPLATE_DIR)) {
+      const templateFiles = readdirSync(PACKAGE_TEMPLATE_DIR);
+      for (const file of templateFiles) {
+        const srcPath = join(PACKAGE_TEMPLATE_DIR, file);
+        const destPath = join(templateDir, file);
         cpSync(srcPath, destPath, { recursive: true });
-        result.created.push(file);
+        result.created.push(`template/${file}`);
       }
-    }
-  } else {
-    // Fallback: create minimal PRD.md if template doesn't exist
-    const prdPath = join(dir, "PRD.md");
-    if (existsSync(prdPath)) {
-      result.skipped.push("PRD.md");
     } else {
+      // Fallback: create minimal templates if package template dir doesn't exist
       const prdContent = `# Product Requirements Document: [Project Name]
 
 ## Overview
@@ -105,8 +96,63 @@ Who will use this? What are their needs?
 ## Open Questions
 - Any unresolved decisions or unknowns
 `;
-      await Bun.write(prdPath, prdContent);
-      result.created.push("PRD.md");
+
+      const planContent = `# Implementation Plan
+
+## Summary
+Brief summary of what will be implemented based on the PRD.
+
+## Architecture Overview
+High-level architecture decisions and design patterns to be used.
+
+## Implementation Phases
+
+### Phase 1: [Phase Name]
+**Goal**: What this phase accomplishes
+
+**Tasks**:
+1. Task description
+2. Task description
+
+**Acceptance Criteria**:
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Dependencies
+- List any external dependencies or prerequisites
+
+## Risks & Mitigations
+- **Risk**: Description
+  - **Mitigation**: How to address it
+
+## Open Questions
+- Questions that need resolution before or during implementation
+`;
+
+      const claudeContent = `# Project Guidelines
+
+## Commit Style
+Always use conventional commits.
+
+## Development Workflow
+1. Review the PRD in PRD.md
+2. Check the plan in plan.md
+3. Follow the tasks in tasks.yaml
+
+## Code Standards
+- Write clear, maintainable code
+- Add tests for new functionality
+- Update documentation as needed
+`;
+
+      await Bun.write(join(templateDir, "PRD.md"), prdContent);
+      result.created.push("template/PRD.md");
+
+      await Bun.write(join(templateDir, "plan.md"), planContent);
+      result.created.push("template/plan.md");
+
+      await Bun.write(join(templateDir, "CLAUDE.template.md"), claudeContent);
+      result.created.push("template/CLAUDE.template.md");
     }
   }
 
@@ -143,7 +189,6 @@ export async function cmdInit(): Promise<void> {
   }
 
   console.log("\nWorkspace ready. Next steps:");
-  console.log("  bloom repo clone <url>    Add a repository");
-  console.log("  bloom plan                Create tasks with Claude");
-  console.log("  bloom run                 Start the orchestrator");
+  console.log("  bloom repo clone <url>    Add repositories to work on");
+  console.log("  bloom create <name>       Create a new project");
 }

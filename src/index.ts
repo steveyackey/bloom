@@ -24,6 +24,7 @@ import {
   cmdPlan,
   cmdQuestions,
   cmdQuestionsDashboard,
+  cmdRefine,
   cmdReset,
   cmdSetStatus,
   cmdShow,
@@ -202,6 +203,10 @@ export async function main(): Promise<void> {
 
     case "plan":
       await cmdPlan();
+      break;
+
+    case "refine":
+      await cmdRefine();
       break;
 
     case "generate":
