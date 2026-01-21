@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { ClaudeAgentProvider } from "../agents";
 import { loadPrompt } from "../prompts";
-import { BLOOM_DIR, findGitRoot, getTasksFile } from "./context";
+import { BLOOM_DIR, findGitRoot } from "./context";
 import { buildReposContext } from "./plan-command";
 
 // =============================================================================
@@ -51,7 +51,7 @@ IMPORTANT: After writing tasks.yaml, you MUST validate it by running \`bloom val
 export async function cmdGenerate(): Promise<void> {
   const workingDir = process.cwd();
   const planFile = join(workingDir, "plan.md");
-  const tasksFile = getTasksFile();
+  const tasksFile = join(workingDir, "tasks.yaml");
 
   // Check for plan.md
   if (!existsSync(planFile)) {
