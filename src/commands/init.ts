@@ -184,17 +184,17 @@ async function promptGitProtocol(): Promise<"ssh" | "https"> {
     message: "How do you want to clone repositories?",
     choices: [
       {
-        name: "HTTPS (recommended for most users)",
-        value: "https",
-        description: "Works out of the box, uses personal access tokens",
+        name: "SSH (recommended)",
+        value: "ssh",
+        description: "Uses SSH keys, preferred for most developers",
       },
       {
-        name: "SSH",
-        value: "ssh",
-        description: "Requires SSH key setup, preferred for frequent contributors",
+        name: "HTTPS",
+        value: "https",
+        description: "Works without SSH keys, uses personal access tokens",
       },
     ],
-    default: "https",
+    default: "ssh",
   });
 
   return protocol as "ssh" | "https";
