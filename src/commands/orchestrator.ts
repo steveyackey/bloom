@@ -8,7 +8,7 @@ import { createWorktree, getWorktreePath, worktreeExists } from "../git";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { loadAgentPrompt } from "../prompts";
-import { listRepos } from "../repos";
+import { listRepos, pullAllDefaultBranches } from "../repos";
 import {
   getAllAgents,
   getAvailableTasks,
@@ -184,6 +184,25 @@ export async function startOrchestrator(): Promise<void> {
       logger.orchestrator.warn(`Missing repos: ${missingRepos.map((r) => r.name).join(", ")}. Run 'bloom repo sync'.`);
     } else {
       logger.orchestrator.info(`Found ${repos.length} repo(s): ${repos.map((r) => r.name).join(", ")}`);
+    }
+  }
+
+  // Pull latest updates from default branches
+  if (repos.length > 0 && repos.some((r) => r.exists)) {
+    logger.orchestrator.info("Pulling latest updates from default branches...");
+    const pullResult = await pullAllDefaultBranches(BLOOM_DIR);
+
+    if (pullResult.updated.length > 0) {
+      logger.orchestrator.info(`Updated: ${pullResult.updated.join(", ")}`);
+    }
+    if (pullResult.upToDate.length > 0) {
+      logger.orchestrator.info(`Already up to date: ${pullResult.upToDate.join(", ")}`);
+    }
+    if (pullResult.failed.length > 0) {
+      for (const { name, error } of pullResult.failed) {
+        logger.orchestrator.warn(`Failed to pull ${name}: ${error}`);
+      }
+      logger.orchestrator.info("Proceeding with existing local state.");
     }
   }
 
