@@ -102,17 +102,17 @@ export async function ensureGitProtocolConfigured(url: string): Promise<void> {
     message: "How do you want to clone repositories?",
     choices: [
       {
-        name: "HTTPS (recommended for most users)",
-        value: "https",
-        description: "Works with GitHub personal access tokens",
-      },
-      {
-        name: "SSH",
+        name: "SSH (recommended)",
         value: "ssh",
         description: "Requires SSH keys configured with GitHub",
       },
+      {
+        name: "HTTPS",
+        value: "https",
+        description: "Works with GitHub personal access tokens",
+      },
     ],
-    default: "https",
+    default: "ssh",
   });
 
   await setGitProtocol(protocol as "ssh" | "https");
