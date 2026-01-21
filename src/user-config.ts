@@ -13,7 +13,7 @@ import { z } from "zod";
 // =============================================================================
 
 const UserConfigSchema = z.object({
-  gitProtocol: z.enum(["ssh", "https"]).default("https"),
+  gitProtocol: z.enum(["ssh", "https"]).default("ssh"),
 });
 
 export type UserConfig = z.infer<typeof UserConfigSchema>;
@@ -43,7 +43,7 @@ export function getUserConfigPath(): string {
 export async function loadUserConfig(): Promise<UserConfig> {
   const configPath = getUserConfigPath();
   if (!existsSync(configPath)) {
-    return { gitProtocol: "https" };
+    return { gitProtocol: "ssh" };
   }
 
   try {
@@ -51,7 +51,7 @@ export async function loadUserConfig(): Promise<UserConfig> {
     const parsed = YAML.parse(content) || {};
     return UserConfigSchema.parse(parsed);
   } catch {
-    return { gitProtocol: "https" };
+    return { gitProtocol: "ssh" };
   }
 }
 

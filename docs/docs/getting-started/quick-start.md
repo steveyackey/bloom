@@ -22,8 +22,8 @@ You'll be prompted to choose your Git protocol preference:
 
 ```
 ? How would you like to clone repositories?
-❯ SSH (git@github.com:...)
-  HTTPS (https://github.com/...)
+❯ SSH (recommended)
+  HTTPS
 ```
 
 This creates:

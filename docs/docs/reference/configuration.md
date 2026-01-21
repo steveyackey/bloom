@@ -86,7 +86,7 @@ git_protocol: https  # https://github.com/org/repo.git
 
 - **Type:** `enum`
 - **Values:** `ssh`, `https`
-- **Default:** Prompted during `bloom init`
+- **Default:** `ssh` (prompted during `bloom init`)
 
 ### Management
 
@@ -226,7 +226,7 @@ my-workspace/
 
 | Setting | Default |
 |---------|---------|
-| Git protocol | Prompted on init |
+| Git protocol | `ssh` |
 | Task status | `todo` |
 | Agent | `claude-code` |
 | Worktree | Repository default branch |
