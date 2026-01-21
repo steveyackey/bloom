@@ -2,7 +2,6 @@
 // Question Commands
 // =============================================================================
 
-import { ansi, semantic } from "../colors";
 import {
   answerQuestion,
   askQuestion,
@@ -179,18 +178,18 @@ export async function cmdQuestionsDashboard(): Promise<void> {
         const oldStatus = task.status;
         task.status = result.status as TaskStatus;
         await saveTasks(getTasksFile(), tasksFile);
-        console.log(`${semantic.success}Action executed:${ansi.reset} ${q.taskId}: ${oldStatus} → ${result.status}`);
+        console.log(`Action executed: ${q.taskId}: ${oldStatus} → ${result.status}`);
         await markActionExecuted(q.id);
       }
 
       if (result.note) {
         task.ai_notes.push(result.note);
         await saveTasks(getTasksFile(), tasksFile);
-        console.log(`${semantic.success}Note added to task:${ansi.reset} ${q.taskId}`);
+        console.log(`Note added to task: ${q.taskId}`);
         await markActionExecuted(q.id);
       }
     } catch (err) {
-      console.log(`${semantic.error}Failed to execute action:${ansi.reset}`, err);
+      console.log(`Failed to execute action:`, err);
     }
   };
 
@@ -256,7 +255,7 @@ export async function cmdQuestionsDashboard(): Promise<void> {
         console.log(`\nQuestion: ${selectedQ.question}`);
 
         if (selectedQ.action && selectedQ.taskId) {
-          console.log(`\n${semantic.info}Auto-action:${ansi.reset}`);
+          console.log(`\nAuto-action:`);
           if (selectedQ.action.onYes) {
             console.log(`  Yes → set task status to "${selectedQ.action.onYes}"`);
           }

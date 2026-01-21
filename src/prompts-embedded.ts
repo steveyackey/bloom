@@ -188,6 +188,7 @@ tasks:                           # Root array of tasks
     ai_notes:                    # OPTIONAL. Notes added by AI during execution
       - Note from AI
     validation_task_id: task-id  # OPTIONAL. Points to a checkpoint task
+    checkpoint: true             # OPTIONAL. If true, requires human approval before downstream tasks proceed
     subtasks:                    # OPTIONAL. Nested tasks (same schema, recursive)
       - id: subtask-id
         title: Subtask title
@@ -238,7 +239,7 @@ conflicts. Tasks working in different directories can use different agents.
 
 1. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
 2. **DEPENDENCIES**: Use depends_on to enforce task ordering
-3. **CHECKPOINTS**: Create "[CHECKPOINT]" validation tasks at phase boundaries
+3. **CHECKPOINTS**: Add \`checkpoint: true\` to validation tasks at phase boundaries
 4. **WORKTREES**: One agent per worktree at a time (no conflicts)
 5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
 6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
@@ -283,18 +284,19 @@ tasks:
       - yaml installed for file parsing
     validation_task_id: validate-phase-1
 
-  # CHECKPOINT - Human validates before next phase
+  # Checkpoint - Human validates before next phase
   - id: validate-phase-1
-    title: "[CHECKPOINT] Validate phase 1 setup"
+    title: Validate phase 1 setup
     status: todo
     phase: 1
+    checkpoint: true
     depends_on:
       - setup-project-structure
       - setup-dependencies
     repo: ./packages/core
     worktree: phase-1-setup
     instructions: |
-      VALIDATION CHECKPOINT - Human review required.
+      Human review required before proceeding to next phase.
 
       Run these checks:
       - bun install succeeds
@@ -449,6 +451,7 @@ tasks:                           # Root array of tasks
     ai_notes:                    # OPTIONAL. Notes added by AI during execution
       - Note from AI
     validation_task_id: task-id  # OPTIONAL. Points to a checkpoint task
+    checkpoint: true             # OPTIONAL. If true, requires human approval before downstream tasks proceed
     subtasks:                    # OPTIONAL. Nested tasks (same schema, recursive)
       - id: subtask-id
         title: Subtask title
@@ -499,7 +502,7 @@ conflicts. Tasks working in different directories can use different agents.
 
 1. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
 2. **DEPENDENCIES**: Use depends_on to enforce task ordering
-3. **CHECKPOINTS**: Create "[CHECKPOINT]" validation tasks at phase boundaries
+3. **CHECKPOINTS**: Add \`checkpoint: true\` to validation tasks at phase boundaries
 4. **WORKTREES**: One agent per worktree at a time (no conflicts)
 5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
 6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
@@ -545,18 +548,19 @@ tasks:
       - yaml installed for file parsing
     validation_task_id: validate-phase-1
 
-  # CHECKPOINT - Human validates before next phase
+  # Checkpoint - Human validates before next phase
   - id: validate-phase-1
-    title: "[CHECKPOINT] Validate phase 1 setup"
+    title: Validate phase 1 setup
     status: todo
     phase: 1
+    checkpoint: true
     depends_on:
       - setup-project-structure
       - setup-dependencies
     repo: ./packages/core
     worktree: phase-1-setup
     instructions: |
-      VALIDATION CHECKPOINT - Human review required.
+      Human review required before proceeding to next phase.
 
       Run these checks:
       - bun install succeeds
@@ -604,13 +608,14 @@ tasks:
           - Edge cases handled
 
   - id: validate-phase-2
-    title: "[CHECKPOINT] Validate phase 2 implementation"
+    title: Validate phase 2 implementation
     status: todo
     phase: 2
+    checkpoint: true
     depends_on:
       - implement-core-feature
     instructions: |
-      VALIDATION CHECKPOINT - Human review required.
+      Human review required before proceeding.
       Verify all tests pass and implementation is correct.
     acceptance_criteria:
       - All tests pass

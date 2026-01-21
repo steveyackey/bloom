@@ -3,7 +3,6 @@
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
-import { ansi, semantic } from "../colors";
 import { dismissInterjection, getInterjection, listInterjections, markInterjectionResumed } from "../human-queue";
 
 export async function cmdInterjections(): Promise<void> {
@@ -20,7 +19,7 @@ export async function cmdInterjections(): Promise<void> {
     const time = new Date(i.createdAt).toLocaleTimeString();
     const taskInfo = i.taskId ? ` [task: ${i.taskId}]` : "";
 
-    console.log(`${semantic.info}${i.id}${ansi.reset}`);
+    console.log(`${i.id}`);
     console.log(`  Agent: ${i.agentName}${taskInfo}`);
     console.log(`  Time: ${time}`);
     console.log(`  Dir: ${i.workingDirectory}`);
@@ -30,7 +29,7 @@ export async function cmdInterjections(): Promise<void> {
     if (i.reason) {
       console.log(`  Reason: ${i.reason}`);
     }
-    console.log(`  ${semantic.success}Resume:${ansi.reset} bloom interject resume ${i.id}`);
+    console.log(`  Resume: bloom interject resume ${i.id}`);
     console.log();
   }
 }
@@ -50,7 +49,7 @@ export async function cmdInterjectResume(id: string): Promise<void> {
 
   await markInterjectionResumed(id);
 
-  console.log(`${semantic.warning}Resuming interjected session for ${i.agentName}${ansi.reset}\n`);
+  console.log(`Resuming interjected session for ${i.agentName}\n`);
   console.log(`Working directory: ${i.workingDirectory}`);
 
   if (i.sessionId) {

@@ -371,9 +371,13 @@ export async function cmdValidate(): Promise<void> {
     console.log("Validation passed");
 
     const stats = { todo: 0, ready_for_agent: 0, assigned: 0, in_progress: 0, done: 0, blocked: 0 };
+    let checkpointCount = 0;
     function countStats(tasks: Task[]) {
       for (const task of tasks) {
         stats[task.status]++;
+        if (task.checkpoint === true || task.title.includes("[CHECKPOINT]")) {
+          checkpointCount++;
+        }
         countStats(task.subtasks);
       }
     }
@@ -382,5 +386,6 @@ export async function cmdValidate(): Promise<void> {
     console.log(`\nTask summary:`);
     console.log(`  ${stats.done} done, ${stats.in_progress} in_progress, ${stats.assigned} assigned`);
     console.log(`  ${stats.ready_for_agent} ready, ${stats.todo} todo, ${stats.blocked} blocked`);
+    console.log(`  ${checkpointCount} checkpoint${checkpointCount !== 1 ? "s" : ""}`);
   }
 }

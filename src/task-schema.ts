@@ -28,6 +28,8 @@ export type Task = {
   subtasks: Task[];
   /** Points to a validation task that verifies this task's work (e.g. run tests, lint) */
   validation_task_id?: string;
+  /** If true, this task requires human approval before downstream tasks can proceed */
+  checkpoint?: boolean;
 };
 
 export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
@@ -45,6 +47,7 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     ai_notes: z.array(z.string()).default([]),
     subtasks: z.array(TaskSchema).default([]),
     validation_task_id: z.string().optional(),
+    checkpoint: z.boolean().optional(),
   })
 );
 

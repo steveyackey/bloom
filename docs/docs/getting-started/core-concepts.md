@@ -139,6 +139,7 @@ tasks:
 | `repo` | No | Working directory |
 | `worktree` | No | Git branch for isolation |
 | `agent_name` | No | Assign to specific agent |
+| `checkpoint` | No | If true, requires human approval before downstream tasks |
 | `instructions` | Yes | Detailed work description |
 | `acceptance_criteria` | No | Definition of done |
 

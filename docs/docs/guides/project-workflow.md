@@ -376,7 +376,7 @@ bloom note task-id "Discovered dependency on config service"
 
 ### Team Validation at Checkpoints
 
-Checkpoints (`[CHECKPOINT]` tasks) pause execution for human review. This is where QA and team members validate work:
+Checkpoints (tasks with `checkpoint: true`) pause execution for human review to validate work:
 
 ```bash
 # Review changes before allowing agents to continue

@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
 import { interjectSession } from "./agents";
-import { ansi, CSI, cellBgToAnsi, cellFgToAnsi, getBorderColor, semantic } from "./colors";
+import { ansi, CSI, cellBgToAnsi, cellFgToAnsi, getBorderColor } from "./colors";
 import { createInterjection } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 import { spawnTerminal, type TerminalProcess } from "./terminal";
@@ -380,7 +380,7 @@ export class OrchestratorTUI {
 
     // Skip non-agent panes (dashboard, questions)
     if (pane.config.name === "dashboard" || pane.config.name === "questions") {
-      pane.term.write(`\r\n${semantic.warning}[Cannot interject this pane]${ansi.reset}\r\n`);
+      pane.term.write(`\r\n[Cannot interject this pane]\r\n`);
       this.scheduleRender();
       return;
     }
@@ -405,8 +405,8 @@ export class OrchestratorTUI {
     } catch {}
 
     // Show interjection message in original pane
-    pane.term.write(`\r\n${semantic.warning}━━━ INTERJECTED ━━━${ansi.reset}\r\n`);
-    pane.term.write(`${semantic.muted}Session moved to new pane. Press "r" to restart agent later.${ansi.reset}\r\n`);
+    pane.term.write(`\r\n━━━ INTERJECTED ━━━\r\n`);
+    pane.term.write(`Session moved to new pane. Press "r" to restart agent later.\r\n`);
 
     // Build command for interactive session
     const interactiveCmd: string[] = ["claude"];
@@ -430,16 +430,16 @@ export class OrchestratorTUI {
     // Write context info to the new pane
     const newPane = this.panes[newPaneIndex];
     if (newPane) {
-      newPane.term.write(`${semantic.warning}━━━ HUMAN TAKEOVER: ${pane.config.name} ━━━${ansi.reset}\r\n`);
-      newPane.term.write(`${semantic.muted}Interjection ID: ${interjectionId}${ansi.reset}\r\n`);
+      newPane.term.write(`━━━ HUMAN TAKEOVER: ${pane.config.name} ━━━\r\n`);
+      newPane.term.write(`Interjection ID: ${interjectionId}\r\n`);
       if (session?.taskId) {
-        newPane.term.write(`${semantic.muted}Task: ${session.taskId}${ansi.reset}\r\n`);
+        newPane.term.write(`Task: ${session.taskId}\r\n`);
       }
-      newPane.term.write(`${semantic.muted}Dir: ${workingDir}${ansi.reset}\r\n`);
+      newPane.term.write(`Dir: ${workingDir}\r\n`);
       if (session?.sessionId) {
-        newPane.term.write(`${semantic.muted}Resuming session: ${session.sessionId}${ansi.reset}\r\n`);
+        newPane.term.write(`Resuming session: ${session.sessionId}\r\n`);
       }
-      newPane.term.write(`${semantic.muted}Ctrl+B to exit focus, "X" to close when done${ansi.reset}\r\n\r\n`);
+      newPane.term.write(`Ctrl+B to exit focus, "X" to close when done\r\n\r\n`);
     }
 
     this.scheduleRender();
@@ -466,20 +466,18 @@ export class OrchestratorTUI {
 
     // Header
     output += ansi.moveTo(1, 1);
-    output += `${semantic.header.bg}${semantic.header.fg}${semantic.header.style}`;
     const header = ` Bloom Orchestrator | View: ${this.viewMode} | Agents: ${this.panes.length} | n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit `;
     output += header.padEnd(this.cols);
-    output += ansi.reset;
 
     // Separator
     output += ansi.moveTo(2, 1);
-    output += `${semantic.separator}${"─".repeat(this.cols)}${ansi.reset}`;
+    output += "─".repeat(this.cols);
 
     if (this.panes.length === 0) {
       const msg = "No agents configured. Press 'n' to create a new agent.";
       const x = Math.floor((this.cols - msg.length) / 2);
       const y = Math.floor(this.rows / 2);
-      output += `${ansi.moveTo(y, x)}${semantic.warning}${msg}${ansi.reset}`;
+      output += `${ansi.moveTo(y, x)}${msg}`;
     } else {
       const indicesToRender = this.viewMode === "single" ? [this.selectedIndex] : this.panes.map((_, i) => i);
 

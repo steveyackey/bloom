@@ -63,5 +63,5 @@ export async function cmdGenerate(): Promise<void> {
   console.log(`Tasks generated to: ${tasksFile}`);
   console.log(`\nNext steps:`);
   console.log(`  bloom validate      # Check for issues`);
-  console.log(`  bloom run           # Execute tasks`);
+  console.log(`  bloom run           # Execute tasks (run from this directory)`);
 }

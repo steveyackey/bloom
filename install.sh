@@ -64,12 +64,14 @@ install_bloom() {
   # Create install directory
   mkdir -p "$INSTALL_DIR"
 
-  # Download binary
+  # Download binary (remove old one first to avoid race condition)
   echo "Downloading from ${url}..."
   if [[ "$platform" == windows-* ]]; then
+    rm -f "$INSTALL_DIR/bloom.exe"
     curl -fsSL "$url" -o "$INSTALL_DIR/bloom.exe"
     chmod +x "$INSTALL_DIR/bloom.exe"
   else
+    rm -f "$INSTALL_DIR/bloom"
     curl -fsSL "$url" -o "$INSTALL_DIR/bloom"
     chmod +x "$INSTALL_DIR/bloom"
   fi

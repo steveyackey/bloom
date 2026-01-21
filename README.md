@@ -162,7 +162,7 @@ You can organize everything outside `repos/` however you like—create folders f
 7. GENERATE  bloom generate            # Generate tasks.yaml from plan
 8. RUN       bloom run                 # Start agents (resumes if interrupted)
 9. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
-10. REVIEW   [CHECKPOINT] tasks        # Human reviews at phase boundaries
+10. REVIEW   checkpoint tasks           # Human reviews at phase boundaries
 ```
 
 ### Team Collaboration Points
@@ -303,6 +303,7 @@ tasks:
     repo: ./path/to/repo            # Working directory
     worktree: branch-name           # Git worktree for isolation
     agent_name: claude-code         # Assign to specific agent
+    checkpoint: true                # Requires human approval before downstream tasks
     instructions: |                 # Detailed instructions
       Multi-line instructions
     acceptance_criteria:            # Definition of done
@@ -314,7 +315,7 @@ tasks:
 ## Key Concepts
 
 - **Phases**: Group tasks into numbered phases (1, 2, 3...)
-- **Checkpoints**: `[CHECKPOINT]` tasks at phase boundaries for human review
+- **Checkpoints**: Tasks with `checkpoint: true` at phase boundaries require human approval
 - **Dependencies**: `depends_on` enforces task ordering
 - **Worktrees**: Git worktrees isolate parallel work (one agent per worktree)
 - **Priming**: Tasks auto-change from `todo` to `ready_for_agent` when deps complete

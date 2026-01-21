@@ -165,7 +165,8 @@ export function getStatusIcon(status: TaskStatus): string {
 // =============================================================================
 
 function isCheckpointTask(task: Task): boolean {
-  return task.title.includes("[CHECKPOINT]");
+  // Prefer explicit checkpoint field, fall back to legacy title detection
+  return task.checkpoint === true || task.title.includes("[CHECKPOINT]");
 }
 
 export async function primeTasks(

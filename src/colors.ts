@@ -48,59 +48,41 @@ export enum ColorMode {
 }
 
 // =============================================================================
-// Standard Colors (only defining what's actually used)
-// =============================================================================
-
-const colors = {
-  blue: `${CSI}34m`,
-  white: `${CSI}37m`,
-  brightBlack: `${CSI}90m`,
-  brightRed: `${CSI}91m`,
-  brightGreen: `${CSI}92m`,
-  brightYellow: `${CSI}93m`,
-  brightBlue: `${CSI}94m`,
-  brightCyan: `${CSI}96m`,
-  brightWhite: `${CSI}97m`,
-  // Dim white - a readable muted gray that works on both light and dark backgrounds
-  dim: `${CSI}2;37m`,
-};
-
-// =============================================================================
-// Semantic Colors (Application-specific meanings)
+// Semantic Colors (Application-specific meanings) - COLORS REMOVED
 // =============================================================================
 
 export const semantic = {
-  // Status
-  error: colors.brightRed,
-  warning: colors.brightYellow,
-  success: colors.brightGreen,
-  info: colors.brightCyan,
-  muted: colors.dim,
+  // Status - no colors
+  error: "",
+  warning: "",
+  success: "",
+  info: "",
+  muted: "",
 
-  // UI elements
+  // UI elements - no colors
   header: {
-    bg: ansi.inverse,
+    bg: "",
     fg: "",
-    style: ansi.bold,
+    style: "",
   },
-  separator: colors.dim,
+  separator: "",
 
-  // Border states (bright color codes for CSI)
+  // Border states - all use default (white/no color)
   border: {
-    default: "37", // white (visible on dark backgrounds)
-    error: "91", // bright red
-    focused: "92", // bright green
-    selected: "93", // bright yellow
-    running: "96", // bright cyan
+    default: "37",
+    error: "37",
+    focused: "37",
+    selected: "37",
+    running: "37",
   },
 
-  // Agent output
-  tool: colors.brightCyan,
-  toolResult: colors.dim,
-  session: colors.dim,
-  cost: colors.dim,
-  heartbeat: colors.dim,
-  timeout: colors.brightRed,
+  // Agent output - no colors
+  tool: "",
+  toolResult: "",
+  session: "",
+  cost: "",
+  heartbeat: "",
+  timeout: "",
 };
 
 // =============================================================================

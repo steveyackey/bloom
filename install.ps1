@@ -40,6 +40,11 @@ function Install-Bloom {
 
     $destination = Join-Path $InstallDir "bloom.exe"
 
+    # Remove old binary first to avoid race condition
+    if (Test-Path $destination) {
+        Remove-Item -Path $destination -Force
+    }
+
     # Download binary
     Write-Host "Downloading from $url..."
     Invoke-WebRequest -Uri $url -OutFile $destination
