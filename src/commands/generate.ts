@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { ClaudeAgentProvider } from "../agents";
 import { loadPrompt } from "../prompts";
-import { BLOOM_DIR, findGitRoot } from "./context";
+import { BLOOM_DIR } from "./context";
 import { buildReposContext } from "./plan-command";
 
 // =============================================================================
@@ -14,8 +14,6 @@ import { buildReposContext } from "./plan-command";
 // =============================================================================
 
 export async function runGenerateSession(workingDir: string, tasksFile: string): Promise<void> {
-  const gitRoot = findGitRoot() || workingDir;
-
   // Build repos context
   const reposContext = await buildReposContext(BLOOM_DIR);
 
@@ -36,11 +34,11 @@ export async function runGenerateSession(workingDir: string, tasksFile: string):
 
 IMPORTANT: After writing tasks.yaml, you MUST validate it by running \`bloom validate\`. If validation fails (especially YAML parsing errors with strings containing special characters like backticks, quotes, or colons), fix the quoting issues and re-validate until it passes.`;
 
-  // Run Claude from git root but tell it about the working directory
+  // Run Claude from the working directory
   await agent.run({
     systemPrompt,
     prompt: initialPrompt,
-    startingDirectory: gitRoot,
+    startingDirectory: workingDir,
   });
 }
 

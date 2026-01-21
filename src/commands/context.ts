@@ -41,7 +41,8 @@ function findProjectRoot(): string {
 // Base directory (project root - git root of cwd)
 export const BLOOM_DIR = findProjectRoot();
 export const REPOS_DIR = join(BLOOM_DIR, "repos");
-export const DEFAULT_TASKS_FILE = join(BLOOM_DIR, "tasks.yaml");
+// Default tasks file is in the current working directory, not the git root
+export const DEFAULT_TASKS_FILE = join(process.cwd(), "tasks.yaml");
 export const POLL_INTERVAL_MS = 10_000;
 export const FLOATING_AGENT = "floating";
 

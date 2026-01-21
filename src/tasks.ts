@@ -3,6 +3,7 @@
 // =============================================================================
 
 import YAML from "yaml";
+import { askQuestion } from "./human-queue";
 import { type Task, type TaskStatus, type TasksFile, validateTasksFile } from "./task-schema";
 
 // =============================================================================
@@ -151,6 +152,10 @@ export function getStatusIcon(status: TaskStatus): string {
 // Task Priming
 // =============================================================================
 
+function isCheckpointTask(task: Task): boolean {
+  return task.title.includes("[CHECKPOINT]");
+}
+
 export async function primeTasks(
   tasksFile: string,
   tasks: TasksFile,
@@ -167,6 +172,7 @@ export async function primeTasks(
   collectCompleted(tasks.tasks);
 
   let primedCount = 0;
+  const checkpointTasks: Task[] = [];
 
   function primeTaskList(taskList: Task[]) {
     for (const task of taskList) {
@@ -181,6 +187,11 @@ export async function primeTasks(
         task.status = "ready_for_agent";
         primedCount++;
         logger.info(`${task.id} → ready_for_agent`);
+
+        // Track checkpoint tasks for question creation
+        if (isCheckpointTask(task)) {
+          checkpointTasks.push(task);
+        }
       }
 
       primeTaskList(task.subtasks);
@@ -190,6 +201,21 @@ export async function primeTasks(
 
   if (primedCount > 0) {
     await saveTasks(tasksFile, tasks);
+  }
+
+  // Create questions for checkpoint tasks that just became ready
+  for (const task of checkpointTasks) {
+    const question = `[CHECKPOINT] Task "${task.title}" is ready for review.\n\n${task.instructions || "Please review and mark as done when complete."}\n\nMark task ${task.id} as done?`;
+    await askQuestion("orchestrator", question, {
+      taskId: task.id,
+      questionType: "yes_no",
+      action: {
+        type: "set_status",
+        onYes: "done",
+        onNo: "blocked",
+      },
+    });
+    logger.info(`Created checkpoint question for ${task.id}`);
   }
 
   return primedCount;

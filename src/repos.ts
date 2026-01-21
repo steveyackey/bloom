@@ -267,7 +267,6 @@ export async function createRepo(
   const defaultBranch = options?.defaultBranch || "main";
   const reposDir = getReposDir(bloomDir);
   const bareRepoPath = getBareRepoPath(bloomDir, name);
-  const worktreesDir = getWorktreesDir(bloomDir, name);
 
   // Require workspace to be initialized
   if (!existsSync(reposDir)) {
