@@ -21,6 +21,7 @@
     "validate": "bun run check && bun run typecheck && bun run test",
     "prepare": "simple-git-hooks",
     "package": "bun build --compile ./src/cli.ts --outfile dist/bloom",
+    "install:local": "bun run package && mkdir -p ~/.local/bin && cp dist/bloom ~/.local/bin/bloom",
     "package:linux-x64": "bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile dist/bloom-linux-x64",
     "package:linux-arm64": "bun build --compile --target=bun-linux-arm64 ./src/cli.ts --outfile dist/bloom-linux-arm64",
     "package:darwin-x64": "bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile dist/bloom-darwin-x64",
