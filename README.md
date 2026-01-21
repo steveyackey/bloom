@@ -134,17 +134,18 @@ When you run `bloom repo clone <url>`, Bloom clones the repository as a **bare r
 
 ```
 repos/
-├── backend.git/              # Bare repo (shared git data)
-├── backend/                  # Default branch worktree (main)
-├── backend-feature-auth/     # Worktree for agent 1
-└── backend-feature-api/      # Worktree for agent 2
+└── backend/
+    ├── backend.git/          # Bare repo (shared git data)
+    ├── main/                 # Default branch worktree
+    ├── feature-auth/         # Worktree for agent 1
+    └── feature-api/          # Worktree for agent 2
 ```
 
 When you run `bloom run`, worktrees are **automatically created** as needed based on task definitions—you don't need to manage them manually. The manual commands are only needed if you want to work outside of Bloom:
 
 ```bash
-bloom repo worktree add backend feature-auth
-bloom repo worktree add backend feature-api
+bloom repo worktree add backend feature/auth
+bloom repo worktree add backend feature/api
 ```
 
 You can organize everything outside `repos/` however you like—create folders for research, designs, meeting notes, or anything else that helps provide context for your project.

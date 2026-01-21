@@ -215,6 +215,9 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
     }
   }
 
+  // Set upstream tracking branch for the default branch
+  runGit(["branch", "--set-upstream-to", `origin/${defaultBranch}`, defaultBranch], worktreePath);
+
   // Save to repos file
   const reposFile = await loadReposFile(bloomDir);
   reposFile.repos.push({
@@ -547,6 +550,9 @@ export async function addWorktree(
   if (!result.success) {
     return { success: false, path: "", error: result.error };
   }
+
+  // Set upstream tracking branch if remote branch exists
+  runGit(["branch", "--set-upstream-to", `origin/${branch}`, branch], worktreePath);
 
   return { success: true, path: worktreePath };
 }

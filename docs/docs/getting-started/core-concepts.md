@@ -32,12 +32,14 @@ A **repository** (repo) is a codebase cloned into the workspace with `bloom repo
 
 ```
 repos/
-├── backend.git/           # Bare repository (git data)
-├── backend/               # Default branch worktree
-├── backend-feature-auth/  # Feature branch worktree
-├── frontend.git/
-├── frontend/
-└── frontend-feature-auth/
+├── backend/
+│   ├── backend.git/       # Bare repository (git data)
+│   ├── main/              # Default branch worktree
+│   └── feature-auth/      # Feature branch worktree
+└── frontend/
+    ├── frontend.git/
+    ├── main/
+    └── feature-auth/
 ```
 
 ### Git Worktrees

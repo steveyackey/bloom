@@ -179,18 +179,18 @@ describe("Bare Repo + Worktree Structure", () => {
     }
   });
 
-  test("repos are stored at repos/<name>.git (bare) with worktrees at repos/<name>/<branch>", async () => {
+  test("repos are stored at repos/<name>/<name>.git (bare) with worktrees at repos/<name>/<branch>", async () => {
     // This is a design/documentation test
     // The structure should be:
     // repos/
-    //   myrepo.git/     <- bare repo
     //   myrepo/
+    //     myrepo.git/   <- bare repo (inside worktrees dir)
     //     main/         <- worktree for main branch
     //     feature-x/    <- worktree for feature branch
 
     const reposDir = join(TEST_DIR, "repos");
-    const bareRepoPath = join(reposDir, "myrepo.git");
     const worktreesDir = join(reposDir, "myrepo");
+    const bareRepoPath = join(worktreesDir, "myrepo.git");
     const mainWorktree = join(worktreesDir, "main");
 
     // These paths follow the expected convention

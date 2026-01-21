@@ -26,14 +26,16 @@ bloom repo clone myorg/backend
 
 When you clone:
 
-1. Repository is cloned as a bare repo: `repos/backend.git/`
-2. Default branch worktree is created: `repos/backend/`
-3. URL is added to `bloom.config.yaml`
+1. A directory is created for the repo: `repos/backend/`
+2. Repository is cloned as a bare repo inside: `repos/backend/backend.git/`
+3. Default branch worktree is created: `repos/backend/main/`
+4. URL is added to `bloom.config.yaml`
 
 ```
 repos/
-├── backend.git/      # Bare repository (git data)
-└── backend/          # Main branch worktree
+└── backend/
+    ├── backend.git/  # Bare repository (git data)
+    └── main/         # Main branch worktree
 ```
 
 ## Creating Local Repositories
@@ -45,8 +47,8 @@ bloom repo create my-new-service
 ```
 
 This creates:
-- `repos/my-new-service.git/` — Empty bare repo
-- `repos/my-new-service/` — Initial worktree
+- `repos/my-new-service/my-new-service.git/` — Empty bare repo
+- `repos/my-new-service/main/` — Initial worktree
 
 ## Listing Repositories
 
@@ -96,7 +98,7 @@ bloom repo worktree add backend feature/existing-branch
 bloom repo worktree add backend feature/new-branch
 ```
 
-Directory created: `repos/backend-feature-new-branch/`
+Directory created: `repos/backend/feature-new-branch/`
 
 ### Listing Worktrees
 
@@ -107,9 +109,9 @@ bloom repo worktree list backend
 Output:
 ```
 Worktrees for backend:
-  main              repos/backend
-  feature/auth      repos/backend-feature-auth
-  feature/api       repos/backend-feature-api
+  main              repos/backend/main
+  feature/auth      repos/backend/feature-auth
+  feature/api       repos/backend/feature-api
 ```
 
 ### Removing Worktrees
@@ -170,10 +172,10 @@ git fetch --all  # All remotes
 For worktrees:
 
 ```bash
-cd repos/backend  # main worktree
+cd repos/backend/main  # main worktree
 git pull origin main
 
-cd repos/backend-feature-auth  # feature worktree
+cd repos/backend/feature-auth  # feature worktree
 git pull origin feature/auth
 ```
 
@@ -184,8 +186,9 @@ bloom repo remove backend
 ```
 
 This removes:
-- The bare repository (`repos/backend.git/`)
-- All worktrees (`repos/backend/`, `repos/backend-feature-*/`)
+- The entire repo directory (`repos/backend/`) including:
+  - The bare repository (`repos/backend/backend.git/`)
+  - All worktrees (`repos/backend/main/`, `repos/backend/feature-*/`)
 - Entry from `bloom.config.yaml`
 
 :::warning
@@ -215,12 +218,12 @@ bloom repo worktree add backend feature/new-feature
 After agents complete:
 
 ```bash
-cd repos/backend-feature-auth
+cd repos/backend/feature-auth
 git push origin feature/auth
 
 # Create PR through GitHub/GitLab
 # Or merge locally:
-cd repos/backend
+cd repos/backend/main
 git merge feature/auth
 git push origin main
 ```
@@ -262,13 +265,13 @@ git push origin main
 Use the branch name in the worktree path:
 
 ```
-repos/backend-feature-auth     # Clear
-repos/backend-work-1           # Unclear
+repos/backend/feature-auth     # Clear
+repos/backend/work-1           # Unclear
 ```
 
 ### 2. Keep Main Worktree Clean
 
-Use `repos/backend/` (main) as reference. Create feature worktrees for changes.
+Use `repos/backend/main/` as reference. Create feature worktrees for changes.
 
 ### 3. Clean Up Completed Work
 
@@ -281,14 +284,14 @@ bloom repo worktree remove backend feature/completed
 
 ### 4. Don't Edit Bare Repos
 
-Never modify files in `repos/*.git/`. These are git internals.
+Never modify files in `repos/*/*.git/`. These are git internals.
 
 ### 5. Commit Before Switching
 
 Ensure worktrees have clean state:
 
 ```bash
-cd repos/backend-feature-auth
+cd repos/backend/feature-auth
 git status
 git stash  # if uncommitted changes
 ```
@@ -300,7 +303,7 @@ git stash  # if uncommitted changes
 The directory exists:
 
 ```bash
-ls repos/backend-feature-auth
+ls repos/backend/feature-auth
 ```
 
 Remove it first:
@@ -326,7 +329,7 @@ Ensure you're using the correct path:
 bloom repo worktree add backend feature/x
 
 # Incorrect (don't include .git or full path)
-bloom repo worktree add repos/backend.git feature/x
+bloom repo worktree add repos/backend/backend.git feature/x
 ```
 
 ### Detached HEAD
@@ -334,7 +337,7 @@ bloom repo worktree add repos/backend.git feature/x
 If a worktree has detached HEAD:
 
 ```bash
-cd repos/backend-feature-auth
+cd repos/backend/feature-auth
 git checkout feature/auth
 ```
 
