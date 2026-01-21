@@ -279,7 +279,7 @@ The orchestrator runs as many agents as there are available tasks (up to system 
 
 ### Activity Timeout
 
-Agents have a 2-minute activity timeout. If no output occurs, the orchestrator may mark the task as stuck.
+Agents have a 10-minute activity timeout. If no output occurs, the orchestrator may mark the task as stuck.
 
 ### Custom Task File
 

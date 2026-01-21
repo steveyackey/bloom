@@ -31,7 +31,7 @@ export interface ClaudeProviderOptions {
   dangerouslySkipPermissions?: boolean;
   /** Stream output to stdout/stderr while capturing */
   streamOutput?: boolean;
-  /** Timeout in ms before considering agent dead (default: 120000 = 2 min) */
+  /** Timeout in ms before considering agent dead (default: 600000 = 10 min) */
   activityTimeoutMs?: number;
   /** Interval for heartbeat output when waiting (default: 10000 = 10s) */
   heartbeatIntervalMs?: number;
@@ -94,7 +94,7 @@ export class ClaudeAgentProvider implements Agent {
     this.interactive = options.interactive ?? false;
     this.dangerouslySkipPermissions = options.dangerouslySkipPermissions ?? true;
     this.streamOutput = options.streamOutput ?? true;
-    this.activityTimeoutMs = options.activityTimeoutMs ?? 120_000; // 2 min
+    this.activityTimeoutMs = options.activityTimeoutMs ?? 600_000; // 10 min
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000; // 10s
     this.onEvent = options.onEvent;
     this.onHeartbeat = options.onHeartbeat;
