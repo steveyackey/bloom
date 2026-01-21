@@ -41,7 +41,7 @@ export interface TerminalSpawnOptions {
 function spawnWithBunTerminal(command: string[], options: TerminalSpawnOptions): TerminalProcess {
   const proc = Bun.spawn(command, {
     cwd: options.cwd,
-    env: { ...process.env, FORCE_COLOR: "3", ...options.env } as Record<string, string>,
+    env: { ...process.env, ...options.env } as Record<string, string>,
     stdin: "pipe",
     terminal: {
       cols: options.cols,
@@ -95,8 +95,8 @@ if (feature("WINDOWS")) {
       throw new Error("Command is required");
     }
 
-    // Filter out undefined values from env, and force color support
-    const env: Record<string, string> = { FORCE_COLOR: "3" };
+    // Filter out undefined values from env
+    const env: Record<string, string> = {};
     for (const [key, value] of Object.entries({ ...process.env, ...options.env })) {
       if (value !== undefined) {
         env[key] = value;
