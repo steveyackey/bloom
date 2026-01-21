@@ -55,6 +55,7 @@ export async function loadUserConfig(): Promise<UserConfig> {
   }
 }
 
+
 export async function saveUserConfig(config: UserConfig): Promise<void> {
   const bloomHome = getBloomHome();
   if (!existsSync(bloomHome)) {

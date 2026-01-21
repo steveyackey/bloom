@@ -4,7 +4,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 // Find the git root of the current working directory
 export function findGitRoot(): string | null {
@@ -23,22 +23,45 @@ export function isInGitRepo(): boolean {
   return findGitRoot() !== null;
 }
 
-// Find the project root (git root with bloom.config.yaml, or just git root, or cwd)
+// Search upward from cwd to find bloom.config.yaml
+function findBloomRoot(): string | null {
+  let dir = process.cwd();
+  const root = dirname(dir);
+
+  while (dir !== root) {
+    if (existsSync(join(dir, "bloom.config.yaml"))) {
+      return dir;
+    }
+    dir = dirname(dir);
+  }
+
+  // Check root as well
+  if (existsSync(join(root, "bloom.config.yaml"))) {
+    return root;
+  }
+
+  return null;
+}
+
+// Find the project root (bloom.config.yaml location, or git root, or cwd)
 function findProjectRoot(): string {
+  // First, search upward for bloom.config.yaml
+  const bloomRoot = findBloomRoot();
+  if (bloomRoot) {
+    return bloomRoot;
+  }
+
+  // Fall back to git root (for init command)
   const gitRoot = findGitRoot();
   if (gitRoot) {
-    // Check if bloom.config.yaml exists at git root
-    if (existsSync(join(gitRoot, "bloom.config.yaml"))) {
-      return gitRoot;
-    }
-    // Use git root even without config (init will create it)
     return gitRoot;
   }
+
   // Fall back to current working directory
   return process.cwd();
 }
 
-// Base directory (project root - git root of cwd)
+// Base directory (bloom workspace root)
 export const BLOOM_DIR = findProjectRoot();
 export const REPOS_DIR = join(BLOOM_DIR, "repos");
 // Default tasks file is in the current working directory, not the git root

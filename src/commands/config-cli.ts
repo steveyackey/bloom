@@ -12,7 +12,8 @@ export async function handleConfigCommand(args: string[]): Promise<void> {
     const userConfig = await loadUserConfig();
     console.log(chalk.bold("User config") + chalk.dim(" (~/.bloom/config.yaml):\n"));
     console.log(`  ${chalk.bold("gitProtocol:")} ${chalk.cyan(userConfig.gitProtocol)}`);
-    console.log(`\n${chalk.bold("Project repos")} ${chalk.dim("(bloom.repos.yaml)")}:`);
+    console.log(`\n${chalk.bold("Workspace:")} ${chalk.cyan(BLOOM_DIR)}`);
+    console.log(`\n${chalk.bold("Project repos")} ${chalk.dim("(bloom.config.yaml)")}:`);
     const repos = await listRepos(BLOOM_DIR);
     if (repos.length === 0) {
       console.log(chalk.dim("  (none)"));
