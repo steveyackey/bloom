@@ -69,6 +69,57 @@ export async function setGitProtocol(protocol: "ssh" | "https"): Promise<void> {
   await saveUserConfig(config);
 }
 
+/**
+ * Check if URL is a shorthand format (org/repo) that needs protocol expansion.
+ */
+export function isShorthandUrl(url: string): boolean {
+  // Already a full URL - doesn't need protocol
+  if (url.startsWith("git@") || url.startsWith("https://") || url.startsWith("http://")) {
+    return false;
+  }
+  // Check for org/repo format
+  return /^[^/\s]+\/[^/\s]+$/.test(url);
+}
+
+/**
+ * Ensure git protocol is configured. If no config exists and URL needs protocol,
+ * prompt the user to choose between SSH and HTTPS.
+ */
+export async function ensureGitProtocolConfigured(url: string): Promise<void> {
+  const configPath = getUserConfigPath();
+
+  // If config already exists or URL doesn't need protocol expansion, we're done
+  if (existsSync(configPath) || !isShorthandUrl(url)) {
+    return;
+  }
+
+  // Prompt user for protocol preference
+  const select = (await import("@inquirer/select")).default;
+
+  console.log("\nFirst time using Bloom repo commands? Let's configure your git preferences.\n");
+
+  const protocol = await select({
+    message: "How do you want to clone repositories?",
+    choices: [
+      {
+        name: "HTTPS (recommended for most users)",
+        value: "https",
+        description: "Works with GitHub personal access tokens",
+      },
+      {
+        name: "SSH",
+        value: "ssh",
+        description: "Requires SSH keys configured with GitHub",
+      },
+    ],
+    default: "https",
+  });
+
+  await setGitProtocol(protocol as "ssh" | "https");
+  console.log(`\nGit protocol set to: ${protocol}`);
+  console.log("  To change later: bloom config set-protocol <ssh|https>\n");
+}
+
 // =============================================================================
 // Git URL Conversion
 // =============================================================================
