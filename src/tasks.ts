@@ -103,6 +103,12 @@ export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
         continue;
       }
 
+      // Skip checkpoint tasks - they're handled via human questions, not agents
+      if (isCheckpointTask(task)) {
+        findAvailable(task.subtasks);
+        continue;
+      }
+
       available.push(task);
       findAvailable(task.subtasks);
     }

@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { existsSync, type FSWatcher, mkdirSync, readdirSync, unlinkSync, watch } from "node:fs";
-import { join } from "node:path";
-import { BLOOM_DIR } from "./commands/context";
+import { dirname, join } from "node:path";
+import { getTasksFile } from "./commands/context";
 import { createLogger } from "./logger";
 
 const logger = createLogger("human-queue");
@@ -53,8 +53,14 @@ export interface Interjection {
 // Constants & Helpers
 // =============================================================================
 
-const QUEUE_DIR = join(BLOOM_DIR, ".questions");
-const INTERJECT_DIR = join(BLOOM_DIR, ".interjections");
+// Store questions/interjections alongside the tasks file
+function getQueueDir(): string {
+  return join(dirname(getTasksFile()), ".questions");
+}
+
+function getInterjectDir(): string {
+  return join(dirname(getTasksFile()), ".interjections");
+}
 
 const YES_ANSWERS = new Set([
   "yes",
@@ -112,7 +118,7 @@ async function listJsonFiles<T>(dir: string, filter?: (item: T) => boolean): Pro
 // =============================================================================
 
 function getQuestionPath(id: string): string {
-  return join(QUEUE_DIR, `${id}.json`);
+  return join(getQueueDir(), `${id}.json`);
 }
 
 function detectQuestionType(question: string, hasChoices: boolean): QuestionType {
@@ -142,7 +148,7 @@ export async function askQuestion(
     action?: QuestionAction;
   }
 ): Promise<string> {
-  ensureDir(QUEUE_DIR);
+  ensureDir(getQueueDir());
 
   const id = generateId("q");
   const questionType = options?.questionType ?? detectQuestionType(question, !!options?.choices?.length);
@@ -187,7 +193,7 @@ export async function getQuestion(id: string): Promise<Question | null> {
 }
 
 export async function listQuestions(status?: "pending" | "answered"): Promise<Question[]> {
-  const questions = await listJsonFiles<Question>(QUEUE_DIR, status ? (q) => q.status === status : undefined);
+  const questions = await listJsonFiles<Question>(getQueueDir(), status ? (q) => q.status === status : undefined);
   return questions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
@@ -226,11 +232,11 @@ let activeWatcher: FSWatcher | null = null;
 const eventHandlers = new Set<QueueEventHandler>();
 
 export function watchQueue(handler: QueueEventHandler): () => void {
-  ensureDir(QUEUE_DIR);
+  ensureDir(getQueueDir());
   eventHandlers.add(handler);
 
   if (!activeWatcher) {
-    activeWatcher = watch(QUEUE_DIR, async (_, filename) => {
+    activeWatcher = watch(getQueueDir(), async (_, filename) => {
       if (!filename?.endsWith(".json")) return;
 
       const questionId = filename.replace(".json", "");
@@ -298,14 +304,14 @@ export async function waitForAnswer(id: string, timeoutMs = 300000): Promise<str
 // =============================================================================
 
 function getInterjectionPath(id: string): string {
-  return join(INTERJECT_DIR, `${id}.json`);
+  return join(getInterjectDir(), `${id}.json`);
 }
 
 export async function createInterjection(
   agentName: string,
   options: { taskId?: string; sessionId?: string; workingDirectory: string; reason?: string }
 ): Promise<string> {
-  ensureDir(INTERJECT_DIR);
+  ensureDir(getInterjectDir());
 
   const id = generateId("i");
   const interjection: Interjection = {
@@ -327,7 +333,7 @@ export async function getInterjection(id: string): Promise<Interjection | null> 
 
 export async function listInterjections(status?: "pending" | "resumed" | "dismissed"): Promise<Interjection[]> {
   const interjections = await listJsonFiles<Interjection>(
-    INTERJECT_DIR,
+    getInterjectDir(),
     status ? (i) => i.status === status : undefined
   );
   return interjections.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

@@ -3,6 +3,7 @@
 // =============================================================================
 
 import chalk from "chalk";
+import { createLogger } from "../logger";
 import type { Task, TaskStatus } from "../task-schema";
 import {
   findTask,
@@ -12,6 +13,7 @@ import {
   getTasksByAgent,
   getTasksByStatus,
   loadTasks,
+  primeTasks,
   saveTasks,
   updateTaskStatus,
 } from "../tasks";
@@ -89,6 +91,13 @@ export async function cmdDashboard(): Promise<void> {
     console.log(
       `${chalk.bold("Status:")}   ${chalk.cyan(stats.in_progress)} in_progress, ${chalk.blue(stats.assigned)} assigned, ${chalk.yellow(stats.ready_for_agent)} ready, ${chalk.gray(stats.todo)} todo, ${chalk.red(stats.blocked)} blocked\n`
     );
+
+    // Show completion banner when all tasks are done
+    if (progress === 100 && total > 0) {
+      console.log(chalk.bold.green("═══════════════════════════════════════════════"));
+      console.log(chalk.bold.green("   ✓ ALL TASKS COMPLETE! Press q to quit"));
+      console.log(chalk.bold.green("═══════════════════════════════════════════════\n"));
+    }
 
     const activeAgents = new Map<string, { task: string; worktree?: string }[]>();
     function collectActive(tasks: Task[]) {
@@ -257,6 +266,12 @@ export async function cmdSetStatus(taskId: string, status: TaskStatus): Promise<
   updateTaskStatus(tasksFile.tasks, taskId, status);
   await saveTasks(getTasksFile(), tasksFile);
   console.log(`${chalk.yellow(taskId)}: ${colorStatus(oldStatus)} ${chalk.dim("→")} ${colorStatus(status)}`);
+
+  // When a task is marked done, prime any newly-unblocked tasks (including checkpoints)
+  if (status === "done") {
+    const logger = createLogger("prime");
+    await primeTasks(getTasksFile(), tasksFile, logger);
+  }
 }
 
 export async function cmdAssign(taskId: string, agentName: string): Promise<void> {
