@@ -267,8 +267,9 @@ describe("pull repos", () => {
       const result = await pullAllDefaultBranches(TEST_DIR);
 
       expect(result.failed.length).toBe(1);
-      expect(result.failed[0].name).toBe("missing-repo");
-      expect(result.failed[0].error).toContain("Bare repo not found");
+      const failedRepo = result.failed[0];
+      expect(failedRepo?.name).toBe("missing-repo");
+      expect(failedRepo?.error).toContain("Bare repo not found");
     });
 
     it("should handle multiple repos with mixed results", async () => {
@@ -335,7 +336,8 @@ describe("pull repos", () => {
       expect(result.upToDate).toContain("local-only");
       // Missing repo should fail
       expect(result.failed.length).toBe(1);
-      expect(result.failed[0].name).toBe("missing-repo");
+      const failedRepo = result.failed[0];
+      expect(failedRepo?.name).toBe("missing-repo");
     });
   });
 });
