@@ -7,10 +7,6 @@ const config: Config = {
   tagline: 'Multi-agent task orchestration for AI-powered development',
   favicon: 'img/favicon.ico',
 
-  future: {
-    v4: true,
-  },
-
   url: 'https://docs.use-bloom.dev',
   baseUrl: '/',
 
