@@ -2,6 +2,8 @@
 // Structured Logger for Bloom
 // =============================================================================
 
+import chalk from "chalk";
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LOG_LEVELS: Record<LogLevel, number> = {
@@ -9,6 +11,21 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   info: 1,
   warn: 2,
   error: 3,
+};
+
+// Level styling
+const levelStyles: Record<LogLevel, (s: string) => string> = {
+  debug: chalk.dim,
+  info: chalk.cyan,
+  warn: chalk.yellow,
+  error: chalk.red.bold,
+};
+
+const levelIcons: Record<LogLevel, string> = {
+  debug: "·",
+  info: "›",
+  warn: "⚠",
+  error: "✗",
 };
 
 let currentLevel: LogLevel = "info";
@@ -22,7 +39,7 @@ export function getLogLevel(): LogLevel {
 }
 
 function timestamp(): string {
-  return new Date().toLocaleTimeString();
+  return chalk.gray(new Date().toLocaleTimeString());
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -30,8 +47,11 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 function formatMessage(level: LogLevel, context: string, message: string): string {
-  const levelTag = level.toUpperCase().padEnd(5);
-  return `[${timestamp()}] [${levelTag}] [${context}] ${message}`;
+  const style = levelStyles[level];
+  const icon = levelIcons[level];
+  const levelTag = style(`${icon} [${level.toUpperCase()}]`);
+  const contextTag = chalk.bold.magenta(`[${context}]`);
+  return `${timestamp()} ${levelTag} ${contextTag} ${message}`;
 }
 
 export interface Logger {

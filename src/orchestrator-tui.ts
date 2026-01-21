@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
 import { interjectSession } from "./agents";
-import { ansi, CSI, cellBgToAnsi, cellFgToAnsi, getBorderColor } from "./colors";
+import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
 import { createInterjection } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 import { spawnTerminal, type TerminalProcess } from "./terminal";
@@ -464,18 +464,22 @@ export class OrchestratorTUI {
       output += ansi.moveTo(row, 1) + blankLine;
     }
 
-    // Header
+    // Header with chalk styling
     output += ansi.moveTo(1, 1);
-    const header = ` Bloom Orchestrator | View: ${this.viewMode} | Agents: ${this.panes.length} | n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit `;
-    output += header.padEnd(this.cols);
+    const title = chalk.bold.cyan(" Bloom");
+    const viewInfo = chalk.gray(` ${this.viewMode}`);
+    const agentCount = chalk.green(`${this.panes.length}`);
+    const keys = chalk.dim("n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit");
+    const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Agents:")} ${agentCount} ${chalk.dim("|")} ${keys}`;
+    output += header.padEnd(this.cols + 50); // Extra padding for ANSI codes
 
     // Separator
     output += ansi.moveTo(2, 1);
     output += "─".repeat(this.cols);
 
     if (this.panes.length === 0) {
-      const msg = "No agents configured. Press 'n' to create a new agent.";
-      const x = Math.floor((this.cols - msg.length) / 2);
+      const msg = chalk.dim("No agents configured. Press ") + chalk.yellow("n") + chalk.dim(" to create a new agent.");
+      const x = Math.floor((this.cols - 50) / 2); // Approximate visible length
       const y = Math.floor(this.rows / 2);
       output += `${ansi.moveTo(y, x)}${msg}`;
     } else {
@@ -497,29 +501,32 @@ export class OrchestratorTUI {
     const isFocused = index === this.focusedIndex;
     const isSelected = index === this.selectedIndex && this.focusedIndex === null;
 
-    // Color based on status and selection
-    let borderColor = getBorderColor("default");
+    // Get chalk function for border based on status and selection
+    let borderState: BorderState = "default";
     if (pane.status === "error") {
-      borderColor = getBorderColor("error");
+      borderState = "error";
     } else if (isFocused) {
-      borderColor = getBorderColor("focused");
+      borderState = "focused";
     } else if (isSelected) {
-      borderColor = getBorderColor("selected");
+      borderState = "selected";
     } else if (pane.status === "running") {
-      borderColor = getBorderColor("running");
+      borderState = "running";
     }
+    const border = getBorderChalk(borderState);
 
     let output = "";
 
-    // Status indicator
-    const statusIcon = pane.status === "running" ? "●" : pane.status === "error" ? "✗" : "○";
-    const focusStatus = isFocused ? " (focused)" : isSelected ? " (selected)" : "";
-    const titleText = `─ ${statusIcon} ${pane.config.name}${focusStatus} `;
-    const remainingWidth = region.w - titleText.length - 2;
+    // Status indicator with chalk colors
+    const statusIcon =
+      pane.status === "running" ? chalk.green("●") : pane.status === "error" ? chalk.red("✗") : chalk.gray("○");
+    const focusStatus = isFocused ? chalk.cyan(" (focused)") : isSelected ? chalk.yellow(" (selected)") : "";
+    const nameStyled = border.bold(pane.config.name);
+    const titleText = `─ ${statusIcon} ${nameStyled}${focusStatus} `;
+    const titleVisibleLen = 4 + pane.config.name.length + (isFocused ? 10 : isSelected ? 11 : 0);
+    const remainingWidth = region.w - titleVisibleLen - 2;
 
     output += ansi.moveTo(region.y, region.x + 1);
-    output += `${CSI}${borderColor}m`;
-    output += `╭${titleText}${"─".repeat(Math.max(0, remainingWidth))}╮`;
+    output += border(`╭${titleText}${"─".repeat(Math.max(0, remainingWidth))}╮`);
 
     // Content from xterm buffer
     const contentH = region.h - 2;
@@ -529,7 +536,7 @@ export class OrchestratorTUI {
 
     for (let row = 0; row < contentH; row++) {
       output += ansi.moveTo(region.y + 1 + row, region.x + 1);
-      output += `${CSI}${borderColor}m│${ansi.reset}`;
+      output += border("│");
 
       const line = buffer.getLine(viewportY + row);
       let colsRendered = 0;
@@ -568,14 +575,12 @@ export class OrchestratorTUI {
         output += " ".repeat(contentW - colsRendered);
       }
 
-      output += `${CSI}${borderColor}m│${ansi.reset}`;
+      output += border("│");
     }
 
     // Bottom border
     output += ansi.moveTo(region.y + region.h - 1, region.x + 1);
-    output += `${CSI}${borderColor}m`;
-    output += `╰${"─".repeat(region.w - 2)}╯`;
-    output += ansi.reset;
+    output += border(`╰${"─".repeat(region.w - 2)}╯`);
 
     return output;
   }

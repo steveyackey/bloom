@@ -4,6 +4,7 @@
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
 import { findGitRoot } from "./context";
 
@@ -56,7 +57,7 @@ async function selectFileToRefine(workingDir: string): Promise<RefineFile | null
   }
 
   const choices = existingFiles.map((f) => ({
-    name: `${f.name} - ${f.description}`,
+    name: `${chalk.cyan(f.name)} ${chalk.dim("-")} ${f.description}`,
     value: f,
   }));
 
@@ -136,7 +137,7 @@ Focus on making documents clear, complete, and actionable.`;
     dangerouslySkipPermissions: true,
   });
 
-  console.log(`Refining: ${selectedFile.name}\n`);
+  console.log(`${chalk.bold("Refining:")} ${chalk.cyan(selectedFile.name)}\n`);
 
   const initialPrompt = `I want to refine ${selectedFile.name}. Please read it first and help me improve it.`;
 
@@ -158,23 +159,25 @@ export async function cmdRefine(): Promise<void> {
   const selectedFile = await selectFileToRefine(workingDir);
 
   if (!selectedFile) {
-    console.log("No project files found in the current directory.\n");
-    console.log("Typical project files:");
-    console.log("  PRD.md      - Product Requirements Document");
-    console.log("  plan.md     - Implementation plan");
-    console.log("  tasks.yaml  - Task definitions");
-    console.log("  CLAUDE.md   - Guidelines for Claude\n");
-    console.log("Run 'bloom create <name>' to create a new project with templates.");
+    console.log(chalk.yellow("No project files found in the current directory.\n"));
+    console.log(chalk.bold("Typical project files:"));
+    console.log(`  ${chalk.cyan("PRD.md")}      - Product Requirements Document`);
+    console.log(`  ${chalk.cyan("plan.md")}     - Implementation plan`);
+    console.log(`  ${chalk.cyan("tasks.yaml")}  - Task definitions`);
+    console.log(`  ${chalk.cyan("CLAUDE.md")}   - Guidelines for Claude\n`);
+    console.log(chalk.dim("Run 'bloom create <name>' to create a new project with templates."));
     process.exit(1);
   }
 
   await runRefineSession(workingDir, selectedFile);
 
-  console.log(`\n---`);
-  console.log(`Refine session complete.`);
+  console.log(chalk.dim(`\n---`));
+  console.log(chalk.green("Refine session complete."));
 
   // Show next step based on selected file
   if (selectedFile.nextCommand) {
-    console.log(`\nNext: ${selectedFile.nextCommand.padEnd(16)} # ${selectedFile.nextStep}`);
+    console.log(
+      `\n${chalk.bold("Next:")} ${chalk.cyan(selectedFile.nextCommand.padEnd(16))} ${chalk.dim("#")} ${selectedFile.nextStep}`
+    );
   }
 }

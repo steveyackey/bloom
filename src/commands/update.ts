@@ -2,6 +2,7 @@
 // Update Command - Check for and install latest version of Bloom
 // =============================================================================
 
+import chalk from "chalk";
 import { VERSION } from "../version";
 
 const REPO = "steveyackey/bloom";
@@ -71,12 +72,12 @@ function getInstallCommand(platform: Platform): string {
 }
 
 export async function cmdUpdate(): Promise<void> {
-  console.log("Checking for updates...\n");
+  console.log(chalk.dim("Checking for updates...\n"));
 
   const latestVersion = await getLatestVersion();
 
   if (!latestVersion) {
-    console.error("Failed to check for updates. Please check your internet connection.");
+    console.error(chalk.red("Failed to check for updates. Please check your internet connection."));
     process.exit(1);
   }
 
@@ -84,7 +85,7 @@ export async function cmdUpdate(): Promise<void> {
   const latestNormalized = normalizeVersion(latestVersion);
 
   if (currentNormalized === latestNormalized) {
-    console.log(`You're already on the latest version (${VERSION}).`);
+    console.log(`${chalk.green("You're already on the latest version")} (${chalk.cyan(VERSION)}).`);
     return;
   }
 
@@ -92,13 +93,13 @@ export async function cmdUpdate(): Promise<void> {
   try {
     platform = detectPlatform();
   } catch (err) {
-    console.error((err as Error).message);
+    console.error(chalk.red((err as Error).message));
     process.exit(1);
   }
 
-  console.log(`Current version: ${VERSION}`);
-  console.log(`Latest version:  ${latestVersion}\n`);
-  console.log("Updating bloom...\n");
+  console.log(`${chalk.bold("Current version:")} ${chalk.yellow(VERSION)}`);
+  console.log(`${chalk.bold("Latest version:")}  ${chalk.green(latestVersion)}\n`);
+  console.log(chalk.cyan("Updating bloom...\n"));
 
   const installCommand = getInstallCommand(platform);
 
@@ -111,8 +112,8 @@ export async function cmdUpdate(): Promise<void> {
     });
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
-      console.error("\nUpdate failed. Please try running manually:");
-      console.error(`  ${installCommand}`);
+      console.error(chalk.red("\nUpdate failed. Please try running manually:"));
+      console.error(`  ${chalk.cyan(installCommand)}`);
       process.exit(1);
     }
   } else {
@@ -124,11 +125,11 @@ export async function cmdUpdate(): Promise<void> {
     });
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
-      console.error("\nUpdate failed. Please try running manually:");
-      console.error(`  ${installCommand}`);
+      console.error(chalk.red("\nUpdate failed. Please try running manually:"));
+      console.error(`  ${chalk.cyan(installCommand)}`);
       process.exit(1);
     }
   }
 
-  console.log("\nUpdate complete! Run 'bloom --version' to verify.");
+  console.log(`\n${chalk.green.bold("Update complete!")} Run ${chalk.cyan("bloom --version")} to verify.`);
 }

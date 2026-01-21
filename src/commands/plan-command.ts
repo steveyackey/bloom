@@ -4,6 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
 import { loadPrompt } from "../prompts";
 import { listRepos, pullAllDefaultBranches } from "../repos";
@@ -59,7 +60,7 @@ export async function runPlanSession(workingDir: string, planFile: string): Prom
     dangerouslySkipPermissions: true,
   });
 
-  console.log(`Planning session - plan will be written to: ${planFile}\n`);
+  console.log(`${chalk.bold("Planning session")} - plan will be written to: ${chalk.cyan(planFile)}\n`);
 
   const initialPrompt = `Let's create an implementation plan. First, read the PRD.md to understand what we're building, then summarize the key requirements and ask me any clarifying questions before we draft the plan.`;
 
@@ -82,35 +83,35 @@ export async function cmdPlan(): Promise<void> {
 
   // Check for PRD in the project directory
   if (!existsSync(prdPath)) {
-    console.log("Note: No PRD.md found in the current directory.");
-    console.log("Consider running 'bloom create <name>' first or adding a PRD.md.\n");
+    console.log(chalk.yellow("Note: No PRD.md found in the current directory."));
+    console.log(chalk.dim("Consider running 'bloom create <name>' first or adding a PRD.md.\n"));
   }
 
   // Pull updates from default branches before planning
-  console.log("Pulling latest updates from default branches...\n");
+  console.log(chalk.dim("Pulling latest updates from default branches...\n"));
   const pullResult = await pullAllDefaultBranches(BLOOM_DIR);
 
   if (pullResult.updated.length > 0) {
-    console.log(`Updated: ${pullResult.updated.join(", ")}`);
+    console.log(`${chalk.green("Updated:")} ${pullResult.updated.map((u) => chalk.cyan(u)).join(", ")}`);
   }
   if (pullResult.upToDate.length > 0) {
-    console.log(`Already up to date: ${pullResult.upToDate.join(", ")}`);
+    console.log(`${chalk.dim("Already up to date:")} ${pullResult.upToDate.join(", ")}`);
   }
   if (pullResult.failed.length > 0) {
-    console.log("\nWarning: Failed to pull updates for some repos:");
+    console.log(chalk.yellow("\nWarning: Failed to pull updates for some repos:"));
     for (const { name, error } of pullResult.failed) {
-      console.log(`  ${name}: ${error}`);
+      console.log(`  ${chalk.red(name)}: ${error}`);
     }
-    console.log("\nProceeding with planning using existing local state.\n");
+    console.log(chalk.dim("\nProceeding with planning using existing local state.\n"));
   } else if (pullResult.updated.length > 0 || pullResult.upToDate.length > 0) {
     console.log("");
   }
 
   await runPlanSession(workingDir, planFile);
 
-  console.log(`\n---`);
-  console.log(`Plan saved to: ${planFile}`);
-  console.log(`\nNext steps:`);
-  console.log(`  bloom refine        # Refine the plan if needed`);
-  console.log(`  bloom generate      # Generate tasks.yaml for execution`);
+  console.log(chalk.dim(`\n---`));
+  console.log(`${chalk.green("Plan saved to:")} ${chalk.cyan(planFile)}`);
+  console.log(`\n${chalk.bold("Next steps:")}`);
+  console.log(`  ${chalk.cyan("bloom refine")}        # Refine the plan if needed`);
+  console.log(`  ${chalk.cyan("bloom generate")}      # Generate tasks.yaml for execution`);
 }

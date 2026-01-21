@@ -4,6 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
 import { loadPrompt } from "../prompts";
 import { BLOOM_DIR } from "./context";
@@ -28,7 +29,7 @@ export async function runGenerateSession(workingDir: string, tasksFile: string):
     dangerouslySkipPermissions: true,
   });
 
-  console.log(`Generate session - tasks will be written to: ${tasksFile}\n`);
+  console.log(`${chalk.bold("Generate session")} - tasks will be written to: ${chalk.cyan(tasksFile)}\n`);
 
   const initialPrompt = `Please read the plan.md and generate a tasks.yaml file. Start by reading the plan, then create the task definitions.
 
@@ -53,15 +54,15 @@ export async function cmdGenerate(): Promise<void> {
 
   // Check for plan.md
   if (!existsSync(planFile)) {
-    console.log("Note: No plan found at plan.md");
-    console.log("Consider running 'bloom plan' first to create an implementation plan.\n");
+    console.log(chalk.yellow("Note: No plan found at plan.md"));
+    console.log(chalk.dim("Consider running 'bloom plan' first to create an implementation plan.\n"));
   }
 
   await runGenerateSession(workingDir, tasksFile);
 
-  console.log(`\n---`);
-  console.log(`Tasks generated to: ${tasksFile}`);
-  console.log(`\nNext steps:`);
-  console.log(`  bloom validate      # Check for issues`);
-  console.log(`  bloom run           # Execute tasks (run from this directory)`);
+  console.log(chalk.dim(`\n---`));
+  console.log(`${chalk.green("Tasks generated to:")} ${chalk.cyan(tasksFile)}`);
+  console.log(`\n${chalk.bold("Next steps:")}`);
+  console.log(`  ${chalk.cyan("bloom validate")}      # Check for issues`);
+  console.log(`  ${chalk.cyan("bloom run")}           # Execute tasks (run from this directory)`);
 }

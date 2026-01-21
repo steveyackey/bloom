@@ -4,6 +4,7 @@
 
 import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import chalk from "chalk";
 import * as YAML from "yaml";
 import { getUserConfigPath, loadUserConfig, setGitProtocol } from "../user-config";
 import { BLOOM_DIR, isInGitRepo } from "./context";
@@ -184,7 +185,7 @@ async function promptGitProtocol(): Promise<"ssh" | "https"> {
     message: "How do you want to clone repositories?",
     choices: [
       {
-        name: "SSH (recommended)",
+        name: chalk.cyan("SSH") + chalk.dim(" (recommended)"),
         value: "ssh",
         description: "Uses SSH keys, preferred for most developers",
       },
@@ -202,30 +203,30 @@ async function promptGitProtocol(): Promise<"ssh" | "https"> {
 
 export async function cmdInit(): Promise<void> {
   if (!isInGitRepo()) {
-    console.log("Not in a git repository.\n");
-    console.log("Bloom works best inside a git repo. Please run:");
-    console.log("  git init");
-    console.log("  git remote add origin <your-repo-url>");
-    console.log("  git push -u origin main\n");
-    console.log("Then run 'bloom init' again.");
+    console.log(chalk.yellow("Not in a git repository.\n"));
+    console.log(chalk.dim("Bloom works best inside a git repo. Please run:"));
+    console.log(`  ${chalk.cyan("git init")}`);
+    console.log(`  ${chalk.cyan("git remote add origin")} ${chalk.yellow("<your-repo-url>")}`);
+    console.log(`  ${chalk.cyan("git push -u origin main")}\n`);
+    console.log(chalk.dim("Then run 'bloom init' again."));
     process.exit(1);
   }
 
-  console.log(`Initializing Bloom workspace in ${BLOOM_DIR}\n`);
+  console.log(`${chalk.bold.cyan("Initializing Bloom workspace")} in ${chalk.dim(BLOOM_DIR)}\n`);
 
   const result = await initWorkspace();
 
   if (result.created.length > 0) {
-    console.log("Created:");
+    console.log(chalk.bold("Created:"));
     for (const item of result.created) {
-      console.log(`  + ${item}`);
+      console.log(`  ${chalk.green("+")} ${item}`);
     }
   }
 
   if (result.skipped.length > 0) {
-    console.log("Already exists:");
+    console.log(chalk.bold("Already exists:"));
     for (const item of result.skipped) {
-      console.log(`  - ${item}`);
+      console.log(`  ${chalk.dim("-")} ${chalk.dim(item)}`);
     }
   }
 
@@ -235,15 +236,15 @@ export async function cmdInit(): Promise<void> {
     console.log("");
     const protocol = await promptGitProtocol();
     await setGitProtocol(protocol);
-    console.log(`\nGit protocol set to: ${protocol}`);
-    console.log("  To change later: bloom config set-protocol <ssh|https>");
+    console.log(`\n${chalk.bold("Git protocol set to:")} ${chalk.cyan(protocol)}`);
+    console.log(chalk.dim("  To change later: bloom config set-protocol <ssh|https>"));
   } else {
     const userConfig = await loadUserConfig();
-    console.log(`\nUsing existing git protocol preference: ${userConfig.gitProtocol}`);
-    console.log("  To change: bloom config set-protocol <ssh|https>");
+    console.log(`\n${chalk.dim("Using existing git protocol preference:")} ${chalk.cyan(userConfig.gitProtocol)}`);
+    console.log(chalk.dim("  To change: bloom config set-protocol <ssh|https>"));
   }
 
-  console.log("\nWorkspace ready. Next steps:");
-  console.log("  bloom repo clone <url>    Add repositories to work on");
-  console.log("  bloom create <name>       Create a new project");
+  console.log(`\n${chalk.green.bold("Workspace ready.")} ${chalk.bold("Next steps:")}`);
+  console.log(`  ${chalk.cyan("bloom repo clone")} ${chalk.yellow("<url>")}    Add repositories to work on`);
+  console.log(`  ${chalk.cyan("bloom create")} ${chalk.yellow("<name>")}       Create a new project`);
 }

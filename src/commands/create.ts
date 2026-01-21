@@ -4,6 +4,7 @@
 
 import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
 import { loadPrompt } from "../prompts";
 import { BLOOM_DIR } from "./context";
@@ -87,8 +88,8 @@ export async function runCreateSession(projectDir: string): Promise<void> {
     dangerouslySkipPermissions: true,
   });
 
-  console.log(`\nStarting project creation session...\n`);
-  console.log(`Claude will help you define your project and fill out the PRD.\n`);
+  console.log(`\n${chalk.bold.cyan("Starting project creation session...")}\n`);
+  console.log(chalk.dim("Claude will help you define your project and fill out the PRD.\n"));
 
   const initialPrompt = `I've just created a new project and need help filling out the PRD.md. What would you like to build? Tell me about your idea and I'll help you capture the requirements.`;
 
@@ -105,34 +106,36 @@ export async function runCreateSession(projectDir: string): Promise<void> {
 
 export async function cmdCreate(projectName: string): Promise<void> {
   if (!projectName) {
-    console.error("Usage: bloom create <projectName>");
+    console.error(chalk.red("Usage: bloom create <projectName>"));
     process.exit(1);
   }
 
-  console.log(`Creating project '${projectName}'...\n`);
+  console.log(`${chalk.bold.cyan("Creating project")} '${chalk.yellow(projectName)}'...\n`);
 
   const result = await createProject(projectName);
 
   if (!result.success) {
-    console.error(`Error: ${result.error}`);
+    console.error(chalk.red(`Error: ${result.error}`));
     process.exit(1);
   }
 
-  console.log("Created:");
+  console.log(chalk.bold("Created:"));
   for (const item of result.created) {
-    console.log(`  + ${item}`);
+    console.log(`  ${chalk.green("+")} ${item}`);
   }
 
   // Launch Claude session
   await runCreateSession(result.projectDir);
 
-  console.log(`\n---`);
-  console.log(`Project '${projectName}' created at: ${result.projectDir}`);
-  console.log(`\nNext steps:`);
-  console.log(`  cd ${projectName}`);
-  console.log(`\nThen run these commands from within the project directory:`);
-  console.log(`  bloom refine        # Refine the PRD and templates`);
-  console.log(`  bloom plan          # Create implementation plan`);
-  console.log(`  bloom generate      # Generate tasks.yaml from plan`);
-  console.log(`  bloom run           # Execute tasks`);
+  console.log(chalk.dim(`\n---`));
+  console.log(
+    `${chalk.green("Project")} '${chalk.yellow(projectName)}' ${chalk.green("created at:")} ${chalk.cyan(result.projectDir)}`
+  );
+  console.log(`\n${chalk.bold("Next steps:")}`);
+  console.log(`  ${chalk.cyan(`cd ${projectName}`)}`);
+  console.log(chalk.dim(`\nThen run these commands from within the project directory:`));
+  console.log(`  ${chalk.cyan("bloom refine")}        # Refine the PRD and templates`);
+  console.log(`  ${chalk.cyan("bloom plan")}          # Create implementation plan`);
+  console.log(`  ${chalk.cyan("bloom generate")}      # Generate tasks.yaml from plan`);
+  console.log(`  ${chalk.cyan("bloom run")}           # Execute tasks`);
 }

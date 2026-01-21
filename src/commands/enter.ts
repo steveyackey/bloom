@@ -4,6 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
 import { findGitRoot } from "./context";
 
@@ -47,13 +48,13 @@ export async function cmdEnter(): Promise<void> {
   const hasPlan = existsSync(join(workingDir, "plan.md"));
   const hasTasks = existsSync(join(workingDir, "tasks.yaml"));
 
-  console.log(`Entering Claude Code in: ${workingDir}\n`);
+  console.log(`${chalk.bold.cyan("Entering Claude Code in:")} ${chalk.dim(workingDir)}\n`);
 
   if (hasPrd || hasPlan || hasTasks) {
-    console.log("Project files:");
-    if (hasPrd) console.log("  - PRD.md");
-    if (hasPlan) console.log("  - plan.md");
-    if (hasTasks) console.log("  - tasks.yaml");
+    console.log(chalk.bold("Project files:"));
+    if (hasPrd) console.log(`  ${chalk.green("•")} PRD.md`);
+    if (hasPlan) console.log(`  ${chalk.green("•")} plan.md`);
+    if (hasTasks) console.log(`  ${chalk.green("•")} tasks.yaml`);
     console.log("");
   }
 

@@ -2,6 +2,7 @@
 // Question Commands
 // =============================================================================
 
+import chalk from "chalk";
 import {
   answerQuestion,
   askQuestion,
@@ -54,42 +55,42 @@ export async function cmdAsk(
     action,
   });
 
-  console.log(`Question ID: ${id}`);
-  console.log(`Agent "${agentName}" asks: ${question}`);
-  console.log(`Type: ${options.questionType || "auto-detected"}`);
+  console.log(`${chalk.bold("Question ID:")} ${chalk.yellow(id)}`);
+  console.log(`${chalk.bold("Agent")} ${chalk.cyan(`"${agentName}"`)} ${chalk.bold("asks:")} ${question}`);
+  console.log(`${chalk.bold("Type:")} ${chalk.magenta(options.questionType || "auto-detected")}`);
 
   if (options.choices) {
-    console.log(`Choices: ${options.choices.join(", ")}`);
+    console.log(`${chalk.bold("Choices:")} ${options.choices.map((c) => chalk.cyan(c)).join(", ")}`);
   }
 
   if (action) {
-    console.log(`Action: ${action.type}`);
-    if (action.onYes) console.log(`  On Yes: ${action.onYes}`);
-    if (action.onNo) console.log(`  On No: ${action.onNo}`);
+    console.log(`${chalk.bold("Action:")} ${chalk.magenta(action.type)}`);
+    if (action.onYes) console.log(`  ${chalk.green("On Yes:")} ${action.onYes}`);
+    if (action.onNo) console.log(`  ${chalk.red("On No:")} ${action.onNo}`);
   }
 
-  console.log(`\nTo answer: bloom answer ${id} "your response"`);
+  console.log(`\n${chalk.dim("To answer:")} ${chalk.cyan(`bloom answer ${id} "your response"`)}`);
 }
 
 export async function cmdAnswer(questionId: string, answer: string): Promise<void> {
   const q = await getQuestion(questionId);
   if (!q) {
-    console.error(`Question not found: ${questionId}`);
+    console.error(chalk.red(`Question not found: ${questionId}`));
     process.exit(1);
   }
 
   if (q.status === "answered") {
-    console.error(`Question already answered: ${questionId}`);
+    console.error(chalk.red(`Question already answered: ${questionId}`));
     process.exit(1);
   }
 
   const success = await answerQuestion(questionId, answer);
   if (success) {
-    console.log(`Answered question ${questionId}`);
-    console.log(`Q: ${q.question}`);
-    console.log(`A: ${answer}`);
+    console.log(`${chalk.green("Answered question")} ${chalk.yellow(questionId)}`);
+    console.log(`${chalk.bold("Q:")} ${q.question}`);
+    console.log(`${chalk.bold("A:")} ${chalk.green(answer)}`);
   } else {
-    console.error("Failed to answer question");
+    console.error(chalk.red("Failed to answer question"));
     process.exit(1);
   }
 }
@@ -98,32 +99,32 @@ export async function cmdQuestions(showAll = false): Promise<void> {
   const questions = await listQuestions(showAll ? undefined : "pending");
 
   if (questions.length === 0) {
-    console.log(showAll ? "No questions in queue" : "No pending questions");
+    console.log(chalk.dim(showAll ? "No questions in queue" : "No pending questions"));
     return;
   }
 
-  console.log(showAll ? "All Questions:" : "Pending Questions:\n");
+  console.log(chalk.bold(showAll ? "All Questions:" : "Pending Questions:\n"));
 
   for (const q of questions) {
-    const time = new Date(q.createdAt).toLocaleTimeString();
-    const taskInfo = q.taskId ? ` [task: ${q.taskId}]` : "";
-    const statusIcon = q.status === "pending" ? "?" : "✓";
+    const time = chalk.gray(new Date(q.createdAt).toLocaleTimeString());
+    const taskInfo = q.taskId ? chalk.dim(` [task: ${chalk.yellow(q.taskId)}]`) : "";
+    const statusIcon = q.status === "pending" ? chalk.yellow("?") : chalk.green("✓");
 
-    console.log(`${statusIcon} ${q.id}`);
-    console.log(`  From: ${q.agentName}${taskInfo} at ${time}`);
-    console.log(`  Q: ${q.question}`);
+    console.log(`${statusIcon} ${chalk.yellow(q.id)}`);
+    console.log(`  ${chalk.bold("From:")} ${chalk.cyan(q.agentName)}${taskInfo} ${chalk.dim("at")} ${time}`);
+    console.log(`  ${chalk.bold("Q:")} ${q.question}`);
 
     if (q.options && q.options.length > 0) {
-      console.log(`  Options:`);
+      console.log(`  ${chalk.bold("Options:")}`);
       for (const [i, opt] of q.options.entries()) {
-        console.log(`    ${i + 1}. ${opt}`);
+        console.log(`    ${chalk.cyan(`${i + 1}.`)} ${opt}`);
       }
     }
 
     if (q.status === "answered") {
-      console.log(`  A: ${q.answer}`);
+      console.log(`  ${chalk.bold("A:")} ${chalk.green(q.answer)}`);
     } else {
-      console.log(`  Answer: bloom answer ${q.id} "your response"`);
+      console.log(`  ${chalk.dim("Answer:")} ${chalk.cyan(`bloom answer ${q.id} "your response"`)}`);
     }
     console.log();
   }
@@ -132,7 +133,7 @@ export async function cmdQuestions(showAll = false): Promise<void> {
 export async function cmdWaitAnswer(questionId: string, timeoutSecs = 300): Promise<void> {
   const q = await getQuestion(questionId);
   if (!q) {
-    console.error(`Question not found: ${questionId}`);
+    console.error(chalk.red(`Question not found: ${questionId}`));
     process.exit(1);
   }
 
@@ -141,21 +142,21 @@ export async function cmdWaitAnswer(questionId: string, timeoutSecs = 300): Prom
     return;
   }
 
-  console.error(`Waiting for answer to: ${q.question}`);
+  console.error(chalk.dim(`Waiting for answer to: ${q.question}`));
 
   const answer = await waitForAnswer(questionId, timeoutSecs * 1000);
 
   if (answer !== null) {
     console.log(answer);
   } else {
-    console.error("Timed out waiting for answer");
+    console.error(chalk.red("Timed out waiting for answer"));
     process.exit(1);
   }
 }
 
 export async function cmdClearAnswered(): Promise<void> {
   const count = await clearAnsweredQuestions();
-  console.log(`Cleared ${count} answered question(s)`);
+  console.log(`${chalk.green("Cleared")} ${chalk.yellow(count)} ${chalk.green("answered question(s)")}`);
 }
 
 export async function cmdQuestionsDashboard(): Promise<void> {
@@ -178,18 +179,20 @@ export async function cmdQuestionsDashboard(): Promise<void> {
         const oldStatus = task.status;
         task.status = result.status as TaskStatus;
         await saveTasks(getTasksFile(), tasksFile);
-        console.log(`Action executed: ${q.taskId}: ${oldStatus} → ${result.status}`);
+        console.log(
+          `${chalk.green("Action executed:")} ${chalk.yellow(q.taskId)}: ${chalk.gray(oldStatus)} ${chalk.dim("→")} ${chalk.green(result.status)}`
+        );
         await markActionExecuted(q.id);
       }
 
       if (result.note) {
         task.ai_notes.push(result.note);
         await saveTasks(getTasksFile(), tasksFile);
-        console.log(`Note added to task: ${q.taskId}`);
+        console.log(`${chalk.green("Note added to task:")} ${chalk.yellow(q.taskId)}`);
         await markActionExecuted(q.id);
       }
     } catch (err) {
-      console.log(`Failed to execute action:`, err);
+      console.log(chalk.red(`Failed to execute action:`), err);
     }
   };
 
@@ -198,13 +201,13 @@ export async function cmdQuestionsDashboard(): Promise<void> {
       const questions = await listQuestions("pending");
       console.clear();
 
-      console.log("══════════════════════════════════════════");
-      console.log("  HUMAN QUESTIONS QUEUE");
-      console.log("══════════════════════════════════════════\n");
+      console.log(chalk.cyan("══════════════════════════════════════════"));
+      console.log(chalk.bold.cyan("  HUMAN QUESTIONS QUEUE"));
+      console.log(chalk.cyan("══════════════════════════════════════════\n"));
 
       if (questions.length === 0) {
-        console.log("No pending questions - agents are working autonomously.\n");
-        console.log("Waiting for questions from agents...\n");
+        console.log(chalk.dim("No pending questions - agents are working autonomously.\n"));
+        console.log(chalk.dim("Waiting for questions from agents...\n"));
 
         await new Promise<void>((resolve) => {
           const unsubscribe = watchQueue((event) => {
@@ -220,23 +223,28 @@ export async function cmdQuestionsDashboard(): Promise<void> {
       const choices = questions.map((q) => {
         const time = new Date(q.createdAt).toLocaleTimeString();
         const taskInfo = q.taskId ? ` [${q.taskId}]` : "";
-        const typeIcon = q.questionType === "yes_no" ? "◉" : q.questionType === "choice" ? "◈" : "◇";
+        const typeIcon =
+          q.questionType === "yes_no"
+            ? chalk.green("◉")
+            : q.questionType === "choice"
+              ? chalk.blue("◈")
+              : chalk.yellow("◇");
         return {
-          name: `${typeIcon} [${q.agentName}${taskInfo}] ${q.question.slice(0, 55)}${q.question.length > 55 ? "..." : ""}`,
+          name: `${typeIcon} ${chalk.dim("[")}${chalk.cyan(q.agentName)}${chalk.dim(`${taskInfo}]`)} ${q.question.slice(0, 55)}${q.question.length > 55 ? "..." : ""}`,
           value: q.id,
           description: `Asked at ${time}: ${q.question}`,
         };
       });
 
       choices.push({
-        name: "↻ Refresh list",
+        name: chalk.dim("↻ Refresh list"),
         value: "__refresh__",
         description: "Check for new questions",
       });
 
       try {
         const selectedId = await select({
-          message: `${questions.length} question(s) need your attention: (◉=yes/no ◈=choice ◇=open)`,
+          message: `${chalk.yellow(questions.length)} question(s) need your attention: ${chalk.dim("(")}${chalk.green("◉")}${chalk.dim("=yes/no")} ${chalk.blue("◈")}${chalk.dim("=choice")} ${chalk.yellow("◇")}${chalk.dim("=open)")}`,
           choices,
           pageSize: 10,
         });
@@ -248,32 +256,32 @@ export async function cmdQuestionsDashboard(): Promise<void> {
         const selectedQ = questions.find((q) => q.id === selectedId);
         if (!selectedQ) continue;
 
-        console.log("\n──────────────────────────────────────────");
-        console.log(`Agent: ${selectedQ.agentName}`);
-        if (selectedQ.taskId) console.log(`Task: ${selectedQ.taskId}`);
-        console.log(`Type: ${selectedQ.questionType || "open"}`);
-        console.log(`\nQuestion: ${selectedQ.question}`);
+        console.log(chalk.dim("\n──────────────────────────────────────────"));
+        console.log(`${chalk.bold("Agent:")} ${chalk.cyan(selectedQ.agentName)}`);
+        if (selectedQ.taskId) console.log(`${chalk.bold("Task:")} ${chalk.yellow(selectedQ.taskId)}`);
+        console.log(`${chalk.bold("Type:")} ${chalk.magenta(selectedQ.questionType || "open")}`);
+        console.log(`\n${chalk.bold("Question:")} ${selectedQ.question}`);
 
         if (selectedQ.action && selectedQ.taskId) {
-          console.log(`\nAuto-action:`);
+          console.log(`\n${chalk.bold("Auto-action:")}`);
           if (selectedQ.action.onYes) {
-            console.log(`  Yes → set task status to "${selectedQ.action.onYes}"`);
+            console.log(`  ${chalk.green("Yes")} → set task status to "${chalk.green(selectedQ.action.onYes)}"`);
           }
           if (selectedQ.action.onNo) {
-            console.log(`  No → set task status to "${selectedQ.action.onNo}"`);
+            console.log(`  ${chalk.red("No")} → set task status to "${chalk.red(selectedQ.action.onNo)}"`);
           }
           if (selectedQ.action.type === "add_note") {
-            console.log(`  Answer will be added as note to task`);
+            console.log(`  ${chalk.cyan("Answer will be added as note to task")}`);
           }
         }
 
         if (selectedQ.options && selectedQ.options.length > 0) {
-          console.log("\nSuggested options:");
+          console.log(`\n${chalk.bold("Suggested options:")}`);
           for (const [i, opt] of selectedQ.options.entries()) {
-            console.log(`  ${i + 1}. ${opt}`);
+            console.log(`  ${chalk.cyan(`${i + 1}.`)} ${opt}`);
           }
         }
-        console.log("──────────────────────────────────────────\n");
+        console.log(chalk.dim("──────────────────────────────────────────\n"));
 
         let answer: string;
 
@@ -288,7 +296,7 @@ export async function cmdQuestionsDashboard(): Promise<void> {
             name: opt,
             value: opt,
           }));
-          choiceOptions.push({ name: "Other (type custom answer)", value: "__other__" });
+          choiceOptions.push({ name: chalk.dim("Other (type custom answer)"), value: "__other__" });
 
           const selected = await select({
             message: "Your answer:",
@@ -311,14 +319,14 @@ export async function cmdQuestionsDashboard(): Promise<void> {
         }
 
         await answerQuestion(selectedId, answer.trim());
-        console.log("\n✓ Answer submitted!");
+        console.log(`\n${chalk.green("✓ Answer submitted!")}`);
 
         await executeAction(selectedQ, answer.trim());
 
         await Bun.sleep(1000);
       } catch (err: unknown) {
         if (err && typeof err === "object" && "name" in err && err.name === "ExitPromptError") {
-          console.log("\nExiting questions dashboard...");
+          console.log(chalk.dim("\nExiting questions dashboard..."));
           process.exit(0);
         }
         throw err;
