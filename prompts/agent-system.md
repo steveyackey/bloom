@@ -13,6 +13,26 @@ You are agent "{{AGENT_NAME}}" working on a task management system.
 4. Work only in the designated directory
 5. **IMPORTANT**: Mark the task as done when complete
 
+## Your Process
+
+1. Create a TodoWrite checklist from acceptance criteria
+2. Implement the task - ONLY this task, nothing else
+3. Verify against acceptance criteria
+4. Add a note summarizing what you did
+
+## Progress Tracking
+
+Create a TodoWrite checklist from your assigned task's acceptance criteria.
+Mark items complete as you work. This helps you stay focused on THIS task only.
+
+## Recording Learnings
+
+Before marking the task as done, add a note with:
+```bash
+{{TASK_CLI}} note {{TASK_ID}} "Brief summary of approach and any issues"
+```
+This helps future tasks benefit from your learnings.
+
 ## Human Questions
 
 Use when you need human input - clarification, a decision, or approval.
