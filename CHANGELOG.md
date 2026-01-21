@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.14](https://github.com/steveyackey/bloom/compare/bloom-v0.1.13...bloom-v0.1.14) (2026-01-21)
+
+
+### Features
+
+* change default git protocol recommendation to SSH ([c55f797](https://github.com/steveyackey/bloom/commit/c55f7976b0c26e0ec4470841f527a47d3b925231))
+* pass initial prompt to Claude in interactive mode ([d1db4d4](https://github.com/steveyackey/bloom/commit/d1db4d4e57c4ae21dc20fc851d2597922274e03c))
+
+
+### Bug Fixes
+
+* correct broken footer links in docs site ([c6cb9f1](https://github.com/steveyackey/bloom/commit/c6cb9f1cc0970cdca3cab36c69adbd5f2391b61b))
+* prevent Claude from building during PRD creation phase ([0af1b1d](https://github.com/steveyackey/bloom/commit/0af1b1d23ff83f228880a4bfd9fb518906d3cbae))
+* remove unused YamlIcon component from web landing page ([093e9c0](https://github.com/steveyackey/bloom/commit/093e9c085ee48f1cc9c3b16f9994f315fbf98b7a))
+
+
+### Documentation
+
+* add release version and Bun badges to README ([c808339](https://github.com/steveyackey/bloom/commit/c808339061a9917ffdf52553199e73986784cb64))
+* add website and documentation links to README ([6a77bd5](https://github.com/steveyackey/bloom/commit/6a77bd5022e6e271c4d89f965f754b00197122bd))
+* update documentation to reflect SSH as recommended default ([cbfa57c](https://github.com/steveyackey/bloom/commit/cbfa57c08769e8e8a8228cd560dd005418b2f3dd))
+
 ## [0.1.13](https://github.com/steveyackey/bloom/compare/bloom-v0.1.12...bloom-v0.1.13) (2026-01-21)
 
 
