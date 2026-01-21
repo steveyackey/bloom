@@ -332,6 +332,11 @@ export class ClaudeAgentProvider implements Agent {
 
     args.push("--append-system-prompt", options.systemPrompt);
 
+    // Add initial prompt so Claude starts with context instead of blank slate
+    if (options.prompt) {
+      args.push(options.prompt);
+    }
+
     return args;
   }
 

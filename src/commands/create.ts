@@ -90,7 +90,7 @@ export async function runCreateSession(projectDir: string): Promise<void> {
   console.log(`\nStarting project creation session...\n`);
   console.log(`Claude will help you define your project and fill out the PRD.\n`);
 
-  const initialPrompt = `I've just created a new project. Please help me fill out the PRD.md. Start by asking me about what I want to build.`;
+  const initialPrompt = `I've just created a new project and need help filling out the PRD.md. What would you like to build? Tell me about your idea and I'll help you capture the requirements.`;
 
   await agent.run({
     systemPrompt,
