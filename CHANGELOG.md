@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/steveyackey/bloom/compare/bloom-v0.1.16...bloom-v0.1.17) (2026-01-21)
+
+
+### Bug Fixes
+
+* bloom run uses pwd for tasks.yaml and fix PullResult type usage ([5ff0092](https://github.com/steveyackey/bloom/commit/5ff0092e668a9e2d5f80dd1bdcd6f74e35af29db))
+
 ## [0.1.16](https://github.com/steveyackey/bloom/compare/bloom-v0.1.15...bloom-v0.1.16) (2026-01-21)
 
 
