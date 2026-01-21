@@ -43,7 +43,7 @@ export function getReposDir(bloomDir: string): string {
 }
 
 export function getBareRepoPath(bloomDir: string, repoName: string): string {
-  return join(getReposDir(bloomDir), `${repoName}.git`);
+  return join(getWorktreesDir(bloomDir, repoName), `${repoName}.git`);
 }
 
 export function getWorktreesDir(bloomDir: string, repoName: string): string {
@@ -162,6 +162,11 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
     };
   }
 
+  // Ensure repo directory exists (bare repo goes inside it)
+  if (!existsSync(worktreesDir)) {
+    mkdirSync(worktreesDir, { recursive: true });
+  }
+
   // Clone as bare repository
   console.log(`Cloning ${normalizedUrl} as bare repo...`);
   const cloneResult = runGit(["clone", "--bare", normalizedUrl, bareRepoPath]);
@@ -185,11 +190,6 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
 
   // Get the default branch
   const defaultBranch = getDefaultBranch(bareRepoPath);
-
-  // Create worktrees directory
-  if (!existsSync(worktreesDir)) {
-    mkdirSync(worktreesDir, { recursive: true });
-  }
 
   // Create worktree for default branch
   const worktreePath = getWorktreePath(bloomDir, repoName, defaultBranch);
@@ -300,11 +300,6 @@ export async function createRepo(
 
   // Set default branch
   runGit(["symbolic-ref", "HEAD", `refs/heads/${defaultBranch}`], bareRepoPath);
-
-  // Create worktrees directory
-  if (!existsSync(worktreesDir)) {
-    mkdirSync(worktreesDir, { recursive: true });
-  }
 
   // Create worktree for default branch with orphan (no commits yet)
   const worktreePath = getWorktreePath(bloomDir, name, defaultBranch);
