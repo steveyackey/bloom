@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.16](https://github.com/steveyackey/bloom/compare/bloom-v0.1.15...bloom-v0.1.16) (2026-01-21)
+
+
+### Features
+
+* pull latest updates from default branches before bloom run ([7f80b8e](https://github.com/steveyackey/bloom/commit/7f80b8e8d76bb6631117b5b69ed1d560967617ce))
+
+
+### Bug Fixes
+
+* improve TUI colors for dark terminal backgrounds ([4d06a2c](https://github.com/steveyackey/bloom/commit/4d06a2c6817395b12444fa93ef0ca38155b3b9a5))
+* only pull repos referenced in tasks.yaml before bloom run ([024b0cb](https://github.com/steveyackey/bloom/commit/024b0cbcab3c9ae458e0e2319eb668fa5c5084d5))
+* use pwd for tasks.yaml and generate, notify on checkpoint tasks ([bec6c91](https://github.com/steveyackey/bloom/commit/bec6c916f429adb988d28acbbff5411d3c276f26))
+
 ## [0.1.15](https://github.com/steveyackey/bloom/compare/bloom-v0.1.14...bloom-v0.1.15) (2026-01-21)
 
 
