@@ -41,17 +41,6 @@ export const ansi = {
 };
 
 // =============================================================================
-// Color Mode Constants (for xterm cell parsing)
-// =============================================================================
-
-export enum ColorMode {
-  DEFAULT = 0,
-  PALETTE_16 = 16,
-  PALETTE_256 = 256,
-  RGB = 16777216,
-}
-
-// =============================================================================
 // Chalk-based styling for beautiful output
 // =============================================================================
 
@@ -121,36 +110,74 @@ export function getBorderColor(state: BorderState): string {
 }
 
 // =============================================================================
-// xterm Cell Color Conversion
+// xterm Cell Color Conversion (using helper methods per xterm.js docs)
 // =============================================================================
 
-export function cellFgToAnsi(cell: { getFgColorMode(): number; getFgColor(): number }): string {
-  const mode = cell.getFgColorMode();
+interface FgCell {
+  isFgDefault(): boolean;
+  isFgPalette(): boolean;
+  isFgRGB(): boolean;
+  getFgColor(): number;
+}
+
+interface BgCell {
+  isBgDefault(): boolean;
+  isBgPalette(): boolean;
+  isBgRGB(): boolean;
+  getBgColor(): number;
+}
+
+export function cellFgToAnsi(cell: FgCell): string {
+  if (cell.isFgDefault()) return "";
+
   const color = cell.getFgColor();
 
-  if (mode === ColorMode.DEFAULT) return "";
-  if (mode === ColorMode.PALETTE_16) {
-    return color < 8 ? `${CSI}${30 + color}m` : `${CSI}${90 + (color - 8)}m`;
-  }
-  if (mode === ColorMode.PALETTE_256) return ansi.fg(color);
-  if (mode >= ColorMode.RGB) {
+  if (cell.isFgRGB()) {
+    // RGB mode: color is 0xRRGGBB
     return ansi.fgRgb((color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
   }
+
+  if (cell.isFgPalette()) {
+    // Palette mode: 0-255
+    if (color < 8) {
+      // Standard colors (30-37)
+      return `${CSI}${30 + color}m`;
+    }
+    if (color < 16) {
+      // Bright colors (90-97)
+      return `${CSI}${90 + (color - 8)}m`;
+    }
+    // 256-color palette
+    return ansi.fg(color);
+  }
+
   return "";
 }
 
-export function cellBgToAnsi(cell: { getBgColorMode(): number; getBgColor(): number }): string {
-  const mode = cell.getBgColorMode();
+export function cellBgToAnsi(cell: BgCell): string {
+  if (cell.isBgDefault()) return "";
+
   const color = cell.getBgColor();
 
-  if (mode === ColorMode.DEFAULT) return "";
-  if (mode === ColorMode.PALETTE_16) {
-    return color < 8 ? `${CSI}${40 + color}m` : `${CSI}${100 + (color - 8)}m`;
-  }
-  if (mode === ColorMode.PALETTE_256) return ansi.bg(color);
-  if (mode >= ColorMode.RGB) {
+  if (cell.isBgRGB()) {
+    // RGB mode: color is 0xRRGGBB
     return ansi.bgRgb((color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
   }
+
+  if (cell.isBgPalette()) {
+    // Palette mode: 0-255
+    if (color < 8) {
+      // Standard colors (40-47)
+      return `${CSI}${40 + color}m`;
+    }
+    if (color < 16) {
+      // Bright colors (100-107)
+      return `${CSI}${100 + (color - 8)}m`;
+    }
+    // 256-color palette
+    return ansi.bg(color);
+  }
+
   return "";
 }
 

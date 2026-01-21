@@ -81,6 +81,9 @@ export class OrchestratorTUI {
       this.createPane(config);
     }
 
+    // Select first pane (dashboard) after all agents are spawned
+    this.selectedIndex = 0;
+
     this.render();
   }
 

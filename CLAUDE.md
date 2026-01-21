@@ -29,3 +29,7 @@ Installation changes must be reflected in:
 - **template/**: Folder created by `bloom init` containing PRD.md, plan.md, CLAUDE.template.md templates.
 
 Flow: init workspace → clone repos → create project → refine PRD → plan → refine plan → generate → run
+
+## TUI Colors
+
+Use `chalk` for all terminal colors. For xterm.js cell rendering, use helper methods (`isFgDefault()`, `isFgPalette()`, `isFgRGB()`) not raw color mode values.
