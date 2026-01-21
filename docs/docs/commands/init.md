@@ -38,11 +38,11 @@ The `.gitignore` file is created (or updated) to exclude the `repos/` folder, pr
 
 ```
 ? How would you like to clone repositories?
-❯ SSH (git@github.com:...)
-  HTTPS (https://github.com/...)
+❯ SSH (recommended)
+  HTTPS
 ```
 
-This sets your default protocol for `bloom repo clone` commands.
+SSH is recommended for most developers. This sets your default protocol for `bloom repo clone` commands.
 
 ## Prerequisites
 

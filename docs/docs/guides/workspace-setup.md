@@ -20,7 +20,7 @@ bloom init
 
 During initialization, you'll be asked:
 
-1. **Git protocol preference** — SSH or HTTPS for cloning repositories
+1. **Git protocol preference** — SSH (recommended) or HTTPS for cloning repositories
 
 ### Workspace Structure
 
