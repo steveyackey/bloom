@@ -53,6 +53,7 @@ export enum ColorMode {
 
 const colors = {
   blue: `${CSI}34m`,
+  white: `${CSI}37m`,
   brightBlack: `${CSI}90m`,
   brightRed: `${CSI}91m`,
   brightGreen: `${CSI}92m`,
@@ -60,6 +61,8 @@ const colors = {
   brightBlue: `${CSI}94m`,
   brightCyan: `${CSI}96m`,
   brightWhite: `${CSI}97m`,
+  // Dim white - a readable muted gray that works on both light and dark backgrounds
+  dim: `${CSI}2;37m`,
 };
 
 // =============================================================================
@@ -72,31 +75,31 @@ export const semantic = {
   warning: colors.brightYellow,
   success: colors.brightGreen,
   info: colors.brightCyan,
-  muted: colors.brightBlack,
+  muted: colors.dim,
 
   // UI elements
   header: {
-    bg: `${CSI}48;5;19m`,
-    fg: colors.brightWhite,
+    bg: ansi.inverse,
+    fg: "",
     style: ansi.bold,
   },
-  separator: colors.blue,
+  separator: colors.dim,
 
-  // Border states (color codes for CSI)
+  // Border states (bright color codes for CSI)
   border: {
-    default: "90",
-    error: "31",
-    focused: "32",
-    selected: "33",
-    running: "36",
+    default: "37", // white (visible on dark backgrounds)
+    error: "91", // bright red
+    focused: "92", // bright green
+    selected: "93", // bright yellow
+    running: "96", // bright cyan
   },
 
   // Agent output
   tool: colors.brightCyan,
-  toolResult: colors.brightBlack,
-  session: colors.brightBlack,
-  cost: colors.brightBlack,
-  heartbeat: colors.brightBlack,
+  toolResult: colors.dim,
+  session: colors.dim,
+  cost: colors.dim,
+  heartbeat: colors.dim,
   timeout: colors.brightRed,
 };
 
@@ -105,7 +108,7 @@ export const semantic = {
 // =============================================================================
 
 export const logColors = {
-  debug: colors.brightBlack,
+  debug: colors.dim,
   info: colors.brightBlue,
   warn: colors.brightYellow,
   error: colors.brightRed,
