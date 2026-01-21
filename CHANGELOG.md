@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.18](https://github.com/steveyackey/bloom/compare/bloom-v0.1.17...bloom-v0.1.18) (2026-01-21)
+
+
+### Features
+
+* add checkpoint field to task schema ([6635424](https://github.com/steveyackey/bloom/commit/6635424288a745b87c1340788b687f573a29f3ed))
+* add install:local script for local testing ([7591e06](https://github.com/steveyackey/bloom/commit/7591e063cdcfdc0ec965f1e3908fa34bb65e19a1))
+* add structured process, progress tracking, and learning capture to agent prompt ([ea2fad9](https://github.com/steveyackey/bloom/commit/ea2fad9bf3de63c19fd5dec16c11c33a00678fd4))
+
+
+### Bug Fixes
+
+* checkpoint question creation and storage location ([408994f](https://github.com/steveyackey/bloom/commit/408994f1bcad5ee27dc5f444c97e7d99e6a5e198))
+* increase agent activity timeout from 2 to 10 minutes ([a9eeea1](https://github.com/steveyackey/bloom/commit/a9eeea1317bf50a2cad134e608b812c435445d01))
+* remove colors from logging output ([417503d](https://github.com/steveyackey/bloom/commit/417503d94692ba6ac14ce097114874bbe1397126))
+* TUI color rendering and default pane selection ([4ac90a0](https://github.com/steveyackey/bloom/commit/4ac90a0ac7f7438f5103954aa2d34f2a07c8b94a))
+
 ## [0.1.17](https://github.com/steveyackey/bloom/compare/bloom-v0.1.16...bloom-v0.1.17) (2026-01-21)
 
 
