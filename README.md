@@ -2,6 +2,11 @@
   <img src="assets/bloom-header.png" alt="Bloom" width="800">
 </p>
 
+<p align="center">
+  <a href="https://github.com/steveyackey/bloom/releases/latest"><img src="https://img.shields.io/github/v/release/steveyackey/bloom" alt="Latest Release"></a>
+  <img src="https://img.shields.io/badge/built%20with-Bun-f9f1e1?logo=bun" alt="Built with Bun">
+</p>
+
 # Bloom - Multi-Agent Task Orchestrator
 
 A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel. Designed for teams and solo developers alike.
