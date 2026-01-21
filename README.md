@@ -6,6 +6,8 @@
 
 A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel. Designed for teams and solo developers alike.
 
+**[Website](https://www.use-bloom.dev)** · **[Documentation](https://docs.use-bloom.dev)**
+
 ## Built for Teams and Solo Developers
 
 Bloom adapts to how you work:
