@@ -19,7 +19,7 @@ import {
   saveTasks,
   updateTaskStatus,
 } from "../tasks";
-import { BLOOM_DIR, DEFAULT_TASKS_FILE, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
+import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
 
 // =============================================================================
 // Types
@@ -58,7 +58,7 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
   updateTaskStatus(tasksFile.tasks, task.id, "in_progress", agentName);
   await saveTasks(getTasksFile(), tasksFile);
 
-  const taskCli = `bloom${getTasksFile() !== DEFAULT_TASKS_FILE ? ` -f "${getTasksFile()}"` : ""}`;
+  const taskCli = `bloom -f "${getTasksFile()}"`;
 
   let prompt = `# Task: ${task.title}\n\n## Task ID: ${task.id}\n\n`;
 
@@ -211,12 +211,12 @@ export async function startOrchestrator(): Promise<void> {
 
         for (const repoName of reposToPull) {
           const result = await pullDefaultBranch(BLOOM_DIR, repoName);
-          if (result.status === "updated") {
-            updated.push(repoName);
-          } else if (result.status === "up-to-date") {
-            upToDate.push(repoName);
-          } else {
+          if (!result.success) {
             failed.push({ name: repoName, error: result.error || "Unknown error" });
+          } else if (result.updated) {
+            updated.push(repoName);
+          } else {
+            upToDate.push(repoName);
           }
         }
 
@@ -267,36 +267,32 @@ export async function startOrchestrator(): Promise<void> {
 }
 
 async function startTUI(agents: Set<string>): Promise<void> {
-  const useCustomFile = getTasksFile() !== DEFAULT_TASKS_FILE;
   const agentConfigs: AgentConfig[] = [];
+  // Always pass the tasks file explicitly since subprocesses run in BLOOM_DIR,
+  // not the original pwd where the user ran `bloom run`
+  const tasksFileArg = ["-f", getTasksFile()];
 
   // Dashboard pane
-  const dashboardCmd = ["bloom"];
-  if (useCustomFile) dashboardCmd.push("-f", getTasksFile());
-  dashboardCmd.push("dashboard");
-
-  agentConfigs.push({ name: "dashboard", command: dashboardCmd, cwd: BLOOM_DIR });
+  agentConfigs.push({ name: "dashboard", command: ["bloom", ...tasksFileArg, "dashboard"], cwd: BLOOM_DIR });
 
   // Human Questions pane
-  const questionsCmd = ["bloom"];
-  if (useCustomFile) questionsCmd.push("-f", getTasksFile());
-  questionsCmd.push("questions-dashboard");
-
-  agentConfigs.push({ name: "questions", command: questionsCmd, cwd: BLOOM_DIR });
+  agentConfigs.push({ name: "questions", command: ["bloom", ...tasksFileArg, "questions-dashboard"], cwd: BLOOM_DIR });
 
   // Agent panes
   for (const agentName of [...agents].sort()) {
-    const cmd = ["bloom"];
-    if (useCustomFile) cmd.push("-f", getTasksFile());
-    cmd.push("agent", "run", agentName);
-    agentConfigs.push({ name: agentName, command: cmd, cwd: BLOOM_DIR });
+    agentConfigs.push({
+      name: agentName,
+      command: ["bloom", ...tasksFileArg, "agent", "run", agentName],
+      cwd: BLOOM_DIR,
+    });
   }
 
   // Floating agent
-  const floatingCmd = ["bloom"];
-  if (useCustomFile) floatingCmd.push("-f", getTasksFile());
-  floatingCmd.push("agent", "run", FLOATING_AGENT);
-  agentConfigs.push({ name: FLOATING_AGENT, command: floatingCmd, cwd: BLOOM_DIR });
+  agentConfigs.push({
+    name: FLOATING_AGENT,
+    command: ["bloom", ...tasksFileArg, "agent", "run", FLOATING_AGENT],
+    cwd: BLOOM_DIR,
+  });
 
   logger.orchestrator.info("Starting TUI...");
   const tui = new OrchestratorTUI(agentConfigs);
