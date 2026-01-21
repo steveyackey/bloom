@@ -78,15 +78,15 @@ const config: Config = {
           items: [
             {
               label: 'Getting Started',
-              to: '/getting-started',
+              to: '/getting-started/installation',
             },
             {
               label: 'Commands',
-              to: '/commands',
+              to: '/commands/overview',
             },
             {
               label: 'Best Practices',
-              to: '/best-practices',
+              to: '/best-practices/project-structure',
             },
           ],
         },
