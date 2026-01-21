@@ -7,7 +7,13 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import * as YAML from "yaml";
 import { z } from "zod";
-import { expandRepoUrl, extractRepoName, loadUserConfig, normalizeGitUrl } from "./user-config";
+import {
+  ensureGitProtocolConfigured,
+  expandRepoUrl,
+  extractRepoName,
+  loadUserConfig,
+  normalizeGitUrl,
+} from "./user-config";
 
 // =============================================================================
 // Schema for bloom.config.yaml (project-level)
@@ -128,6 +134,9 @@ export interface CloneResult {
 }
 
 export async function cloneRepo(bloomDir: string, url: string, options?: { name?: string }): Promise<CloneResult> {
+  // Ensure git protocol is configured (prompts on first shorthand URL if needed)
+  await ensureGitProtocolConfigured(url);
+
   const userConfig = await loadUserConfig();
   // Expand shorthand (org/repo) to full URL, then normalize to preferred protocol
   const expandedUrl = expandRepoUrl(url, userConfig.gitProtocol);
@@ -214,6 +223,9 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
       };
     }
   }
+
+  // Set upstream tracking branch for the default branch
+  runGit(["branch", "--set-upstream-to", `origin/${defaultBranch}`, defaultBranch], worktreePath);
 
   // Save to repos file
   const reposFile = await loadReposFile(bloomDir);
@@ -547,6 +559,9 @@ export async function addWorktree(
   if (!result.success) {
     return { success: false, path: "", error: result.error };
   }
+
+  // Set upstream tracking branch if remote branch exists
+  runGit(["branch", "--set-upstream-to", `origin/${branch}`, branch], worktreePath);
 
   return { success: true, path: worktreePath };
 }

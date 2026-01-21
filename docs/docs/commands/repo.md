@@ -30,9 +30,10 @@ bloom repo clone steveyackey/bloom
 ```
 
 **What happens:**
-1. Creates bare repository: `repos/backend.git/`
-2. Creates default worktree: `repos/backend/`
-3. Adds entry to `bloom.config.yaml`
+1. Creates repo directory: `repos/backend/`
+2. Creates bare repository: `repos/backend/backend.git/`
+3. Creates default worktree: `repos/backend/main/`
+4. Adds entry to `bloom.config.yaml`
 
 ### create
 
@@ -49,8 +50,8 @@ bloom repo create my-new-service
 ```
 
 Creates:
-- `repos/my-new-service.git/` — Empty bare repo
-- `repos/my-new-service/` — Initial worktree
+- `repos/my-new-service/my-new-service.git/` — Empty bare repo
+- `repos/my-new-service/main/` — Initial worktree
 
 ### list
 
@@ -119,7 +120,7 @@ bloom repo worktree add backend feature/existing-branch
 bloom repo worktree add backend feature/new-feature
 ```
 
-Creates directory: `repos/backend-feature-new-feature/`
+Creates directory: `repos/backend/feature-new-feature/`
 
 ### worktree remove
 
