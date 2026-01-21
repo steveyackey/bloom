@@ -8,9 +8,10 @@ import { createWorktree, getWorktreePath, worktreeExists } from "../git";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { loadAgentPrompt } from "../prompts";
-import { listRepos } from "../repos";
+import { listRepos, pullDefaultBranch } from "../repos";
 import {
   getAllAgents,
+  getAllRepos,
   getAvailableTasks,
   loadTasks,
   primeTasks,
@@ -188,9 +189,51 @@ export async function startOrchestrator(): Promise<void> {
   }
 
   let agents: Set<string>;
+  let taskRepos: Set<string>;
   try {
     logger.orchestrator.info("Validating tasks.yaml...");
     const tasksFile = await loadTasks(getTasksFile());
+
+    // Extract repos referenced in tasks
+    taskRepos = getAllRepos(tasksFile.tasks);
+
+    // Pull latest updates only for repos used in tasks
+    if (taskRepos.size > 0) {
+      const existingRepos = repos.filter((r) => r.exists).map((r) => r.name);
+      const reposToPull = [...taskRepos].filter((r) => existingRepos.includes(r));
+
+      if (reposToPull.length > 0) {
+        logger.orchestrator.info(`Pulling latest updates for task repos: ${reposToPull.join(", ")}...`);
+
+        const updated: string[] = [];
+        const upToDate: string[] = [];
+        const failed: { name: string; error: string }[] = [];
+
+        for (const repoName of reposToPull) {
+          const result = await pullDefaultBranch(BLOOM_DIR, repoName);
+          if (result.status === "updated") {
+            updated.push(repoName);
+          } else if (result.status === "up-to-date") {
+            upToDate.push(repoName);
+          } else {
+            failed.push({ name: repoName, error: result.error || "Unknown error" });
+          }
+        }
+
+        if (updated.length > 0) {
+          logger.orchestrator.info(`Updated: ${updated.join(", ")}`);
+        }
+        if (upToDate.length > 0) {
+          logger.orchestrator.info(`Already up to date: ${upToDate.join(", ")}`);
+        }
+        if (failed.length > 0) {
+          for (const { name, error } of failed) {
+            logger.orchestrator.warn(`Failed to pull ${name}: ${error}`);
+          }
+          logger.orchestrator.info("Proceeding with existing local state.");
+        }
+      }
+    }
 
     logger.orchestrator.info("Checking for stuck tasks...");
     const resetCount = resetStuckTasks(tasksFile, logger.reset);
