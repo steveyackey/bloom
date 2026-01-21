@@ -57,6 +57,18 @@ export function getAllAgents(tasks: Task[]): Set<string> {
   return agents;
 }
 
+export function getAllRepos(tasks: Task[]): Set<string> {
+  const repos = new Set<string>();
+  function collect(taskList: Task[]) {
+    for (const task of taskList) {
+      if (task.repo) repos.add(task.repo);
+      collect(task.subtasks);
+    }
+  }
+  collect(tasks);
+  return repos;
+}
+
 export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
   const completedIds = new Set<string>();
 
