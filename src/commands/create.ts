@@ -130,6 +130,7 @@ export async function cmdCreate(projectName: string): Promise<void> {
   console.log(`Project '${projectName}' created at: ${result.projectDir}`);
   console.log(`\nNext steps:`);
   console.log(`  cd ${projectName}`);
+  console.log(`\nThen run these commands from within the project directory:`);
   console.log(`  bloom refine        # Refine the PRD and templates`);
   console.log(`  bloom plan          # Create implementation plan`);
   console.log(`  bloom generate      # Generate tasks.yaml from plan`);
