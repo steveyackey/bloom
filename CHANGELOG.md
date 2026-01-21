@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.13](https://github.com/steveyackey/bloom/compare/bloom-v0.1.12...bloom-v0.1.13) (2026-01-21)
+
+
+### Documentation
+
+* add cross-repo exploration with bloom enter ([4966c88](https://github.com/steveyackey/bloom/commit/4966c887a3a1af3b2a9cdd13fac607e74e2ccb53))
+* clarify team collaboration and solo developer workflows ([deacc3a](https://github.com/steveyackey/bloom/commit/deacc3a2a98c0ed5ebe80138e5e3284308d86a6c))
+* highlight multi-repository planning as key differentiator ([59fb1d2](https://github.com/steveyackey/bloom/commit/59fb1d2d461a6561a4940afa63af99c66a6453e4))
+
 ## [0.1.12](https://github.com/steveyackey/bloom/compare/bloom-v0.1.11...bloom-v0.1.12) (2026-01-20)
 
 
