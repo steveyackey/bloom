@@ -447,10 +447,6 @@ export async function pullDefaultBranch(bloomDir: string, repoName: string): Pro
     return { success: false, repoName, updated: false, error: `Failed to fetch: ${fetchResult.error}` };
   }
 
-  // Check if we're behind the remote
-  const statusResult = runGit(["status", "-uno", "--porcelain=v2", "--branch"], worktreePath);
-  const isBehind = statusResult.output.includes("+") || statusResult.output.includes("behind");
-
   // Pull updates into the default branch worktree
   const pullResult = runGit(["pull", "--ff-only"], worktreePath);
   if (!pullResult.success) {
@@ -474,8 +470,12 @@ export async function pullDefaultBranch(bloomDir: string, repoName: string): Pro
     return { success: false, repoName, updated: false, error: `Failed to pull: ${pullResult.error}` };
   }
 
-  // Check if we actually updated (output contains "Updating" or "Fast-forward")
-  const wasUpdated = pullResult.output.includes("Updating") || pullResult.output.includes("Fast-forward") || isBehind;
+  // Check if we actually updated
+  // "Already up to date" means no changes, anything else (like "Updating" or file changes) means updated
+  const combinedOutput = pullResult.output + pullResult.error;
+  const alreadyUpToDate =
+    combinedOutput.includes("Already up to date") || combinedOutput.includes("Already up-to-date");
+  const wasUpdated = !alreadyUpToDate;
 
   return { success: true, repoName, updated: wasUpdated };
 }
