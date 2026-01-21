@@ -5,7 +5,7 @@ title: Core Concepts
 
 # Core Concepts
 
-Understanding Bloom's architecture helps you use it effectively. This page covers the key concepts and how they relate.
+Understanding Bloom's architecture helps you use it effectively. This page covers the key concepts and how they relate—whether you're working solo or as part of a team.
 
 ## Workspace
 
@@ -62,37 +62,45 @@ bloom repo worktree remove backend feature/auth
 
 ## Project
 
-A **project** is a unit of work created with `bloom create`. It represents a feature, fix, or any body of work across one or more repositories.
+A **project** is a unit of work created with `bloom create`. It represents a feature, fix, or any body of work across one or more repositories. Projects are where team collaboration happens—from requirements to execution.
 
 ```
 my-feature/
 ├── PRD.md           # Product Requirements Document
 ├── plan.md          # Implementation plan
 ├── CLAUDE.md        # Guidelines for AI agents
-└── tasks.yaml       # Task definitions
+├── tasks.yaml       # Task definitions
+├── designs/         # (Optional) Mockups, wireframes, Figma links
+└── research/        # (Optional) User research, competitive analysis
 ```
 
 ### Project Files
 
-| File | Purpose |
-|------|---------|
-| `PRD.md` | High-level requirements and success criteria |
-| `plan.md` | Detailed implementation plan with phases |
-| `CLAUDE.md` | Instructions and context for AI agents |
-| `tasks.yaml` | Structured task definitions for execution |
+| File | Purpose | Typical Owner |
+|------|---------|---------------|
+| `PRD.md` | High-level requirements and success criteria | PM, Designer |
+| `plan.md` | Detailed implementation plan with phases | Dev, Architect |
+| `CLAUDE.md` | Instructions and context for AI agents | Dev, Tech Lead |
+| `tasks.yaml` | Structured task definitions for execution | Generated from plan |
+| `designs/` | Mockups, wireframes, design system links | Designer |
 
 ### Project Lifecycle
 
 ```
-create → refine PRD → plan → refine plan → generate tasks → run
+create → refine PRD → plan → refine plan → generate tasks → run → validate
 ```
 
-1. **Create** — Scaffold project from templates
-2. **Refine PRD** — Define what to build
-3. **Plan** — Break down into phases and steps
-4. **Refine Plan** — Iterate on the approach
-5. **Generate** — Convert plan to executable tasks
-6. **Run** — Execute with agents
+| Step | Activities | Team Collaboration |
+|------|------------|-------------------|
+| **Create** | Scaffold project from templates | PM initiates project |
+| **Refine PRD** | Define requirements, add designs | PM, Designer contribute assets |
+| **Plan** | Break down into phases and steps | Architects review approach |
+| **Refine Plan** | Iterate on the approach | Tech leads provide feedback |
+| **Generate** | Convert plan to executable tasks | Devs validate task breakdown |
+| **Run** | Execute with agents | Monitor progress |
+| **Validate** | Review at checkpoints | QA validates work quality |
+
+Solo developers move through these stages independently, using AI to help refine and iterate.
 
 ## Task
 

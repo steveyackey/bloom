@@ -4,7 +4,53 @@
 
 # Bloom - Multi-Agent Task Orchestrator
 
-A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel.
+A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel. Designed for teams and solo developers alike.
+
+## Built for Teams and Solo Developers
+
+Bloom adapts to how you work:
+
+**For Teams**: Product managers and designers define requirements in PRDs, adding mockups and designs to the project folder. Developers, architects, and technical leads collaborate on implementation plans. QA engineers validate checkpoints throughout the process. Everyone stays aligned from requirements to deployment.
+
+**For Solo Developers**: Move fast with AI-powered planning. Turn your ideas into structured plans and let multiple agents execute in parallel while you focus on what matters.
+
+## Multi-Repository Planning
+
+Unlike other tools, Bloom enables planning across multiple repositories in a single project. Build features that span your backend, frontend, mobile app, and shared libraries—all coordinated through one plan with proper dependency ordering.
+
+```yaml
+# A single project can orchestrate work across repos
+tasks:
+  - id: api-models
+    repo: ./repos/backend
+    worktree: feature/auth
+
+  - id: shared-types
+    repo: ./repos/shared-types
+    worktree: feature/auth
+    depends_on: [api-models]
+
+  - id: frontend-integration
+    repo: ./repos/frontend
+    worktree: feature/auth
+    depends_on: [shared-types]
+```
+
+## Explore Across Repositories
+
+Use `bloom enter` to start an interactive Claude session with visibility into all your repositories. Ask questions, explore code, or debug issues across your entire codebase—no project setup required.
+
+```bash
+# From anywhere in your workspace
+bloom enter
+
+# Ask questions spanning multiple repos
+> "How does the frontend auth flow connect to the backend JWT service?"
+> "What shared types are used between the API and mobile app?"
+> "Find all places where user permissions are checked"
+```
+
+Create a folder just for exploration if you want—no PRD or plan needed. Perfect for onboarding, architecture review, or understanding complex cross-repo interactions.
 
 ## Install
 
@@ -111,7 +157,13 @@ You can organize everything outside `repos/` however you like—create folders f
 10. REVIEW   [CHECKPOINT] tasks        # Human reviews at phase boundaries
 ```
 
-The more context you provide upfront (PRD, architecture notes, existing code), the better your task breakdown will be.
+### Team Collaboration Points
+
+- **Steps 3-4 (Create & Refine PRD)**: PMs and designers add requirements, mockups, and design assets to the project folder
+- **Steps 5-6 (Plan & Refine)**: Technical leads, architects, and developers review and refine the implementation approach
+- **Step 10 (Checkpoints)**: QA and team members validate work at phase boundaries before agents continue
+
+The more context you provide upfront (PRD, architecture notes, existing code, design mockups), the better your task breakdown will be.
 
 ## Commands
 
