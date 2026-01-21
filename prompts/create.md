@@ -71,6 +71,6 @@ Who will use this? What are their needs?
 After writing the PRD, let the user know:
 1. The PRD has been saved to PRD.md
 2. They can review and edit it if needed
-3. They should run `bloom plan` to create a detailed implementation plan
+3. They should `cd` into the project directory and then run `bloom plan` to create a detailed implementation plan
 
 Be encouraging and helpful throughout the process!
