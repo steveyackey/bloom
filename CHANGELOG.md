@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.15](https://github.com/steveyackey/bloom/compare/bloom-v0.1.14...bloom-v0.1.15) (2026-01-21)
+
+
+### Features
+
+* add cd prompt after project creation ([c016882](https://github.com/steveyackey/bloom/commit/c0168824cab22604222364a969044fd219b0be6b))
+* prompt for git protocol on first shorthand repo clone ([88b6a8c](https://github.com/steveyackey/bloom/commit/88b6a8cff7ae02199b177751bf9e93ef86abe07e))
+* pull updates from default branches before bloom plan ([0e07616](https://github.com/steveyackey/bloom/commit/0e0761678b4864a392259deab208f5d86491a901))
+
+
+### Bug Fixes
+
+* change default git protocol from HTTPS to SSH ([efb9392](https://github.com/steveyackey/bloom/commit/efb9392c22d34dd0eec5370429a9fb062a2afaa1))
+* **docs:** add mobile sidebar styling for proper display ([fef453f](https://github.com/steveyackey/bloom/commit/fef453fd6ceba3536526a61b5672b46108971c1b))
+* resolve TypeScript errors in pull-repos tests ([d83a1fa](https://github.com/steveyackey/bloom/commit/d83a1fac18e5050a56c54b9d4127645fb786dcf6))
+* use current directory for tasks.yaml path in generate command ([082c0fd](https://github.com/steveyackey/bloom/commit/082c0fde99be31855767cf18ed5591231c771a0d))
+
+
+### Documentation
+
+* update documentation to reflect new bare repo location ([aa936d8](https://github.com/steveyackey/bloom/commit/aa936d81317ddf4d21f07c565efe5596c1b1588f))
+
 ## [0.1.14](https://github.com/steveyackey/bloom/compare/bloom-v0.1.13...bloom-v0.1.14) (2026-01-21)
 
 
