@@ -397,6 +397,125 @@ export async function createRepo(
 }
 
 // =============================================================================
+// Pull Default Branch Updates
+// =============================================================================
+
+export interface PullResult {
+  success: boolean;
+  repoName: string;
+  updated: boolean;
+  error?: string;
+}
+
+export interface PullAllResult {
+  updated: string[];
+  upToDate: string[];
+  failed: Array<{ name: string; error: string }>;
+}
+
+/**
+ * Pull updates for a repo's default branch worktree.
+ * This fetches from remote and pulls changes into the default branch worktree.
+ */
+export async function pullDefaultBranch(bloomDir: string, repoName: string): Promise<PullResult> {
+  const reposFile = await loadReposFile(bloomDir);
+  const repo = reposFile.repos.find((r) => r.name === repoName);
+
+  if (!repo) {
+    return { success: false, repoName, updated: false, error: `Repository '${repoName}' not found in config` };
+  }
+
+  // Skip repos without a remote URL (local-only repos)
+  if (!repo.url) {
+    return { success: true, repoName, updated: false };
+  }
+
+  const bareRepoPath = getBareRepoPath(bloomDir, repoName);
+  const worktreePath = getWorktreePath(bloomDir, repoName, repo.defaultBranch);
+
+  if (!existsSync(bareRepoPath)) {
+    return { success: false, repoName, updated: false, error: `Bare repo not found at ${bareRepoPath}` };
+  }
+
+  if (!existsSync(worktreePath)) {
+    return { success: false, repoName, updated: false, error: `Default branch worktree not found at ${worktreePath}` };
+  }
+
+  // First, fetch all updates to the bare repo
+  const fetchResult = runGit(["fetch", "--all"], bareRepoPath);
+  if (!fetchResult.success) {
+    return { success: false, repoName, updated: false, error: `Failed to fetch: ${fetchResult.error}` };
+  }
+
+  // Check if we're behind the remote
+  const statusResult = runGit(["status", "-uno", "--porcelain=v2", "--branch"], worktreePath);
+  const isBehind = statusResult.output.includes("+") || statusResult.output.includes("behind");
+
+  // Pull updates into the default branch worktree
+  const pullResult = runGit(["pull", "--ff-only"], worktreePath);
+  if (!pullResult.success) {
+    // Check if it failed because of local changes or merge conflicts
+    if (pullResult.error.includes("local changes") || pullResult.error.includes("uncommitted")) {
+      return {
+        success: false,
+        repoName,
+        updated: false,
+        error: `Cannot pull: uncommitted changes in ${repo.defaultBranch}. Commit or stash changes first.`,
+      };
+    }
+    if (pullResult.error.includes("Not possible to fast-forward")) {
+      return {
+        success: false,
+        repoName,
+        updated: false,
+        error: `Cannot pull: local branch has diverged from remote. Manual merge required.`,
+      };
+    }
+    return { success: false, repoName, updated: false, error: `Failed to pull: ${pullResult.error}` };
+  }
+
+  // Check if we actually updated (output contains "Updating" or "Fast-forward")
+  const wasUpdated = pullResult.output.includes("Updating") || pullResult.output.includes("Fast-forward") || isBehind;
+
+  return { success: true, repoName, updated: wasUpdated };
+}
+
+/**
+ * Pull updates for all repos' default branches.
+ * This ensures you have the latest code before planning.
+ */
+export async function pullAllDefaultBranches(bloomDir: string): Promise<PullAllResult> {
+  const reposFile = await loadReposFile(bloomDir);
+  const result: PullAllResult = {
+    updated: [],
+    upToDate: [],
+    failed: [],
+  };
+
+  for (const repo of reposFile.repos) {
+    // Skip repos without a remote URL (local-only repos)
+    if (!repo.url) {
+      result.upToDate.push(repo.name);
+      continue;
+    }
+
+    const pullResult = await pullDefaultBranch(bloomDir, repo.name);
+
+    if (pullResult.success) {
+      if (pullResult.updated) {
+        result.updated.push(repo.name);
+      } else {
+        result.upToDate.push(repo.name);
+      }
+    } else {
+      result.failed.push({ name: repo.name, error: pullResult.error || "Unknown error" });
+    }
+  }
+
+  return result;
+}
+
+// =============================================================================
 // Sync Command
 // =============================================================================
 
