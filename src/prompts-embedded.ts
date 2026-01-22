@@ -213,10 +213,23 @@ Tasks file: {{TASKS_FILE}}
    - {{WORKING_DIR}}/plan.md - The implementation plan (REQUIRED)
    - {{WORKING_DIR}}/PRD.md - The product requirements (if exists)
    - Any other relevant context files in the working directory
-2. **Generate tasks** - Convert each task from the plan into the proper YAML format
-3. **Write tasks.yaml** - Save to: {{TASKS_FILE}}
+2. **Ask clarifying questions** - Before generating, ask about git configuration if needed (see below)
+3. **Generate tasks** - Convert each task from the plan into the proper YAML format
+4. **Write tasks.yaml** - Save to: {{TASKS_FILE}}
 
 **IMPORTANT**: You must read plan.md before generating tasks. Do not ask the user what to generate - the plan already contains this information.
+
+## Clarifying Questions
+
+After reading the plan, ask the user about git configuration if the workflow involves:
+- **Pull requests**: If any task has \`merge_into\` set (especially to main/master), or if the plan mentions creating PRs
+- **Team collaboration**: If multiple people might be working on related branches
+- **CI/CD**: If the plan mentions automated testing or deployment pipelines
+
+**Question to ask**:
+> "I see this workflow will create pull requests / merge branches. Would you like to enable \`push_to_remote: true\`? This pushes branches to the remote after each task completes, which is recommended for PR workflows and provides backup of work in progress. (Default is false - local only)"
+
+If the user confirms, set \`push_to_remote: true\` in the git config. If they decline or the workflow is purely local development, leave it as false.
 
 ## Task Schema
 
