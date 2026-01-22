@@ -21,6 +21,7 @@ import {
   releaseMergeLock,
   waitForMergeLock,
 } from "../repos";
+import { createDashboardService } from "../services";
 import { type GitConfig, getTaskBranch, getTaskMergeTarget } from "../task-schema";
 import {
   getAllAgents,
@@ -60,9 +61,11 @@ interface TaskGetResult {
 
 interface AgentConfig {
   name: string;
-  command: string[];
-  cwd: string;
+  command?: string[];
+  cwd?: string;
   env?: Record<string, string>;
+  /** If set, run this service in-process instead of spawning a subprocess */
+  service?: import("../orchestrator-tui").InProcessService;
 }
 
 // =============================================================================
@@ -635,13 +638,16 @@ async function startTUI(agents: Set<string>): Promise<void> {
   // Note: Global flags must come AFTER the command name for Clerc CLI parsing
   const tasksFile = getTasksFile();
 
-  // Dashboard pane
-  agentConfigs.push({ name: "dashboard", command: ["bloom", "dashboard", "-f", tasksFile], cwd: BLOOM_DIR });
+  // Dashboard pane (runs in-process - no subprocess needed)
+  agentConfigs.push({
+    name: "dashboard",
+    service: createDashboardService(tasksFile),
+  });
 
-  // Human Questions pane
+  // Human Questions pane (needs interactive terminal, must be subprocess)
   agentConfigs.push({ name: "questions", command: ["bloom", "questions-dashboard", "-f", tasksFile], cwd: BLOOM_DIR });
 
-  // Agent panes
+  // Agent panes (spawn claude CLI, must be subprocess)
   for (const agentName of [...agents].sort()) {
     agentConfigs.push({
       name: agentName,
@@ -650,7 +656,7 @@ async function startTUI(agents: Set<string>): Promise<void> {
     });
   }
 
-  // Floating agent
+  // Floating agent (spawn claude CLI, must be subprocess)
   agentConfigs.push({
     name: FLOATING_AGENT,
     command: ["bloom", "agent", "run", FLOATING_AGENT, "-f", tasksFile],

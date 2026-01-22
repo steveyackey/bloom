@@ -12,21 +12,51 @@ import { spawnTerminal, type TerminalProcess } from "./terminal";
 // Types
 // =============================================================================
 
-interface AgentConfig {
+/** Configuration for a pane that spawns a subprocess */
+interface SubprocessPaneConfig {
+  type: "subprocess";
   name: string;
   command: string[];
   cwd: string;
   env?: Record<string, string>;
 }
 
+/** Configuration for a pane that runs an internal service */
+interface InProcessPaneConfig {
+  type: "in-process";
+  name: string;
+  /** The service function that renders content to the terminal */
+  service: InProcessService;
+}
+
+/** A service that runs in-process and writes to a terminal */
+export interface InProcessService {
+  /** Start the service, returns a cleanup function */
+  start(write: (data: string) => void, scheduleRender: () => void): () => void;
+}
+
+type PaneConfig = SubprocessPaneConfig | InProcessPaneConfig;
+
+// Legacy interface for backwards compatibility
+interface AgentConfig {
+  name: string;
+  command?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  /** If set, run this service in-process instead of spawning a subprocess */
+  service?: InProcessService;
+}
+
 interface Pane {
   id: number;
   proc: TerminalProcess | null;
-  config: AgentConfig;
+  config: PaneConfig;
   term: Terminal;
   status: "running" | "stopped" | "error";
   /** If this is a human takeover pane, the name of the original agent pane */
   humanTakeoverSource?: string;
+  /** Cleanup function for in-process services */
+  cleanup?: () => void;
 }
 
 type ViewMode = "tiled" | "single";
@@ -44,14 +74,31 @@ export class OrchestratorTUI {
   private cols: number;
   private rows: number;
   private renderScheduled = false;
-  private agentConfigs: AgentConfig[] = [];
+  private paneConfigs: PaneConfig[] = [];
   private stopTriggerWatch?: () => void;
+  private lastRenderedOutput = "";
 
   constructor(configs?: AgentConfig[]) {
     this.cols = process.stdout.columns || 80;
     this.rows = process.stdout.rows || 24;
     if (configs) {
-      this.agentConfigs = configs;
+      // Convert legacy AgentConfig to new PaneConfig format
+      this.paneConfigs = configs.map((c) => {
+        if (c.service) {
+          return {
+            type: "in-process" as const,
+            name: c.name,
+            service: c.service,
+          };
+        }
+        return {
+          type: "subprocess" as const,
+          name: c.name,
+          command: c.command || [],
+          cwd: c.cwd || process.cwd(),
+          env: c.env,
+        };
+      });
     }
   }
 
@@ -79,9 +126,9 @@ export class OrchestratorTUI {
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
 
-    // Auto-create panes for configured agents
-    for (const config of this.agentConfigs) {
-      this.createPane(config);
+    // Auto-create panes for configured services/agents
+    for (const config of this.paneConfigs) {
+      this.createPaneFromConfig(config);
     }
 
     // Watch for interject triggers from CLI/agents
@@ -110,7 +157,11 @@ export class OrchestratorTUI {
 
     this.panes.forEach((p) => {
       try {
-        p.proc?.kill();
+        if (p.config.type === "in-process") {
+          p.cleanup?.();
+        } else {
+          p.proc?.kill();
+        }
         p.term.dispose();
       } catch {}
     });
@@ -286,7 +337,7 @@ export class OrchestratorTUI {
     });
   }
 
-  private createPane(config: AgentConfig) {
+  private createPaneFromConfig(config: PaneConfig) {
     const id = this.nextId++;
     const size = this.getPaneSize();
     const cols = Math.max(20, size.cols);
@@ -306,20 +357,55 @@ export class OrchestratorTUI {
     this.selectedIndex = this.panes.length - 1;
     this.resizeAllPanes();
 
-    // Start the process
-    this.startPaneProcess(pane);
+    // Start the process or service
+    if (config.type === "in-process") {
+      this.startInProcessService(pane);
+    } else {
+      this.startPaneProcess(pane);
+    }
     this.scheduleRender();
   }
 
+  /** Legacy method for creating ad-hoc panes (e.g., human takeover) */
+  private createPane(config: { name: string; command: string[]; cwd: string; env?: Record<string, string> }) {
+    const paneConfig: SubprocessPaneConfig = {
+      type: "subprocess",
+      name: config.name,
+      command: config.command,
+      cwd: config.cwd,
+      env: config.env,
+    };
+    this.createPaneFromConfig(paneConfig);
+  }
+
+  private startInProcessService(pane: Pane) {
+    if (pane.config.type !== "in-process") return;
+
+    const write = (data: string) => {
+      pane.term.write(data, () => this.scheduleRender());
+    };
+
+    try {
+      pane.cleanup = pane.config.service.start(write, () => this.scheduleRender());
+      pane.status = "running";
+    } catch (err) {
+      pane.status = "error";
+      pane.term.write(`Error starting service: ${err}\r\n`);
+    }
+  }
+
   private async startPaneProcess(pane: Pane) {
+    if (pane.config.type !== "subprocess") return;
+
     const size = this.getPaneSize();
     const cols = Math.max(20, size.cols);
     const rows = Math.max(5, size.rows);
+    const config = pane.config;
 
     try {
-      const proc = await spawnTerminal(pane.config.command, {
-        cwd: pane.config.cwd,
-        env: pane.config.env,
+      const proc = await spawnTerminal(config.command, {
+        cwd: config.cwd,
+        env: config.env,
         cols,
         rows,
         onData: (text) => {
@@ -361,10 +447,16 @@ export class OrchestratorTUI {
     if (!pane) return;
 
     try {
-      pane.proc?.kill();
-      pane.proc = null;
+      if (pane.config.type === "in-process") {
+        pane.cleanup?.();
+        pane.cleanup = undefined;
+        pane.term.write("\r\n[Service stopped]\r\n");
+      } else {
+        pane.proc?.kill();
+        pane.proc = null;
+        pane.term.write("\r\n[Process killed]\r\n");
+      }
       pane.status = "stopped";
-      pane.term.write("\r\n[Process killed]\r\n");
     } catch {}
     this.scheduleRender();
   }
@@ -373,18 +465,27 @@ export class OrchestratorTUI {
     const pane = this.panes[index];
     if (!pane) return;
 
-    // Kill existing process
+    // Kill existing process/service
     try {
-      pane.proc?.kill();
-      pane.proc = null;
+      if (pane.config.type === "in-process") {
+        pane.cleanup?.();
+        pane.cleanup = undefined;
+      } else {
+        pane.proc?.kill();
+        pane.proc = null;
+      }
     } catch {}
 
     // Clear terminal
     pane.term.clear();
     pane.term.write(`[Restarting ${pane.config.name}...]\r\n\r\n`);
 
-    // Start new process
-    this.startPaneProcess(pane);
+    // Start new process/service
+    if (pane.config.type === "in-process") {
+      this.startInProcessService(pane);
+    } else {
+      this.startPaneProcess(pane);
+    }
     this.scheduleRender();
   }
 
@@ -396,7 +497,11 @@ export class OrchestratorTUI {
     const sourceAgentName = pane.humanTakeoverSource;
 
     try {
-      pane.proc?.kill();
+      if (pane.config.type === "in-process") {
+        pane.cleanup?.();
+      } else {
+        pane.proc?.kill();
+      }
       pane.term.dispose();
     } catch {}
 
@@ -436,8 +541,8 @@ export class OrchestratorTUI {
     const pane = this.panes[index];
     if (!pane) return;
 
-    // Skip non-agent panes (dashboard, questions)
-    if (pane.config.name === "dashboard" || pane.config.name === "questions") {
+    // Skip in-process panes and non-agent panes (dashboard, questions)
+    if (pane.config.type === "in-process" || pane.config.name === "dashboard" || pane.config.name === "questions") {
       pane.term.write(`\r\n[Cannot interject this pane]\r\n`);
       this.scheduleRender();
       return;
@@ -445,7 +550,8 @@ export class OrchestratorTUI {
 
     // Try to interject the agent session
     const session = interjectSession(pane.config.name);
-    const workingDir = session?.workingDirectory || pane.config.cwd;
+    const workingDir =
+      session?.workingDirectory || (pane.config.type === "subprocess" ? pane.config.cwd : process.cwd());
 
     // Create interjection record
     const interjectionId = await createInterjection(pane.config.name, {
@@ -517,29 +623,31 @@ export class OrchestratorTUI {
   }
 
   private render() {
-    // Full clear: reset, home, clear screen, clear scrollback, hide cursor
-    let output = `${ansi.reset + ansi.hideCursor}${CSI}H${CSI}2J${CSI}3J`;
+    // Build the entire output in memory first (double-buffering)
+    let output = "";
 
-    // Fill entire screen with spaces to ensure complete clear
-    const blankLine = " ".repeat(this.cols);
-    for (let row = 1; row <= this.rows; row++) {
-      output += ansi.moveTo(row, 1) + blankLine;
-    }
+    // Position cursor at home without clearing (reduces flicker)
+    output += `${ansi.hideCursor}${CSI}H`;
 
     // Header with chalk styling
-    output += ansi.moveTo(1, 1);
     const title = chalk.bold.cyan(" Bloom");
     const viewInfo = chalk.gray(` ${this.viewMode}`);
     const agentCount = chalk.green(`${this.panes.length}`);
     const keys = chalk.dim("n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit");
     const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Agents:")} ${agentCount} ${chalk.dim("|")} ${keys}`;
-    output += header.padEnd(this.cols + 50); // Extra padding for ANSI codes
+    // Pad to full width to overwrite any previous content
+    output += header + " ".repeat(Math.max(0, this.cols - this.stripAnsi(header).length));
 
     // Separator
     output += ansi.moveTo(2, 1);
     output += "─".repeat(this.cols);
 
     if (this.panes.length === 0) {
+      // Clear content area
+      const blankLine = " ".repeat(this.cols);
+      for (let row = 3; row <= this.rows; row++) {
+        output += ansi.moveTo(row, 1) + blankLine;
+      }
       const msg = chalk.dim("No agents configured. Press ") + chalk.yellow("n") + chalk.dim(" to create a new agent.");
       const x = Math.floor((this.cols - 50) / 2); // Approximate visible length
       const y = Math.floor(this.rows / 2);
@@ -552,7 +660,18 @@ export class OrchestratorTUI {
       }
     }
 
-    process.stdout.write(output);
+    // Only write if output changed (reduces unnecessary redraws)
+    if (output !== this.lastRenderedOutput) {
+      this.lastRenderedOutput = output;
+      process.stdout.write(output);
+    }
+  }
+
+  /** Strip ANSI codes from a string to get visible length */
+  private stripAnsi(str: string): string {
+    // Match ESC [ followed by any number of digits/semicolons, then 'm'
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require control chars
+    return str.replace(/\x1b\[[0-9;]*m/g, "");
   }
 
   private renderPane(index: number): string {

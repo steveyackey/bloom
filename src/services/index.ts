@@ -3,6 +3,7 @@
  * Re-exports all service modules for convenient imports.
  */
 
+export { createDashboardService } from "./dashboard";
 export {
   buildReposContext,
   type RefineFile,
@@ -15,7 +16,6 @@ export {
   formatProjectName,
   runCreateSession,
 } from "./project-service";
-
 export {
   formatPullResults,
   type PullResult,
