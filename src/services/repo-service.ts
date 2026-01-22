@@ -4,20 +4,7 @@
  */
 
 import chalk from "chalk";
-import {
-  addWorktree,
-  cloneRepo,
-  getBareRepoPath,
-  getWorktreePath,
-  getWorktreeStatus,
-  listRepos,
-  listWorktrees,
-  type PullAllResult,
-  pullAllDefaultBranches,
-  removeRepo,
-  removeWorktree,
-  syncRepos,
-} from "../repos";
+import { type PullAllResult, pullAllDefaultBranches } from "../repos";
 
 // Re-export types and functions from repos.ts
 export type { CloneResult, PullAllResult, PullResult, RepoInfo, SyncResult } from "../repos";
