@@ -6,7 +6,8 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
-import { findGitRoot } from "./context";
+import { pullAllDefaultBranches } from "../repos";
+import { BLOOM_DIR, findGitRoot } from "./context";
 
 // =============================================================================
 // File Selection
@@ -167,6 +168,26 @@ export async function cmdRefine(): Promise<void> {
     console.log(`  ${chalk.cyan("CLAUDE.md")}   - Guidelines for Claude\n`);
     console.log(chalk.dim("Run 'bloom create <name>' to create a new project with templates."));
     process.exit(1);
+  }
+
+  // Pull updates from default branches before refining
+  console.log(chalk.dim("Pulling latest updates from default branches...\n"));
+  const pullResult = await pullAllDefaultBranches(BLOOM_DIR);
+
+  if (pullResult.updated.length > 0) {
+    console.log(`${chalk.green("Updated:")} ${pullResult.updated.map((u) => chalk.cyan(u)).join(", ")}`);
+  }
+  if (pullResult.upToDate.length > 0) {
+    console.log(`${chalk.dim("Already up to date:")} ${pullResult.upToDate.join(", ")}`);
+  }
+  if (pullResult.failed.length > 0) {
+    console.log(chalk.yellow("\nWarning: Failed to pull updates for some repos:"));
+    for (const { name, error } of pullResult.failed) {
+      console.log(`  ${chalk.red(name)}: ${error}`);
+    }
+    console.log(chalk.dim("\nProceeding with refine using existing local state.\n"));
+  } else if (pullResult.updated.length > 0 || pullResult.upToDate.length > 0) {
+    console.log("");
   }
 
   await runRefineSession(workingDir, selectedFile);
