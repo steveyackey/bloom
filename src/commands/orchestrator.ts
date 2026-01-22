@@ -2,13 +2,13 @@
 // Orchestrator and Agent Work Loop
 // =============================================================================
 
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ClaudeAgentProvider } from "../agents";
-import { createWorktree, getWorktreePath, worktreeExists } from "../git";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { loadAgentPrompt } from "../prompts";
-import { listRepos, pullDefaultBranch } from "../repos";
+import { addWorktree, getWorktreePath, listRepos, listWorktrees, pullDefaultBranch } from "../repos";
 import {
   getAllAgents,
   getAllRepos,
@@ -124,21 +124,48 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
       let workingDir = BLOOM_DIR;
 
       if (taskResult.repo) {
-        let repoPath: string;
-        if (taskResult.repo.startsWith("./") || taskResult.repo.startsWith("/")) {
-          repoPath = resolve(BLOOM_DIR, taskResult.repo);
+        // Check if repo is a path or just a name
+        const isPath = taskResult.repo.startsWith("./") || taskResult.repo.startsWith("/");
+
+        if (isPath) {
+          // Direct path - resolve it relative to BLOOM_DIR
+          workingDir = resolve(BLOOM_DIR, taskResult.repo);
         } else {
-          repoPath = join(REPOS_DIR, taskResult.repo);
+          // Repo name - use bare repo architecture
+          const repoName = taskResult.repo;
+
+          if (taskResult.worktree) {
+            // Check if worktree exists
+            const worktrees = await listWorktrees(BLOOM_DIR, repoName);
+            const worktreeExists = worktrees.some((w) => w.branch === taskResult.worktree);
+
+            if (!worktreeExists) {
+              agentLog.info(`Creating worktree: ${taskResult.worktree}`);
+              const result = await addWorktree(BLOOM_DIR, repoName, taskResult.worktree, { create: true });
+              if (!result.success) {
+                agentLog.error(`Failed to create worktree: ${result.error}`);
+              }
+            }
+            // Get path with sanitized branch name (slashes replaced with hyphens)
+            workingDir = getWorktreePath(BLOOM_DIR, repoName, taskResult.worktree);
+          } else {
+            // No worktree specified - use the default branch worktree
+            // Find the repo's default branch from config
+            const reposList = await listRepos(BLOOM_DIR);
+            const repo = reposList.find((r) => r.name === repoName);
+            if (repo) {
+              workingDir = getWorktreePath(BLOOM_DIR, repoName, repo.defaultBranch);
+            } else {
+              // Fallback to repos directory path
+              workingDir = join(REPOS_DIR, repoName);
+            }
+          }
         }
 
-        if (taskResult.worktree) {
-          if (!worktreeExists(repoPath, taskResult.worktree)) {
-            agentLog.info(`Creating worktree: ${taskResult.worktree}`);
-            createWorktree(repoPath, taskResult.worktree);
-          }
-          workingDir = getWorktreePath(repoPath, taskResult.worktree);
-        } else {
-          workingDir = repoPath;
+        // Verify the working directory exists
+        if (!existsSync(workingDir)) {
+          agentLog.error(`Working directory does not exist: ${workingDir}`);
+          agentLog.error("Run 'bloom repo sync' to clone missing repos.");
         }
       }
 
