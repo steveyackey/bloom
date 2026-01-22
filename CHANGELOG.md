@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.2.1](https://github.com/steveyackey/bloom/compare/bloom-v0.2.0...bloom-v0.2.1) (2026-01-22)
+
+
+### Features
+
+* add clerc CLI framework dependencies ([1950985](https://github.com/steveyackey/bloom/commit/1950985952a993b351da7281eda110fcba23289c))
+* add Clerc command modules for all command groups ([9410b2c](https://github.com/steveyackey/bloom/commit/9410b2c6ddbbdb68dae320f4522ec8125c251685))
+* add config commands to Clerc CLI ([9398fc5](https://github.com/steveyackey/bloom/commit/9398fc5bf0c188f0fe641a22c350270791a354b1))
+* add dynamic completion providers for CLI arguments ([a858a39](https://github.com/steveyackey/bloom/commit/a858a39d6cfea61a4b5b6a5788c897f5cc447efe))
+* add global flags to Clerc CLI ([8cdd817](https://github.com/steveyackey/bloom/commit/8cdd817df5213a675a555fb7f13f09bd05978c69))
+* add interject list subcommand to Clerc CLI ([f8b37b8](https://github.com/steveyackey/bloom/commit/f8b37b829831248fe2a1f0c862af8a3c18e16df9))
+* create Clerc CLI skeleton with help and completions plugins ([f8b7ee2](https://github.com/steveyackey/bloom/commit/f8b7ee277c9924ea8eea06b7420f0e8db6a3c4b4))
+* create command module structure for Clerc migration ([ac16b29](https://github.com/steveyackey/bloom/commit/ac16b2960b2651106b6f40414e01307be3a60626))
+* migrate CLI to Clerc framework with shell completions ([09050a1](https://github.com/steveyackey/bloom/commit/09050a1cb0095d43b6c60401030dfadbf8cc1d08))
+* prompt about push_to_remote during task generation ([ec94ecf](https://github.com/steveyackey/bloom/commit/ec94ecf2209c6dfcb21e17304dd50611064cbaf9))
+* wire up Clerc CLI as main entry point ([162ed25](https://github.com/steveyackey/bloom/commit/162ed25e9f69c0a6bfefc030152484255b9e6057))
+
+
+### Bug Fixes
+
+* apply linting fixes to Clerc command modules ([1cd1da4](https://github.com/steveyackey/bloom/commit/1cd1da42c6227c73438b062090689c6a7b2be0d2))
+* make completion handlers synchronous for shell integration ([48ca68e](https://github.com/steveyackey/bloom/commit/48ca68ee92b55828ea0ee427ac9a43efa73f7d27))
+
+
+### Documentation
+
+* add shell completion setup instructions to README ([ca06d42](https://github.com/steveyackey/bloom/commit/ca06d42853fad94ff47479af932693a0fe7e6d06))
+* add shell completions to installation guide ([07d928e](https://github.com/steveyackey/bloom/commit/07d928e172826354e508d370dc94430ab7afe222))
+
 ## [0.2.0](https://github.com/steveyackey/bloom/compare/bloom-v0.1.19...bloom-v0.2.0) (2026-01-22)
 
 
