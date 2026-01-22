@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/steveyackey/bloom/compare/bloom-v0.2.2...bloom-v0.2.3) (2026-01-22)
+
+
+### Bug Fixes
+
+* **cli:** correct global flag positioning for Clerc parser ([d50f79a](https://github.com/steveyackey/bloom/commit/d50f79a1d7db5681e91779c6ebfbed63935f86ff))
+
 ## [0.2.2](https://github.com/steveyackey/bloom/compare/bloom-v0.2.1...bloom-v0.2.2) (2026-01-22)
 
 
