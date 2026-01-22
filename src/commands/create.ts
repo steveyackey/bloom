@@ -1,31 +1,19 @@
-// =============================================================================
 // Create Command - Create a new project with PRD template
-// =============================================================================
-
 import chalk from "chalk";
-import {
-  createProject,
-  runCreateSession,
-  type CreateResult,
-} from "../services/project-service";
+import { formatProjectName, createProject, runCreateSession } from "../services";
 
-// Re-export types and functions from service for backwards compatibility
-export { createProject, runCreateSession, type CreateResult };
+export { createProject }; // Re-export for backwards compatibility
 
-// =============================================================================
-// Command Handler
-// =============================================================================
-
-export async function cmdCreate(projectName: string): Promise<void> {
-  if (!projectName) {
+export async function cmdCreate(projectName: string | string[]): Promise<void> {
+  if (!projectName || (Array.isArray(projectName) && projectName.length === 0)) {
     console.error(chalk.red("Usage: bloom create <projectName>"));
     process.exit(1);
   }
 
-  console.log(`${chalk.bold.cyan("Creating project")} '${chalk.yellow(projectName)}'...\n`);
+  const { slug, displayName } = formatProjectName(projectName);
+  console.log(`${chalk.bold.cyan("Creating project")} '${chalk.yellow(displayName)}'...\n`);
 
-  const result = await createProject(projectName);
-
+  const result = await createProject(slug);
   if (!result.success) {
     console.error(chalk.red(`Error: ${result.error}`));
     process.exit(1);
@@ -36,15 +24,14 @@ export async function cmdCreate(projectName: string): Promise<void> {
     console.log(`  ${chalk.green("+")} ${item}`);
   }
 
-  // Launch Claude session
   await runCreateSession(result.projectDir);
 
   console.log(chalk.dim(`\n---`));
   console.log(
-    `${chalk.green("Project")} '${chalk.yellow(projectName)}' ${chalk.green("created at:")} ${chalk.cyan(result.projectDir)}`
+    `${chalk.green("Project")} '${chalk.yellow(displayName)}' ${chalk.green("created at:")} ${chalk.cyan(result.projectDir)}`
   );
   console.log(`\n${chalk.bold("Next steps:")}`);
-  console.log(`  ${chalk.cyan(`cd ${projectName}`)}`);
+  console.log(`  ${chalk.cyan(`cd ${slug}`)}`);
   console.log(chalk.dim(`\nThen run these commands from within the project directory:`));
   console.log(`  ${chalk.cyan("bloom refine")}        # Refine the PRD and templates`);
   console.log(`  ${chalk.cyan("bloom plan")}          # Create implementation plan`);
