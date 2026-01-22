@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.0](https://github.com/steveyackey/bloom/compare/bloom-v0.1.19...bloom-v0.2.0) (2026-01-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* The `worktree` field on tasks is removed. Use `branch` instead.
+
+### Features
+
+* add deterministic git workflow with lazy worktree creation ([5753269](https://github.com/steveyackey/bloom/commit/57532693a4528ba62ae9adb45ed4c136de7e7659))
+* deterministic git workflow with lazy worktree creation ([bd094c9](https://github.com/steveyackey/bloom/commit/bd094c9d049678c8f31204a3f405e0bd61f2f792))
+* improve agent session management and worktree safety ([c317169](https://github.com/steveyackey/bloom/commit/c317169a37f8e4484fa24ec5f1dab6f53c82923e))
+* pull latest updates before generate and refine commands ([0a29a93](https://github.com/steveyackey/bloom/commit/0a29a93966385dc4d15223f254c9dca635a4596b))
+
+
+### Bug Fixes
+
+* configure git user for CI environments ([de91348](https://github.com/steveyackey/bloom/commit/de91348db5c9adddd7abcedf8e95ce6dd29617a3))
+* remove conflicting merge instructions from agent system prompt ([0ca30ec](https://github.com/steveyackey/bloom/commit/0ca30ecd296ce8c40bef2b1ea7ebc65c941ee3d5))
+* sanitize slashes in worktree branch names to prevent nested directories ([00b625a](https://github.com/steveyackey/bloom/commit/00b625a520dc270aceed4ee22ea7a013991ae56c))
+* sanitize slashes in worktree branch names to prevent nested directories ([fb18d6e](https://github.com/steveyackey/bloom/commit/fb18d6edc2d3a6bd705586614020e524e2965850))
+
 ## [0.1.19](https://github.com/steveyackey/bloom/compare/bloom-v0.1.18...bloom-v0.1.19) (2026-01-22)
 
 
