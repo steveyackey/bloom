@@ -2,7 +2,7 @@
 // Dynamic Completion Providers - Live data readers for CLI argument completion
 // =============================================================================
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import YAML from "yaml";
 import { loadReposFile } from "../repos";
