@@ -287,6 +287,32 @@ bloom -f project.yaml run
 bloom -f project.yaml plan
 ```
 
+### Shell Completions
+
+Enable tab completion for bloom commands in your shell.
+
+**Bash** (add to `~/.bashrc`):
+```bash
+eval "$(bloom completions bash)"
+```
+
+**Zsh** (add to `~/.zshrc`):
+```bash
+eval "$(bloom completions zsh)"
+```
+
+**Fish** (run once):
+```fish
+bloom completions fish > ~/.config/fish/completions/bloom.fish
+```
+
+**PowerShell** (add to your profile):
+```powershell
+bloom completions powershell | Out-String | Invoke-Expression
+```
+
+To find your PowerShell profile location, run `echo $PROFILE` in PowerShell.
+
 ## TUI Controls
 
 | Key | Action |

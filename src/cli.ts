@@ -2,10 +2,7 @@
 // =============================================================================
 // Bloom CLI Entry Point
 // =============================================================================
+// This file routes all commands through the Clerc CLI framework.
+// =============================================================================
 
-import { main } from "./index";
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+import "./cli-clerc";
