@@ -30,12 +30,12 @@ export function registerSetupCommands(cli: Clerc): Clerc {
       await cmdInit();
     })
     .command("create", "Create a new project with PRD template", {
-      parameters: ["<name>"],
+      parameters: ["<name...>"],
       help: { group: "setup" },
     })
     .on("create", async (ctx) => {
-      const projectName = ctx.parameters.name as string;
-      await cmdCreate(projectName);
+      const nameArgs = ctx.parameters.name as string[];
+      await cmdCreate(nameArgs);
     })
     .command("setup", "Sync repositories (clone or update all configured repos)", {
       help: { group: "setup" },
