@@ -4,7 +4,7 @@
 
 import type { Clerc } from "clerc";
 
-import { getInterjectionIds } from "../../completions/providers";
+import { getInterjectionIdsSync } from "../../completions/providers";
 import { getTasksFile } from "../context";
 import { cmdInterjectDismiss, cmdInterjections, cmdInterjectResume } from "../interjections";
 
@@ -31,8 +31,8 @@ export function registerInterjectionCommands(cli: Clerc): Clerc {
           key: "<id>",
           description: "ID of the interjection to resume",
           completions: {
-            handler: async (complete) => {
-              const ids = await getInterjectionIds(getTasksFile());
+            handler: (complete) => {
+              const ids = getInterjectionIdsSync(getTasksFile());
               for (const id of ids) {
                 complete(id, "Interjection ID");
               }
@@ -51,8 +51,8 @@ export function registerInterjectionCommands(cli: Clerc): Clerc {
           key: "<id>",
           description: "ID of the interjection to dismiss",
           completions: {
-            handler: async (complete) => {
-              const ids = await getInterjectionIds(getTasksFile());
+            handler: (complete) => {
+              const ids = getInterjectionIdsSync(getTasksFile());
               for (const id of ids) {
                 complete(id, "Interjection ID");
               }

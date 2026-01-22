@@ -4,7 +4,7 @@
 
 import chalk from "chalk";
 import type { Clerc } from "clerc";
-import { getRepoNames } from "../../completions/providers";
+import { getRepoNamesSync } from "../../completions/providers";
 import {
   addWorktree,
   cloneRepo,
@@ -21,8 +21,8 @@ import { BLOOM_DIR } from "../context";
 // Completions Handler for Repo Names
 // =============================================================================
 
-const repoNameCompletions = async (complete: (value: string, description: string) => void) => {
-  const repos = await getRepoNames(BLOOM_DIR);
+const repoNameCompletions = (complete: (value: string, description: string) => void) => {
+  const repos = getRepoNamesSync(BLOOM_DIR);
   for (const repo of repos) {
     complete(repo, "Repository");
   }

@@ -4,7 +4,7 @@
 
 import { type Clerc, Types } from "clerc";
 
-import { getAgentNames, getQuestionIds } from "../../completions/providers";
+import { getAgentNamesSync, getQuestionIdsSync } from "../../completions/providers";
 import type { QuestionType } from "../../human-queue";
 import { getTasksFile } from "../context";
 import { cmdAnswer, cmdAsk, cmdClearAnswered, cmdQuestions, cmdQuestionsDashboard, cmdWaitAnswer } from "../questions";
@@ -49,8 +49,8 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           key: "<agent>",
           description: "Name of the agent asking the question",
           completions: {
-            handler: async (complete) => {
-              const names = await getAgentNames(getTasksFile());
+            handler: (complete) => {
+              const names = getAgentNamesSync(getTasksFile());
               for (const name of names) {
                 complete(name, "Agent name");
               }
@@ -112,8 +112,8 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           key: "<questionId>",
           description: "ID of the question to answer",
           completions: {
-            handler: async (complete) => {
-              const ids = await getQuestionIds(getTasksFile());
+            handler: (complete) => {
+              const ids = getQuestionIdsSync(getTasksFile());
               for (const id of ids) {
                 complete(id, "Question ID");
               }
@@ -137,8 +137,8 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           key: "<questionId>",
           description: "ID of the question to wait for",
           completions: {
-            handler: async (complete) => {
-              const ids = await getQuestionIds(getTasksFile());
+            handler: (complete) => {
+              const ids = getQuestionIdsSync(getTasksFile());
               for (const id of ids) {
                 complete(id, "Question ID");
               }

@@ -2,10 +2,11 @@
 // Dynamic Completion Providers - Live data readers for CLI argument completion
 // =============================================================================
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import YAML from "yaml";
 import { loadReposFile } from "../repos";
-import { type Task, TaskStatusSchema, type TasksFile } from "../task-schema";
+import { type Task, TaskStatusSchema, validateTasksFile } from "../task-schema";
 import { getAllAgents, loadTasks } from "../tasks";
 
 // =============================================================================
@@ -46,7 +47,7 @@ function extractTaskIds(tasks: Task[]): string[] {
 }
 
 /**
- * Reads task IDs from a tasks.yaml file.
+ * Reads task IDs from a tasks.yaml file (async version).
  * @param tasksFilePath - Path to the tasks.yaml file
  */
 export async function getTaskIds(tasksFilePath: string): Promise<CompletionItem[]> {
@@ -61,12 +62,30 @@ export async function getTaskIds(tasksFilePath: string): Promise<CompletionItem[
   }
 }
 
+/**
+ * Reads task IDs from a tasks.yaml file (synchronous version for shell completions).
+ * @param tasksFilePath - Path to the tasks.yaml file
+ */
+export function getTaskIdsSync(tasksFilePath: string): CompletionItem[] {
+  try {
+    if (!existsSync(tasksFilePath)) {
+      return [];
+    }
+    const content = readFileSync(tasksFilePath, "utf-8");
+    const parsed = YAML.parse(content);
+    const tasksFile = validateTasksFile(parsed);
+    return extractTaskIds(tasksFile.tasks);
+  } catch {
+    return [];
+  }
+}
+
 // =============================================================================
 // Repo Name Provider
 // =============================================================================
 
 /**
- * Reads repository names from bloom config.
+ * Reads repository names from bloom config (async version).
  * @param bloomDir - Path to the bloom workspace directory (contains bloom.config.yaml)
  */
 export async function getRepoNames(bloomDir: string): Promise<CompletionItem[]> {
@@ -78,31 +97,31 @@ export async function getRepoNames(bloomDir: string): Promise<CompletionItem[]> 
   }
 }
 
+/**
+ * Reads repository names from bloom config (synchronous version for shell completions).
+ * @param bloomDir - Path to the bloom workspace directory (contains bloom.config.yaml)
+ */
+export function getRepoNamesSync(bloomDir: string): CompletionItem[] {
+  try {
+    const configPath = join(bloomDir, "bloom.config.yaml");
+    if (!existsSync(configPath)) {
+      return [];
+    }
+    const content = readFileSync(configPath, "utf-8");
+    const parsed = YAML.parse(content) || {};
+    const repos = parsed.repos || [];
+    return repos.map((repo: { name: string }) => repo.name);
+  } catch {
+    return [];
+  }
+}
+
 // =============================================================================
 // Agent Name Provider
 // =============================================================================
 
 /**
- * Extract all agent names from tasks (agents assigned to tasks).
- */
-function extractAgentNames(tasks: Task[]): Set<string> {
-  const agents = new Set<string>();
-  for (const task of tasks) {
-    if (task.agent_name) {
-      agents.add(task.agent_name);
-    }
-    if (task.subtasks.length > 0) {
-      const subtaskAgents = extractAgentNames(task.subtasks);
-      for (const agent of subtaskAgents) {
-        agents.add(agent);
-      }
-    }
-  }
-  return agents;
-}
-
-/**
- * Reads agent names from tasks file and config.
+ * Reads agent names from tasks file and config (async version).
  * Returns agents that are assigned to tasks.
  * @param tasksFilePath - Path to the tasks.yaml file
  */
@@ -119,15 +138,43 @@ export async function getAgentNames(tasksFilePath: string): Promise<CompletionIt
   }
 }
 
+/**
+ * Reads agent names from tasks file (synchronous version for shell completions).
+ * Returns agents that are assigned to tasks.
+ * @param tasksFilePath - Path to the tasks.yaml file
+ */
+export function getAgentNamesSync(tasksFilePath: string): CompletionItem[] {
+  try {
+    if (!existsSync(tasksFilePath)) {
+      return [];
+    }
+    const content = readFileSync(tasksFilePath, "utf-8");
+    const parsed = YAML.parse(content);
+    const tasksFile = validateTasksFile(parsed);
+    const agents = getAllAgents(tasksFile.tasks);
+    return Array.from(agents);
+  } catch {
+    return [];
+  }
+}
+
 // =============================================================================
 // Question ID Provider
 // =============================================================================
 
 /**
- * Reads question IDs from the .questions/ directory.
+ * Reads question IDs from the .questions/ directory (async version).
  * @param tasksFilePath - Path to the tasks.yaml file (questions are stored relative to it)
  */
 export async function getQuestionIds(tasksFilePath: string): Promise<CompletionItem[]> {
+  return getQuestionIdsSync(tasksFilePath);
+}
+
+/**
+ * Reads question IDs from the .questions/ directory (synchronous version for shell completions).
+ * @param tasksFilePath - Path to the tasks.yaml file (questions are stored relative to it)
+ */
+export function getQuestionIdsSync(tasksFilePath: string): CompletionItem[] {
   try {
     const questionsDir = join(dirname(tasksFilePath), ".questions");
     if (!existsSync(questionsDir)) {
@@ -145,10 +192,18 @@ export async function getQuestionIds(tasksFilePath: string): Promise<CompletionI
 // =============================================================================
 
 /**
- * Reads interjection IDs from the .interjections/ directory.
+ * Reads interjection IDs from the .interjections/ directory (async version).
  * @param tasksFilePath - Path to the tasks.yaml file (interjections are stored relative to it)
  */
 export async function getInterjectionIds(tasksFilePath: string): Promise<CompletionItem[]> {
+  return getInterjectionIdsSync(tasksFilePath);
+}
+
+/**
+ * Reads interjection IDs from the .interjections/ directory (synchronous version for shell completions).
+ * @param tasksFilePath - Path to the tasks.yaml file (interjections are stored relative to it)
+ */
+export function getInterjectionIdsSync(tasksFilePath: string): CompletionItem[] {
   try {
     const interjectionsDir = join(dirname(tasksFilePath), ".interjections");
     if (!existsSync(interjectionsDir)) {

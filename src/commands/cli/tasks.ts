@@ -4,7 +4,7 @@
 
 import type { Clerc } from "clerc";
 
-import { getAgentNames, getTaskIds, getTaskStatuses } from "../../completions/providers";
+import { getAgentNamesSync, getTaskIdsSync, getTaskStatuses } from "../../completions/providers";
 import type { TaskStatus } from "../../task-schema";
 import { getTasksFile } from "../context";
 import {
@@ -23,15 +23,15 @@ import {
 // Completion Handlers
 // =============================================================================
 
-const taskIdCompletionHandler = async (complete: (value: string, description: string) => void) => {
-  const taskIds = await getTaskIds(getTasksFile());
+const taskIdCompletionHandler = (complete: (value: string, description: string) => void) => {
+  const taskIds = getTaskIdsSync(getTasksFile());
   for (const id of taskIds) {
     complete(id, "Task ID");
   }
 };
 
-const agentCompletionHandler = async (complete: (value: string, description: string) => void) => {
-  const agents = await getAgentNames(getTasksFile());
+const agentCompletionHandler = (complete: (value: string, description: string) => void) => {
+  const agents = getAgentNamesSync(getTasksFile());
   for (const agent of agents) {
     complete(agent, "Agent");
   }

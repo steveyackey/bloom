@@ -4,7 +4,7 @@
 
 import type { Clerc } from "clerc";
 
-import { getAgentNames } from "../../completions/providers";
+import { getAgentNamesSync } from "../../completions/providers";
 import { triggerInterject } from "../../human-queue";
 import { getTasksFile } from "../context";
 import { runAgentWorkLoop, startOrchestrator } from "../orchestrator";
@@ -29,8 +29,8 @@ export function registerAgentCommands(cli: Clerc): Clerc {
           key: "<name>",
           description: "Name of the agent to run",
           completions: {
-            handler: async (complete) => {
-              const names = await getAgentNames(getTasksFile());
+            handler: (complete) => {
+              const names = getAgentNamesSync(getTasksFile());
               for (const name of names) {
                 complete(name, "Agent name");
               }
@@ -57,8 +57,8 @@ export function registerAgentCommands(cli: Clerc): Clerc {
           key: "<name>",
           description: "Name of the agent to interject",
           completions: {
-            handler: async (complete) => {
-              const names = await getAgentNames(getTasksFile());
+            handler: (complete) => {
+              const names = getAgentNamesSync(getTasksFile());
               for (const name of names) {
                 complete(name, "Agent name");
               }
