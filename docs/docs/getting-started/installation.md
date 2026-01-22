@@ -97,6 +97,48 @@ bloom help
 # Shows available commands
 ```
 
+## Shell Completions
+
+Bloom supports tab completion for commands, options, and dynamic values like task IDs and repo names. Add one of the following to enable completions in your shell:
+
+### Bash
+
+Add to `~/.bashrc`:
+
+```bash
+eval "$(bloom completions bash)"
+```
+
+### Zsh
+
+Add to `~/.zshrc`:
+
+```bash
+eval "$(bloom completions zsh)"
+```
+
+### Fish
+
+Run once to install:
+
+```fish
+bloom completions fish > ~/.config/fish/completions/bloom.fish
+```
+
+### PowerShell
+
+Add to your PowerShell profile:
+
+```powershell
+bloom completions powershell | Out-String | Invoke-Expression
+```
+
+:::tip Finding your PowerShell profile
+Run `$PROFILE` in PowerShell to see the profile path. Create the file if it doesn't exist.
+:::
+
+After adding completions, restart your shell or source the config file. Then try typing `bloom ` and pressing Tab to see available commands.
+
 ## Updating
 
 To update to the latest version, run the install script again:
