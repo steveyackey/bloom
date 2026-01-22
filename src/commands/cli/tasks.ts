@@ -65,6 +65,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("list", async (ctx) => {
         const status = ctx.parameters.status as TaskStatus | undefined;
@@ -82,19 +83,24 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("show", async (ctx) => {
         await cmdShow(ctx.parameters.taskid as string);
       })
 
       // dashboard - Live dashboard
-      .command("dashboard", "Live dashboard showing task progress")
+      .command("dashboard", "Live dashboard showing task progress", {
+        help: { group: "tasks" },
+      })
       .on("dashboard", async () => {
         await cmdDashboard();
       })
 
       // validate - Validate tasks file
-      .command("validate", "Validate tasks file for errors")
+      .command("validate", "Validate tasks file for errors", {
+        help: { group: "tasks" },
+      })
       .on("validate", async () => {
         await cmdValidate();
       })
@@ -112,6 +118,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("next", async (ctx) => {
         await cmdNext(ctx.parameters.agent as string | undefined);
@@ -128,6 +135,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("ready", async (ctx) => {
         await cmdSetStatus(ctx.parameters.taskid as string, "ready_for_agent");
@@ -144,6 +152,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("start", async (ctx) => {
         await cmdSetStatus(ctx.parameters.taskid as string, "in_progress");
@@ -160,6 +169,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("done", async (ctx) => {
         await cmdSetStatus(ctx.parameters.taskid as string, "done");
@@ -176,6 +186,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("block", async (ctx) => {
         await cmdSetStatus(ctx.parameters.taskid as string, "blocked");
@@ -192,6 +203,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("todo", async (ctx) => {
         await cmdSetStatus(ctx.parameters.taskid as string, "todo");
@@ -215,6 +227,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "tasks" },
       })
       .on("assign", async (ctx) => {
         await cmdAssign(ctx.parameters.taskid as string, ctx.parameters.agent as string);
@@ -235,6 +248,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             description: "Note text to add",
           },
         ],
+        help: { group: "tasks" },
       })
       .on("note", async (ctx) => {
         // Handle variadic note argument - join all parts
@@ -262,6 +276,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             description: "Reset all stuck (in_progress or blocked) tasks",
           },
         },
+        help: { group: "tasks" },
       })
       .on("reset", async (ctx) => {
         // If --stuck flag is provided, reset all stuck tasks

@@ -4,7 +4,8 @@
 // =============================================================================
 
 import { resolve } from "node:path";
-import { Cli, completionsPlugin } from "clerc";
+import chalk from "chalk";
+import { Clerc, completionsPlugin, friendlyErrorPlugin, helpPlugin, notFoundPlugin, versionPlugin } from "clerc";
 
 import {
   registerAgentCommands,
@@ -24,11 +25,42 @@ import { VERSION } from "./version";
 // Valid log levels for validation
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 
-const cli = Cli()
+// =============================================================================
+// Command Groups Definition
+// =============================================================================
+
+const COMMAND_GROUPS = {
+  commands: [
+    ["setup", "Project Setup"],
+    ["repo", "Repository Management"],
+    ["planning", "Planning & Generation"],
+    ["tasks", "Task Management"],
+    ["agents", "Agent Operations"],
+    ["collab", "Collaboration"],
+    ["config", "Configuration"],
+  ] as [string, string][],
+};
+
+// =============================================================================
+// CLI Setup
+// =============================================================================
+
+const cli = Clerc.create()
   .name("bloom")
   .scriptName("bloom")
   .description("Multi-agent task orchestrator with YAML-based task management")
   .version(VERSION)
+  // Add plugins
+  .use(versionPlugin())
+  .use(
+    helpPlugin({
+      groups: COMMAND_GROUPS,
+    })
+  )
+  .use(completionsPlugin())
+  .use(friendlyErrorPlugin())
+  .use(notFoundPlugin())
+  // Global flags
   .globalFlag("file", "Path to tasks file", {
     short: "f",
     type: String,
@@ -67,7 +99,9 @@ const cli = Cli()
         setLogLevel("error");
       } else if (logLevel) {
         if (!VALID_LOG_LEVELS.includes(logLevel as LogLevel)) {
-          console.error(`Invalid log level: ${logLevel}. Valid levels: ${VALID_LOG_LEVELS.join(", ")}`);
+          console.error(
+            `${chalk.red("Error:")} Invalid log level "${logLevel}". Valid levels: ${VALID_LOG_LEVELS.join(", ")}`
+          );
           process.exit(1);
         }
         setLogLevel(logLevel as LogLevel);
@@ -75,8 +109,7 @@ const cli = Cli()
 
       return next();
     },
-  })
-  .use(completionsPlugin());
+  });
 
 // Register command groups
 registerAgentCommands(cli);

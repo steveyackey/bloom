@@ -19,7 +19,9 @@ import { cmdAgents } from "../tasks";
  */
 export function registerAgentCommands(cli: Clerc): Clerc {
   return cli
-    .command("run", "Start the orchestrator with all agents", {})
+    .command("run", "Start the orchestrator with all agents", {
+      help: { group: "agents" },
+    })
     .on("run", async () => {
       await startOrchestrator();
     })
@@ -38,13 +40,18 @@ export function registerAgentCommands(cli: Clerc): Clerc {
           },
         },
       ],
+      help: { group: "agents" },
     })
     .on("agent run", async (ctx) => {
       const name = ctx.parameters.name as string;
       await runAgentWorkLoop(name);
     })
-    .command("agent list", "List all agents defined in tasks")
-    .command("agents", "List all agents defined in tasks (alias for 'agent list')")
+    .command("agent list", "List all agents defined in tasks", {
+      help: { group: "agents" },
+    })
+    .command("agents", "List all agents defined in tasks (alias for 'agent list')", {
+      help: { group: "agents" },
+    })
     .on("agent list", async () => {
       await cmdAgents();
     })
@@ -70,6 +77,7 @@ export function registerAgentCommands(cli: Clerc): Clerc {
           description: "Reason for the interjection",
         },
       ],
+      help: { group: "agents" },
     })
     .on("agent interject", async (ctx) => {
       const name = ctx.parameters.name as string;

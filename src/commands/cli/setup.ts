@@ -23,18 +23,23 @@ import { cmdInit } from "../init";
  */
 export function registerSetupCommands(cli: Clerc): Clerc {
   return cli
-    .command("init", "Initialize a Bloom workspace in the current directory")
+    .command("init", "Initialize a Bloom workspace in the current directory", {
+      help: { group: "setup" },
+    })
     .on("init", async () => {
       await cmdInit();
     })
     .command("create", "Create a new project with PRD template", {
       parameters: ["<name>"],
+      help: { group: "setup" },
     })
     .on("create", async (ctx) => {
       const projectName = ctx.parameters.name as string;
       await cmdCreate(projectName);
     })
-    .command("setup", "Sync repositories (clone or update all configured repos)")
+    .command("setup", "Sync repositories (clone or update all configured repos)", {
+      help: { group: "setup" },
+    })
     .on("setup", async () => {
       const repos = await listRepos(BLOOM_DIR);
       if (repos.length === 0) {

@@ -18,7 +18,11 @@ import { cmdUpdate } from "../update";
  * The `help` command is handled by Clerc's built-in helpPlugin (via --help flag).
  */
 export function registerUtilityCommands(cli: Clerc): Clerc {
-  return cli.command("update", "Update bloom to the latest version").on("update", async () => {
-    await cmdUpdate();
-  });
+  return cli
+    .command("update", "Update bloom to the latest version", {
+      help: { group: "config" },
+    })
+    .on("update", async () => {
+      await cmdUpdate();
+    });
 }

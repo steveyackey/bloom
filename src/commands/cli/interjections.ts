@@ -17,11 +17,15 @@ import { cmdInterjectDismiss, cmdInterjections, cmdInterjectResume } from "../in
  */
 export function registerInterjectionCommands(cli: Clerc): Clerc {
   return cli
-    .command("interject", "List pending interjections")
+    .command("interject", "List pending interjections", {
+      help: { group: "collab" },
+    })
     .on("interject", async () => {
       await cmdInterjections();
     })
-    .command("interject list", "List pending interjections")
+    .command("interject list", "List pending interjections", {
+      help: { group: "collab" },
+    })
     .on("interject list", async () => {
       await cmdInterjections();
     })
@@ -40,6 +44,7 @@ export function registerInterjectionCommands(cli: Clerc): Clerc {
           },
         },
       ],
+      help: { group: "collab" },
     })
     .on("interject resume", async (ctx) => {
       const id = ctx.parameters.id as string;
@@ -60,6 +65,7 @@ export function registerInterjectionCommands(cli: Clerc): Clerc {
           },
         },
       ],
+      help: { group: "collab" },
     })
     .on("interject dismiss", async (ctx) => {
       const id = ctx.parameters.id as string;

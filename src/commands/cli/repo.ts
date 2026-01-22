@@ -59,6 +59,7 @@ export function registerRepoCommands(cli: Clerc): Clerc {
             description: "Custom name for the repository",
           },
         },
+        help: { group: "repo" },
       })
       .on("repo clone", async (ctx) => {
         const { url } = ctx.parameters;
@@ -82,6 +83,7 @@ export function registerRepoCommands(cli: Clerc): Clerc {
       // =========================================================================
       .command("repo create", "Create new local repository", {
         parameters: ["<name>"],
+        help: { group: "repo" },
       })
       .on("repo create", async (ctx) => {
         const { name } = ctx.parameters;
@@ -112,7 +114,9 @@ export function registerRepoCommands(cli: Clerc): Clerc {
       // =========================================================================
       // repo list - List configured repositories
       // =========================================================================
-      .command("repo list", "List configured repositories")
+      .command("repo list", "List configured repositories", {
+        help: { group: "repo" },
+      })
       .on("repo list", async () => {
         const repos = await listRepos(BLOOM_DIR);
         if (repos.length === 0) {
@@ -134,7 +138,9 @@ export function registerRepoCommands(cli: Clerc): Clerc {
       // =========================================================================
       // repo sync - Sync all configured repos (fetch updates)
       // =========================================================================
-      .command("repo sync", "Sync all configured repos (fetch updates)")
+      .command("repo sync", "Sync all configured repos (fetch updates)", {
+        help: { group: "repo" },
+      })
       .on("repo sync", async () => {
         console.log(chalk.dim("Syncing repositories...\n"));
         const result = await syncRepos(BLOOM_DIR);
@@ -166,6 +172,7 @@ export function registerRepoCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "repo" },
       })
       .on("repo remove", async (ctx) => {
         const { name } = ctx.parameters;
@@ -199,6 +206,7 @@ export function registerRepoCommands(cli: Clerc): Clerc {
             description: "Create new branch",
           },
         },
+        help: { group: "repo" },
       })
       .on("repo worktree add", async (ctx) => {
         const { repo, branch } = ctx.parameters;
@@ -227,6 +235,7 @@ export function registerRepoCommands(cli: Clerc): Clerc {
           },
           "<branch>",
         ],
+        help: { group: "repo" },
       })
       .on("repo worktree remove", async (ctx) => {
         const { repo, branch } = ctx.parameters;
@@ -253,6 +262,7 @@ export function registerRepoCommands(cli: Clerc): Clerc {
             },
           },
         ],
+        help: { group: "repo" },
       })
       .on("repo worktree list", async (ctx) => {
         const { repo } = ctx.parameters;

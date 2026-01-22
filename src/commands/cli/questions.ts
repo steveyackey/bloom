@@ -33,12 +33,14 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           alias: "a",
         },
       },
+      help: { group: "collab" },
     })
     .on("questions", async (ctx) => {
       await cmdQuestions(ctx.flags.all ?? false);
     })
     .command("questions-dashboard", "Interactive dashboard for answering questions", {
       alias: "qd",
+      help: { group: "collab" },
     })
     .on("questions-dashboard", async () => {
       await cmdQuestionsDashboard();
@@ -90,6 +92,7 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           type: Boolean,
         },
       },
+      help: { group: "collab" },
     })
     .on("ask", async (ctx) => {
       const agent = ctx.parameters.agent as string;
@@ -125,6 +128,7 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           description: "The answer to provide",
         },
       ],
+      help: { group: "collab" },
     })
     .on("answer", async (ctx) => {
       const questionId = ctx.parameters.questionId as string;
@@ -151,13 +155,16 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           type: Number,
         },
       ],
+      help: { group: "collab" },
     })
     .on("wait-answer", async (ctx) => {
       const questionId = ctx.parameters.questionId as string;
       const timeout = (ctx.parameters.timeout as number) || 300;
       await cmdWaitAnswer(questionId, timeout);
     })
-    .command("clear-answered", "Clear all answered questions from the queue", {})
+    .command("clear-answered", "Clear all answered questions from the queue", {
+      help: { group: "collab" },
+    })
     .on("clear-answered", async () => {
       await cmdClearAnswered();
     });
