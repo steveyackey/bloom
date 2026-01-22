@@ -27,3 +27,45 @@ jobs:
 
       - name: Test
         run: bun test
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: docs
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        working-directory: docs
+        run: bun run typecheck
+
+      - name: Build docs
+        working-directory: docs
+        run: bun run build
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        working-directory: web
+        run: bun run lint
+
+      - name: Build web
+        working-directory: web
+        run: bun run build
