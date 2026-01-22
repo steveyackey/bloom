@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.4](https://github.com/steveyackey/bloom/compare/bloom-v0.2.3...bloom-v0.2.4) (2026-01-22)
+
+
+### Features
+
+* **services:** add service layer structure with placeholder stubs ([d42de46](https://github.com/steveyackey/bloom/commit/d42de465268102f2469c6d97f36f2231b05f9db3))
+* **services:** implement planning-service with buildReposContext, runPlanSession, runGenerateSession, runRefineSession ([dbc156e](https://github.com/steveyackey/bloom/commit/dbc156eb0f891538a5ab66d045a889bde8ccbf40))
+* **services:** implement project-service with formatProjectName ([89c9a23](https://github.com/steveyackey/bloom/commit/89c9a23da2fb3a3ed37d748ec75bfc8d9486f80f))
+* **services:** implement repo-service with formatPullResults, pullAndLogResults ([6eae49c](https://github.com/steveyackey/bloom/commit/6eae49cb6850e1cf3a5c7e91542e19f37e87be48))
+
 ## [0.2.3](https://github.com/steveyackey/bloom/compare/bloom-v0.2.2...bloom-v0.2.3) (2026-01-22)
 
 
