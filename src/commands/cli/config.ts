@@ -3,7 +3,7 @@
 // =============================================================================
 
 import chalk from "chalk";
-import { Clerc, Types } from "clerc";
+import { type Clerc, Types } from "clerc";
 
 import { listRepos } from "../../repos";
 import { loadUserConfig, setGitProtocol } from "../../user-config";

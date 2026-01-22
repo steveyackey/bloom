@@ -2,19 +2,12 @@
 // Question Commands for Clerc CLI
 // =============================================================================
 
-import { Clerc, Types } from "clerc";
+import { type Clerc, Types } from "clerc";
 
-import { getQuestionIds, getTaskIds } from "../../completions/providers";
+import { getAgentNames, getQuestionIds } from "../../completions/providers";
 import type { QuestionType } from "../../human-queue";
 import { getTasksFile } from "../context";
-import {
-  cmdAnswer,
-  cmdAsk,
-  cmdClearAnswered,
-  cmdQuestions,
-  cmdQuestionsDashboard,
-  cmdWaitAnswer,
-} from "../questions";
+import { cmdAnswer, cmdAsk, cmdClearAnswered, cmdQuestions, cmdQuestionsDashboard, cmdWaitAnswer } from "../questions";
 
 // =============================================================================
 // Constants
@@ -57,9 +50,9 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           description: "Name of the agent asking the question",
           completions: {
             handler: async (complete) => {
-              const ids = await getTaskIds(getTasksFile());
-              for (const id of ids) {
-                complete(id, "Agent name");
+              const names = await getAgentNames(getTasksFile());
+              for (const name of names) {
+                complete(name, "Agent name");
               }
             },
           },

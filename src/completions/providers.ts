@@ -5,8 +5,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { loadReposFile } from "../repos";
-import { TaskStatusSchema, type Task, type TasksFile } from "../task-schema";
-import { loadTasks, getAllAgents } from "../tasks";
+import { type Task, TaskStatusSchema, type TasksFile } from "../task-schema";
+import { getAllAgents, loadTasks } from "../tasks";
 
 // =============================================================================
 // Types

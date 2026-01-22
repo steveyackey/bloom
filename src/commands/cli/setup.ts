@@ -2,7 +2,7 @@
 // Setup Commands for Clerc CLI (init, create, setup)
 // =============================================================================
 
-import { Clerc } from "clerc";
+import type { Clerc } from "clerc";
 
 import { listRepos, syncRepos } from "../../repos";
 import { BLOOM_DIR } from "../context";

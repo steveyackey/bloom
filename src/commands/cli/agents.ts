@@ -2,7 +2,7 @@
 // Agent Commands for Clerc CLI
 // =============================================================================
 
-import { Clerc } from "clerc";
+import type { Clerc } from "clerc";
 
 import { getAgentNames } from "../../completions/providers";
 import { triggerInterject } from "../../human-queue";
@@ -43,10 +43,12 @@ export function registerAgentCommands(cli: Clerc): Clerc {
       const name = ctx.parameters.name as string;
       await runAgentWorkLoop(name);
     })
-    .command("agent list", "List all agents defined in tasks", {
-      alias: "agents",
-    })
+    .command("agent list", "List all agents defined in tasks")
+    .command("agents", "List all agents defined in tasks (alias for 'agent list')")
     .on("agent list", async () => {
+      await cmdAgents();
+    })
+    .on("agents", async () => {
       await cmdAgents();
     })
     .command("agent interject", "Trigger an interject for a running agent", {

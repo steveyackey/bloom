@@ -8,7 +8,6 @@ import { getAgentNames, getTaskIds, getTaskStatuses } from "../../completions/pr
 import type { TaskStatus } from "../../task-schema";
 import { getTasksFile } from "../context";
 import {
-  cmdAgents,
   cmdAssign,
   cmdDashboard,
   cmdList,
@@ -53,229 +52,227 @@ const statusCompletionHandler = (complete: (value: string, description: string) 
  * Register task management commands with a Clerc CLI instance.
  */
 export function registerTaskCommands(cli: Clerc): Clerc {
-  return cli
-    // list [status] - List tasks
-    .command("list", "List tasks, optionally filtered by status", {
-      parameters: [
-        {
-          key: "[status]",
-          description: "Filter by status",
-          completions: {
-            handler: statusCompletionHandler,
+  return (
+    cli
+      // list [status] - List tasks
+      .command("list", "List tasks, optionally filtered by status", {
+        parameters: [
+          {
+            key: "[status]",
+            description: "Filter by status",
+            completions: {
+              handler: statusCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("list", async (ctx) => {
+        const status = ctx.parameters.status as TaskStatus | undefined;
+        await cmdList(status);
+      })
+
+      // show <taskid> - Show task details
+      .command("show", "Show task details", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to show",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("show", async (ctx) => {
+        await cmdShow(ctx.parameters.taskid as string);
+      })
+
+      // dashboard - Live dashboard
+      .command("dashboard", "Live dashboard showing task progress")
+      .on("dashboard", async () => {
+        await cmdDashboard();
+      })
+
+      // validate - Validate tasks file
+      .command("validate", "Validate tasks file for errors")
+      .on("validate", async () => {
+        await cmdValidate();
+      })
+
+      // Note: 'agents' command is registered in agents.ts as 'agent list' with alias 'agents'
+
+      // next [agent] - Show available tasks
+      .command("next", "Show available tasks (ready to start)", {
+        parameters: [
+          {
+            key: "[agent]",
+            description: "Filter by agent name",
+            completions: {
+              handler: agentCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("next", async (ctx) => {
+        await cmdNext(ctx.parameters.agent as string | undefined);
+      })
+
+      // ready <taskid> - Mark task as ready
+      .command("ready", "Mark task as ready for agent", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to mark ready",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("ready", async (ctx) => {
+        await cmdSetStatus(ctx.parameters.taskid as string, "ready_for_agent");
+      })
+
+      // start <taskid> - Mark task as in progress
+      .command("start", "Mark task as in progress", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to start",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("start", async (ctx) => {
+        await cmdSetStatus(ctx.parameters.taskid as string, "in_progress");
+      })
+
+      // done <taskid> - Mark task as done
+      .command("done", "Mark task as done", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to mark done",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("done", async (ctx) => {
+        await cmdSetStatus(ctx.parameters.taskid as string, "done");
+      })
+
+      // block <taskid> - Mark task as blocked
+      .command("block", "Mark task as blocked", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to mark blocked",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("block", async (ctx) => {
+        await cmdSetStatus(ctx.parameters.taskid as string, "blocked");
+      })
+
+      // todo <taskid> - Mark task as todo
+      .command("todo", "Mark task as todo", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to mark todo",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("todo", async (ctx) => {
+        await cmdSetStatus(ctx.parameters.taskid as string, "todo");
+      })
+
+      // assign <taskid> <agent> - Assign task to agent
+      .command("assign", "Assign task to an agent", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to assign",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+          {
+            key: "<agent>",
+            description: "Agent name to assign to",
+            completions: {
+              handler: agentCompletionHandler,
+            },
+          },
+        ],
+      })
+      .on("assign", async (ctx) => {
+        await cmdAssign(ctx.parameters.taskid as string, ctx.parameters.agent as string);
+      })
+
+      // note <taskid> <note> - Add note to task
+      .command("note", "Add a note to a task", {
+        parameters: [
+          {
+            key: "<taskid>",
+            description: "Task ID to add note to",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+          {
+            key: "<note...>",
+            description: "Note text to add",
+          },
+        ],
+      })
+      .on("note", async (ctx) => {
+        // Handle variadic note argument - join all parts
+        const noteText = Array.isArray(ctx.parameters.note)
+          ? (ctx.parameters.note as string[]).join(" ")
+          : (ctx.parameters.note as string);
+        await cmdNote(ctx.parameters.taskid as string, noteText);
+      })
+
+      // reset <taskid|--stuck> - Reset task(s)
+      .command("reset", "Reset task to ready_for_agent, or use --stuck to reset all stuck tasks", {
+        parameters: [
+          {
+            key: "[taskid]",
+            description: "Task ID to reset",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+        flags: {
+          stuck: {
+            type: Boolean,
+            short: "s",
+            description: "Reset all stuck (in_progress or blocked) tasks",
           },
         },
-      ],
-    })
-    .on("list", async (ctx) => {
-      const status = ctx.parameters.status as TaskStatus | undefined;
-      await cmdList(status);
-    })
-
-    // show <taskid> - Show task details
-    .command("show", "Show task details", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to show",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("show", async (ctx) => {
-      await cmdShow(ctx.parameters.taskid as string);
-    })
-
-    // dashboard - Live dashboard
-    .command("dashboard", "Live dashboard showing task progress")
-    .on("dashboard", async () => {
-      await cmdDashboard();
-    })
-
-    // validate - Validate tasks file
-    .command("validate", "Validate tasks file for errors")
-    .on("validate", async () => {
-      await cmdValidate();
-    })
-
-    // agents - List agents
-    .command("agents", "List all agents with their task counts")
-    .on("agents", async () => {
-      await cmdAgents();
-    })
-
-    // next [agent] - Show available tasks
-    .command("next", "Show available tasks (ready to start)", {
-      parameters: [
-        {
-          key: "[agent]",
-          description: "Filter by agent name",
-          completions: {
-            handler: agentCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("next", async (ctx) => {
-      await cmdNext(ctx.parameters.agent as string | undefined);
-    })
-
-    // ready <taskid> - Mark task as ready
-    .command("ready", "Mark task as ready for agent", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to mark ready",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("ready", async (ctx) => {
-      await cmdSetStatus(ctx.parameters.taskid as string, "ready_for_agent");
-    })
-
-    // start <taskid> - Mark task as in progress
-    .command("start", "Mark task as in progress", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to start",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("start", async (ctx) => {
-      await cmdSetStatus(ctx.parameters.taskid as string, "in_progress");
-    })
-
-    // done <taskid> - Mark task as done
-    .command("done", "Mark task as done", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to mark done",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("done", async (ctx) => {
-      await cmdSetStatus(ctx.parameters.taskid as string, "done");
-    })
-
-    // block <taskid> - Mark task as blocked
-    .command("block", "Mark task as blocked", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to mark blocked",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("block", async (ctx) => {
-      await cmdSetStatus(ctx.parameters.taskid as string, "blocked");
-    })
-
-    // todo <taskid> - Mark task as todo
-    .command("todo", "Mark task as todo", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to mark todo",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("todo", async (ctx) => {
-      await cmdSetStatus(ctx.parameters.taskid as string, "todo");
-    })
-
-    // assign <taskid> <agent> - Assign task to agent
-    .command("assign", "Assign task to an agent", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to assign",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-        {
-          key: "<agent>",
-          description: "Agent name to assign to",
-          completions: {
-            handler: agentCompletionHandler,
-          },
-        },
-      ],
-    })
-    .on("assign", async (ctx) => {
-      await cmdAssign(ctx.parameters.taskid as string, ctx.parameters.agent as string);
-    })
-
-    // note <taskid> <note> - Add note to task
-    .command("note", "Add a note to a task", {
-      parameters: [
-        {
-          key: "<taskid>",
-          description: "Task ID to add note to",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-        {
-          key: "<note...>",
-          description: "Note text to add",
-        },
-      ],
-    })
-    .on("note", async (ctx) => {
-      // Handle variadic note argument - join all parts
-      const noteText = Array.isArray(ctx.parameters.note)
-        ? (ctx.parameters.note as string[]).join(" ")
-        : (ctx.parameters.note as string);
-      await cmdNote(ctx.parameters.taskid as string, noteText);
-    })
-
-    // reset <taskid|--stuck> - Reset task(s)
-    .command("reset", "Reset task to ready_for_agent, or use --stuck to reset all stuck tasks", {
-      parameters: [
-        {
-          key: "[taskid]",
-          description: "Task ID to reset",
-          completions: {
-            handler: taskIdCompletionHandler,
-          },
-        },
-      ],
-      flags: {
-        stuck: {
-          type: Boolean,
-          short: "s",
-          description: "Reset all stuck (in_progress or blocked) tasks",
-        },
-      },
-    })
-    .on("reset", async (ctx) => {
-      // If --stuck flag is provided, reset all stuck tasks
-      if (ctx.flags.stuck) {
-        await cmdReset("--stuck");
-      } else if (ctx.parameters.taskid) {
-        await cmdReset(ctx.parameters.taskid as string);
-      } else {
-        console.error("Error: Either provide a task ID or use --stuck flag");
-        process.exit(1);
-      }
-    });
+      })
+      .on("reset", async (ctx) => {
+        // If --stuck flag is provided, reset all stuck tasks
+        if (ctx.flags.stuck) {
+          await cmdReset("--stuck");
+        } else if (ctx.parameters.taskid) {
+          await cmdReset(ctx.parameters.taskid as string);
+        } else {
+          console.error("Error: Either provide a task ID or use --stuck flag");
+          process.exit(1);
+        }
+      })
+  );
 }

@@ -2,7 +2,7 @@
 // Interjection Commands for Clerc CLI
 // =============================================================================
 
-import { Clerc } from "clerc";
+import type { Clerc } from "clerc";
 
 import { getInterjectionIds } from "../../completions/providers";
 import { getTasksFile } from "../context";
@@ -17,14 +17,8 @@ import { cmdInterjectDismiss, cmdInterjections, cmdInterjectResume } from "../in
  */
 export function registerInterjectionCommands(cli: Clerc): Clerc {
   return cli
-    .command("interject", "List pending interjections", {
-      alias: "interject list",
-    })
+    .command("interject", "List pending interjections")
     .on("interject", async () => {
-      await cmdInterjections();
-    })
-    .command("interject list", "List pending interjections", {})
-    .on("interject list", async () => {
       await cmdInterjections();
     })
     .command("interject resume", "Resume an interjected Claude session", {
