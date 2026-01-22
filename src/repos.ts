@@ -648,7 +648,7 @@ export async function addWorktree(
   bloomDir: string,
   repoName: string,
   branch: string,
-  options?: { create?: boolean }
+  options?: { create?: boolean; baseBranch?: string }
 ): Promise<{ success: boolean; path: string; error?: string }> {
   const bareRepoPath = getBareRepoPath(bloomDir, repoName);
   const worktreePath = getWorktreePath(bloomDir, repoName, branch);
@@ -662,9 +662,32 @@ export async function addWorktree(
   }
 
   let result: { success: boolean; output: string; error: string };
+
   if (options?.create) {
     // Create new branch and worktree
-    result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+    if (options.baseBranch) {
+      // Create from specific base branch
+      // First check if base branch exists locally or remotely
+      const baseExists = branchExists(bareRepoPath, options.baseBranch);
+      let startPoint: string;
+
+      if (baseExists.local) {
+        startPoint = options.baseBranch;
+      } else if (baseExists.remote) {
+        startPoint = `origin/${options.baseBranch}`;
+      } else {
+        return {
+          success: false,
+          path: "",
+          error: `Base branch '${options.baseBranch}' does not exist locally or remotely`,
+        };
+      }
+
+      result = runGit(["worktree", "add", "-b", branch, worktreePath, startPoint], bareRepoPath);
+    } else {
+      // Create from current HEAD
+      result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+    }
   } else {
     // Checkout existing branch
     result = runGit(["worktree", "add", worktreePath, branch], bareRepoPath);
@@ -744,4 +767,195 @@ export async function listWorktrees(
 
   // Filter out the bare repo itself
   return worktrees.filter((w) => w.branch !== "");
+}
+
+// =============================================================================
+// Git Status and Validation
+// =============================================================================
+
+export interface GitStatusResult {
+  clean: boolean;
+  hasUncommittedChanges: boolean;
+  hasUntrackedFiles: boolean;
+  hasStagedChanges: boolean;
+  modifiedFiles: string[];
+  untrackedFiles: string[];
+  stagedFiles: string[];
+}
+
+/**
+ * Check if a worktree has uncommitted changes.
+ */
+export function getWorktreeStatus(worktreePath: string): GitStatusResult {
+  if (!existsSync(worktreePath)) {
+    return {
+      clean: true,
+      hasUncommittedChanges: false,
+      hasUntrackedFiles: false,
+      hasStagedChanges: false,
+      modifiedFiles: [],
+      untrackedFiles: [],
+      stagedFiles: [],
+    };
+  }
+
+  const result = runGit(["status", "--porcelain"], worktreePath);
+  if (!result.success) {
+    return {
+      clean: true,
+      hasUncommittedChanges: false,
+      hasUntrackedFiles: false,
+      hasStagedChanges: false,
+      modifiedFiles: [],
+      untrackedFiles: [],
+      stagedFiles: [],
+    };
+  }
+
+  // Don't use trim() - leading spaces are significant in git status porcelain format
+  const lines = result.output.split("\n").filter((line) => line.length > 0);
+  const modifiedFiles: string[] = [];
+  const untrackedFiles: string[] = [];
+  const stagedFiles: string[] = [];
+
+  for (const line of lines) {
+    const indexStatus = line[0];
+    const workTreeStatus = line[1];
+    const file = line.slice(3);
+
+    if (indexStatus === "?") {
+      untrackedFiles.push(file);
+    } else {
+      if (indexStatus !== " " && indexStatus !== "?") {
+        stagedFiles.push(file);
+      }
+      if (workTreeStatus !== " " && workTreeStatus !== "?") {
+        modifiedFiles.push(file);
+      }
+    }
+  }
+
+  return {
+    clean: lines.length === 0,
+    hasUncommittedChanges: modifiedFiles.length > 0 || stagedFiles.length > 0,
+    hasUntrackedFiles: untrackedFiles.length > 0,
+    hasStagedChanges: stagedFiles.length > 0,
+    modifiedFiles,
+    untrackedFiles,
+    stagedFiles,
+  };
+}
+
+/**
+ * Check if a branch exists locally or remotely.
+ */
+export function branchExists(bareRepoPath: string, branch: string): { local: boolean; remote: boolean } {
+  const localResult = runGit(["rev-parse", "--verify", `refs/heads/${branch}`], bareRepoPath);
+  const remoteResult = runGit(["rev-parse", "--verify", `refs/remotes/origin/${branch}`], bareRepoPath);
+
+  return {
+    local: localResult.success,
+    remote: remoteResult.success,
+  };
+}
+
+/**
+ * Push a branch to remote.
+ */
+export function pushBranch(
+  worktreePath: string,
+  branch: string,
+  options?: { setUpstream?: boolean }
+): { success: boolean; error?: string } {
+  const args = ["push"];
+  if (options?.setUpstream) {
+    args.push("-u", "origin", branch);
+  } else {
+    args.push("origin", branch);
+  }
+
+  const result = runGit(args, worktreePath);
+  return {
+    success: result.success,
+    error: result.success ? undefined : result.error,
+  };
+}
+
+/**
+ * Get the current branch of a worktree.
+ */
+export function getCurrentBranch(worktreePath: string): string | null {
+  const result = runGit(["rev-parse", "--abbrev-ref", "HEAD"], worktreePath);
+  if (!result.success) return null;
+  return result.output.trim();
+}
+
+/**
+ * Delete a local branch (after it's been merged).
+ */
+export function deleteLocalBranch(
+  bareRepoPath: string,
+  branch: string,
+  options?: { force?: boolean }
+): { success: boolean; error?: string } {
+  const args = ["branch", options?.force ? "-D" : "-d", branch];
+  const result = runGit(args, bareRepoPath);
+  return {
+    success: result.success,
+    error: result.success ? undefined : result.error,
+  };
+}
+
+/**
+ * Find branches that have been merged into a target branch.
+ */
+export function getMergedBranches(bareRepoPath: string, targetBranch: string): string[] {
+  const result = runGit(["branch", "--merged", targetBranch], bareRepoPath);
+  if (!result.success) return [];
+
+  return result.output
+    .split("\n")
+    .map((line) => line.trim().replace(/^\* /, ""))
+    .filter((branch) => branch && branch !== targetBranch);
+}
+
+/**
+ * Clean up merged branches.
+ * Returns list of deleted branches.
+ */
+export async function cleanupMergedBranches(
+  bloomDir: string,
+  repoName: string,
+  targetBranch: string
+): Promise<{ deleted: string[]; failed: Array<{ branch: string; error: string }> }> {
+  const bareRepoPath = getBareRepoPath(bloomDir, repoName);
+  const mergedBranches = getMergedBranches(bareRepoPath, targetBranch);
+
+  const deleted: string[] = [];
+  const failed: Array<{ branch: string; error: string }> = [];
+
+  // Get list of worktrees to avoid deleting branches with active worktrees
+  const worktrees = await listWorktrees(bloomDir, repoName);
+  const worktreeBranches = new Set(worktrees.map((w) => w.branch));
+
+  for (const branch of mergedBranches) {
+    // Skip if there's an active worktree for this branch
+    if (worktreeBranches.has(branch)) {
+      // First remove the worktree
+      const removeResult = await removeWorktree(bloomDir, repoName, branch);
+      if (!removeResult.success) {
+        failed.push({ branch, error: `Cannot remove worktree: ${removeResult.error}` });
+        continue;
+      }
+    }
+
+    const deleteResult = deleteLocalBranch(bareRepoPath, branch);
+    if (deleteResult.success) {
+      deleted.push(branch);
+    } else {
+      failed.push({ branch, error: deleteResult.error || "Unknown error" });
+    }
+  }
+
+  return { deleted, failed };
 }

@@ -12,13 +12,47 @@ You are agent "{{AGENT_NAME}}" working on a task management system.
 3. Follow the acceptance criteria precisely
 4. Work only in the designated directory
 5. **IMPORTANT**: Mark the task as done when complete
+6. **IMPORTANT**: Commit ALL changes before marking task as done
 
 ## Your Process
 
 1. Create a TodoWrite checklist from acceptance criteria
 2. Implement the task - ONLY this task, nothing else
 3. Verify against acceptance criteria
-4. Add a note summarizing what you did
+4. Commit all changes with a descriptive message
+5. If task specifies a merge target, merge your branch into it
+6. Add a note summarizing what you did
+7. Mark task as done
+
+## Git Workflow
+
+Tasks may specify git branch settings. Always check the task prompt for:
+
+- **Working branch**: The branch you're working on
+- **Base branch**: Where your branch was created from
+- **Merge into**: Target branch to merge your work into when done
+
+### Before Marking Done
+
+1. **Commit everything**: No uncommitted changes should remain
+2. **Push if instructed**: The task prompt will tell you if pushing is required
+3. **Merge if instructed**: If the task specifies a `merge_into` branch:
+   - Switch to the target branch
+   - Merge your working branch with a descriptive message
+   - Push the merge if required
+
+### Example Merge Flow
+
+```bash
+# Ensure all changes are committed
+git add -A
+git commit -m "feat: implement feature X"
+
+# Merge into target branch (if specified)
+git checkout main
+git merge feature/my-branch --no-ff -m "Merge feature/my-branch: implement feature X"
+git push origin main  # if push_to_remote is enabled
+```
 
 ## Progress Tracking
 

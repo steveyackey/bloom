@@ -345,6 +345,11 @@ export class ClaudeAgentProvider implements Agent {
       args.push("--dangerously-skip-permissions");
     }
 
+    // Resume previous session if sessionId provided
+    if (options.sessionId) {
+      args.push("--resume", options.sessionId);
+    }
+
     args.push("--append-system-prompt", options.systemPrompt);
     args.push(options.prompt);
 

@@ -8,6 +8,18 @@ export const TaskStatusSchema = z.enum(["todo", "ready_for_agent", "assigned", "
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
 // =============================================================================
+// Git Configuration (top-level)
+// =============================================================================
+
+export const GitConfigSchema = z.object({
+  /** Push to remote after each task completes successfully (default: false) */
+  push_to_remote: z.boolean().default(false),
+  /** Automatically delete local branches that have been merged (default: false) */
+  auto_cleanup_merged: z.boolean().default(false),
+});
+export type GitConfig = z.infer<typeof GitConfigSchema>;
+
+// =============================================================================
 // Task Schema (recursive for subtasks)
 // =============================================================================
 
@@ -19,8 +31,12 @@ export type Task = {
   depends_on: string[];
   /** Folder path to execute this task in */
   repo?: string;
-  /** Git worktree name for isolated work */
-  worktree?: string;
+  /** Working branch for this task. Worktree path is derived from this (slashes -> hyphens) */
+  branch?: string;
+  /** Base branch to create the working branch from if it doesn't exist (default: repo's default branch) */
+  base_branch?: string;
+  /** Branch to merge working branch into when task completes. Same as `branch` means no merge needed */
+  merge_into?: string;
   agent_name?: string;
   instructions?: string;
   acceptance_criteria: string[];
@@ -40,7 +56,9 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     phase: z.number().int().positive().optional(),
     depends_on: z.array(z.string()).default([]),
     repo: z.string().optional(),
-    worktree: z.string().optional(),
+    branch: z.string().optional(),
+    base_branch: z.string().optional(),
+    merge_into: z.string().optional(),
     agent_name: z.string().optional(),
     instructions: z.string().optional(),
     acceptance_criteria: z.array(z.string()).default([]),
@@ -56,6 +74,9 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
 // =============================================================================
 
 export const TasksFileSchema = z.object({
+  /** Git configuration for the project */
+  git: GitConfigSchema.optional(),
+  /** Array of tasks */
   tasks: z.array(TaskSchema).default([]),
 });
 export type TasksFile = z.infer<typeof TasksFileSchema>;
@@ -68,8 +89,34 @@ export function createTask(partial: Partial<Task> & Pick<Task, "id" | "title">):
   return TaskSchema.parse(partial);
 }
 
-export function createTasksFile(tasks: Task[] = []): TasksFile {
-  return TasksFileSchema.parse({ tasks });
+export function createTasksFile(tasks: Task[] = [], git?: Partial<GitConfig>): TasksFile {
+  return TasksFileSchema.parse({ tasks, git });
+}
+
+/**
+ * Get the working branch for a task.
+ */
+export function getTaskBranch(task: Task): string | undefined {
+  return task.branch;
+}
+
+/**
+ * Determine if a task requires a merge step after completion.
+ * Returns the target branch if merge is needed, undefined otherwise.
+ */
+export function getTaskMergeTarget(task: Task): string | undefined {
+  const branch = getTaskBranch(task);
+  if (!branch || !task.merge_into) return undefined;
+  // Same branch = no merge needed
+  if (task.merge_into === branch) return undefined;
+  return task.merge_into;
+}
+
+/**
+ * Sanitize a branch name for filesystem path (replace slashes with hyphens).
+ */
+export function sanitizeBranchName(branch: string): string {
+  return branch.replace(/\//g, "-");
 }
 
 // =============================================================================
@@ -77,15 +124,40 @@ export function createTasksFile(tasks: Task[] = []): TasksFile {
 // =============================================================================
 
 export function validateTasksFile(data: unknown): TasksFile {
-  return TasksFileSchema.parse(data);
+  const parsed = TasksFileSchema.parse(data);
+  // Additional semantic validation
+  validateTaskGitConfig(parsed.tasks);
+  return parsed;
 }
 
 export function safeValidateTasksFile(
   data: unknown
-): { success: true; data: TasksFile } | { success: false; error: z.ZodError } {
+): { success: true; data: TasksFile } | { success: false; error: z.ZodError | Error } {
   const result = TasksFileSchema.safeParse(data);
-  if (result.success) {
-    return { success: true, data: result.data };
+  if (!result.success) {
+    return { success: false, error: result.error };
   }
-  return { success: false, error: result.error };
+  try {
+    validateTaskGitConfig(result.data.tasks);
+    return { success: true, data: result.data };
+  } catch (err) {
+    return { success: false, error: err as Error };
+  }
+}
+
+/**
+ * Validate that tasks with git branch settings have the required repo field.
+ */
+function validateTaskGitConfig(tasks: Task[]): void {
+  for (const task of tasks) {
+    if ((task.branch || task.base_branch || task.merge_into) && !task.repo) {
+      throw new Error(
+        `Task "${task.id}" has git branch settings (branch/base_branch/merge_into) but no repo specified. ` +
+          `Add a 'repo' field pointing to the repository name.`
+      );
+    }
+    if (task.subtasks.length > 0) {
+      validateTaskGitConfig(task.subtasks);
+    }
+  }
 }

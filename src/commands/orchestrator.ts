@@ -8,7 +8,17 @@ import { ClaudeAgentProvider } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { loadAgentPrompt } from "../prompts";
-import { addWorktree, getWorktreePath, listRepos, listWorktrees, pullDefaultBranch } from "../repos";
+import {
+  addWorktree,
+  cleanupMergedBranches,
+  getWorktreePath,
+  getWorktreeStatus,
+  listRepos,
+  listWorktrees,
+  pullDefaultBranch,
+  pushBranch,
+} from "../repos";
+import { type GitConfig, getTaskBranch, getTaskMergeTarget, type Task } from "../task-schema";
 import {
   getAllAgents,
   getAllRepos,
@@ -25,14 +35,22 @@ import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } 
 // Types
 // =============================================================================
 
+interface GitTaskInfo {
+  branch: string;
+  baseBranch?: string;
+  mergeInto?: string;
+  worktreePath: string;
+}
+
 interface TaskGetResult {
   available: boolean;
   taskId?: string;
   title?: string;
   repo?: string | null;
-  worktree?: string | null;
+  gitInfo?: GitTaskInfo | null;
   prompt?: string;
   taskCli?: string;
+  gitConfig?: GitConfig;
 }
 
 interface AgentConfig {
@@ -59,6 +77,32 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
   await saveTasks(getTasksFile(), tasksFile);
 
   const taskCli = `bloom -f "${getTasksFile()}"`;
+  const gitConfig = tasksFile.git;
+
+  // Build git info if task has a branch
+  let gitInfo: GitTaskInfo | null = null;
+  const branch = getTaskBranch(task);
+
+  if (branch && task.repo) {
+    const repoName = task.repo;
+    const isPath = repoName.startsWith("./") || repoName.startsWith("/");
+
+    if (!isPath) {
+      // Get repo info to determine base branch
+      const reposList = await listRepos(BLOOM_DIR);
+      const repo = reposList.find((r) => r.name === repoName);
+      const defaultBranch = repo?.defaultBranch || "main";
+      const baseBranch = task.base_branch || defaultBranch;
+      const mergeInto = getTaskMergeTarget(task);
+
+      gitInfo = {
+        branch,
+        baseBranch,
+        mergeInto,
+        worktreePath: getWorktreePath(BLOOM_DIR, repoName, branch),
+      };
+    }
+  }
 
   let prompt = `# Task: ${task.title}\n\n## Task ID: ${task.id}\n\n`;
 
@@ -78,6 +122,41 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
     prompt += `## Previous Notes\n${task.ai_notes.map((n) => `- ${n}`).join("\n")}\n\n`;
   }
 
+  // Add git workflow instructions if applicable
+  if (gitInfo) {
+    prompt += `## Git Workflow\n`;
+    prompt += `- **Working branch**: \`${gitInfo.branch}\`\n`;
+    prompt += `- **Base branch**: \`${gitInfo.baseBranch}\`\n`;
+
+    if (gitInfo.mergeInto) {
+      prompt += `- **Merge into**: \`${gitInfo.mergeInto}\` when task is complete\n\n`;
+      prompt += `### Before marking done:\n`;
+      prompt += `1. Commit all changes with a descriptive message\n`;
+      prompt += `2. Merge \`${gitInfo.branch}\` into \`${gitInfo.mergeInto}\`:\n`;
+      prompt += `   \`\`\`bash\n`;
+      prompt += `   git checkout ${gitInfo.mergeInto}\n`;
+      prompt += `   git merge ${gitInfo.branch} --no-ff -m "Merge ${gitInfo.branch}: ${task.title}"\n`;
+      prompt += `   \`\`\`\n`;
+      if (gitConfig?.push_to_remote) {
+        prompt += `3. Push the merge to remote:\n`;
+        prompt += `   \`\`\`bash\n`;
+        prompt += `   git push origin ${gitInfo.mergeInto}\n`;
+        prompt += `   \`\`\`\n`;
+      }
+    } else {
+      prompt += `- **No merge required** - work stays on this branch\n\n`;
+      prompt += `### Before marking done:\n`;
+      prompt += `1. Commit all changes with a descriptive message\n`;
+      if (gitConfig?.push_to_remote) {
+        prompt += `2. Push to remote:\n`;
+        prompt += `   \`\`\`bash\n`;
+        prompt += `   git push -u origin ${gitInfo.branch}\n`;
+        prompt += `   \`\`\`\n`;
+      }
+    }
+    prompt += `\n`;
+  }
+
   prompt += `## Your Mission
 Complete this task according to the instructions and acceptance criteria above.
 When finished, mark the task as done using:
@@ -93,9 +172,10 @@ Begin working on the task now.`;
     taskId: task.id,
     title: task.title,
     repo: task.repo || null,
-    worktree: task.worktree || null,
+    gitInfo,
     prompt,
     taskCli,
+    gitConfig,
   };
 }
 
@@ -134,29 +214,46 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
           // Repo name - use bare repo architecture
           const repoName = taskResult.repo;
 
-          if (taskResult.worktree) {
-            // Check if worktree exists
+          if (taskResult.gitInfo) {
+            // Pull latest from origin before creating worktree to ensure we start fresh
+            agentLog.info(`Pulling latest updates for ${repoName}...`);
+            const pullResult = await pullDefaultBranch(BLOOM_DIR, repoName);
+            if (pullResult.success) {
+              if (pullResult.updated) {
+                agentLog.info(`Updated ${repoName} to latest`);
+              } else {
+                agentLog.debug(`${repoName} already up to date`);
+              }
+            } else {
+              agentLog.warn(`Failed to pull ${repoName}: ${pullResult.error}`);
+              agentLog.info("Proceeding with existing local state...");
+            }
+
+            // Lazy worktree creation - create only when agent picks up work
             const worktrees = await listWorktrees(BLOOM_DIR, repoName);
-            const worktreeExists = worktrees.some((w) => w.branch === taskResult.worktree);
+            const worktreeExists = worktrees.some((w) => w.branch === taskResult.gitInfo!.branch);
 
             if (!worktreeExists) {
-              agentLog.info(`Creating worktree: ${taskResult.worktree}`);
-              const result = await addWorktree(BLOOM_DIR, repoName, taskResult.worktree, { create: true });
+              agentLog.info(`Creating worktree for branch: ${taskResult.gitInfo.branch}`);
+              if (taskResult.gitInfo.baseBranch) {
+                agentLog.info(`  Base branch: ${taskResult.gitInfo.baseBranch}`);
+              }
+              const result = await addWorktree(BLOOM_DIR, repoName, taskResult.gitInfo.branch, {
+                create: true,
+                baseBranch: taskResult.gitInfo.baseBranch,
+              });
               if (!result.success) {
                 agentLog.error(`Failed to create worktree: ${result.error}`);
               }
             }
-            // Get path with sanitized branch name (slashes replaced with hyphens)
-            workingDir = getWorktreePath(BLOOM_DIR, repoName, taskResult.worktree);
+            workingDir = taskResult.gitInfo.worktreePath;
           } else {
-            // No worktree specified - use the default branch worktree
-            // Find the repo's default branch from config
+            // No branch specified - use the default branch worktree
             const reposList = await listRepos(BLOOM_DIR);
             const repo = reposList.find((r) => r.name === repoName);
             if (repo) {
               workingDir = getWorktreePath(BLOOM_DIR, repoName, repo.defaultBranch);
             } else {
-              // Fallback to repos directory path
               workingDir = join(REPOS_DIR, repoName);
             }
           }
@@ -174,7 +271,7 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
       agentLog.info(`Starting Claude session in: ${workingDir}`);
 
       const startTime = Date.now();
-      const result = await agent.run({
+      let result = await agent.run({
         systemPrompt,
         prompt: taskResult.prompt!,
         startingDirectory: workingDir,
@@ -185,6 +282,72 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
 
       if (result.success) {
         agentLog.info(`Task ${taskResult.taskId} completed successfully (${duration}s)`);
+
+        // Post-task validation: check for uncommitted changes
+        if (taskResult.gitInfo) {
+          const status = getWorktreeStatus(taskResult.gitInfo.worktreePath);
+
+          if (!status.clean) {
+            agentLog.warn(`Branch ${taskResult.gitInfo.branch} has uncommitted changes:`);
+            if (status.modifiedFiles.length > 0) {
+              agentLog.warn(`  Modified: ${status.modifiedFiles.join(", ")}`);
+            }
+            if (status.untrackedFiles.length > 0) {
+              agentLog.warn(`  Untracked: ${status.untrackedFiles.join(", ")}`);
+            }
+            if (status.stagedFiles.length > 0) {
+              agentLog.warn(`  Staged: ${status.stagedFiles.join(", ")}`);
+            }
+
+            // Resume agent to finish the git work
+            agentLog.info("Resuming agent to commit remaining changes...");
+            const resumePrompt = `The task is marked as done but there are uncommitted changes in the working directory:
+${status.modifiedFiles.length > 0 ? `- Modified files: ${status.modifiedFiles.join(", ")}` : ""}
+${status.untrackedFiles.length > 0 ? `- Untracked files: ${status.untrackedFiles.join(", ")}` : ""}
+${status.stagedFiles.length > 0 ? `- Staged files: ${status.stagedFiles.join(", ")}` : ""}
+
+Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to remote" : "ensure work is saved"}.`;
+
+            result = await agent.run({
+              systemPrompt,
+              prompt: resumePrompt,
+              startingDirectory: workingDir,
+              agentName,
+              taskId: taskResult.taskId,
+              sessionId: result.sessionId, // Resume the same session
+            });
+          }
+
+          // Push if configured and branch work is done
+          if (taskResult.gitConfig?.push_to_remote && taskResult.gitInfo.branch) {
+            const postStatus = getWorktreeStatus(taskResult.gitInfo.worktreePath);
+            if (postStatus.clean) {
+              agentLog.info(`Pushing branch ${taskResult.gitInfo.branch} to remote...`);
+              const pushResult = pushBranch(taskResult.gitInfo.worktreePath, taskResult.gitInfo.branch, {
+                setUpstream: true,
+              });
+              if (pushResult.success) {
+                agentLog.info(`Pushed ${taskResult.gitInfo.branch} successfully`);
+              } else {
+                agentLog.warn(`Failed to push: ${pushResult.error}`);
+              }
+            }
+          }
+
+          // Auto cleanup merged branches if configured
+          if (taskResult.gitConfig?.auto_cleanup_merged && taskResult.gitInfo.mergeInto && taskResult.repo) {
+            agentLog.info(`Cleaning up branches merged into ${taskResult.gitInfo.mergeInto}...`);
+            const cleanup = await cleanupMergedBranches(BLOOM_DIR, taskResult.repo, taskResult.gitInfo.mergeInto);
+            if (cleanup.deleted.length > 0) {
+              agentLog.info(`Deleted merged branches: ${cleanup.deleted.join(", ")}`);
+            }
+            if (cleanup.failed.length > 0) {
+              for (const f of cleanup.failed) {
+                agentLog.warn(`Failed to delete ${f.branch}: ${f.error}`);
+              }
+            }
+          }
+        }
       } else {
         agentLog.error(`Task ${taskResult.taskId} ended with error after ${duration}s: ${result.error}`);
       }

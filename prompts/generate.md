@@ -25,6 +25,11 @@ Tasks file: {{TASKS_FILE}}
 Every field explained:
 
 ```yaml
+# Top-level git configuration
+git:
+  push_to_remote: false          # Push branches to remote after each task (default: false)
+  auto_cleanup_merged: false     # Delete local branches after they're merged (default: false)
+
 tasks:                           # Root array of tasks
   - id: kebab-case-id            # REQUIRED. Unique identifier, kebab-case
     title: Short description     # REQUIRED. Human-readable title
@@ -32,8 +37,10 @@ tasks:                           # Root array of tasks
     phase: 1                     # OPTIONAL. Number to group related tasks (1, 2, 3...)
     depends_on:                  # OPTIONAL. Array of task IDs that must complete first
       - other-task-id
-    repo: ./path/to/repo         # OPTIONAL. Directory to work in
-    worktree: branch-name        # OPTIONAL. Git worktree for isolated work
+    repo: my-repo-name           # OPTIONAL. Repository name (from bloom repo list)
+    branch: feature/my-work      # OPTIONAL. Working branch for this task
+    base_branch: main            # OPTIONAL. Branch to create working branch from (default: repo's default)
+    merge_into: main             # OPTIONAL. Branch to merge into when done (same as branch = no merge)
     agent_name: claude-code      # OPTIONAL. Agent name for task grouping (see AGENT NAMING below)
     instructions: |              # OPTIONAL. Detailed multi-line instructions
       Step by step instructions
@@ -95,7 +102,7 @@ conflicts. Tasks working in different directories can use different agents.
 1. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
 2. **DEPENDENCIES**: Use depends_on to enforce task ordering
 3. **CHECKPOINTS**: Create "[CHECKPOINT]" validation tasks at phase boundaries
-4. **WORKTREES**: One agent per worktree at a time (no conflicts)
+4. **BRANCHES**: One agent per branch at a time (no conflicts)
 5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
 6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
 7. **SMALL TASKS**: Each task should be 1-4 hours of focused work
@@ -106,9 +113,56 @@ conflicts. Tasks working in different directories can use different agents.
    - Leading special chars: @, *, &, !, %, ?, |, >
    - Example: `- "\`bun test\` passes"` NOT `- \`bun test\` passes`
 
+## Git Branching Strategy
+
+Use the `branch`, `base_branch`, and `merge_into` fields to control git workflow:
+
+### Pattern 1: Feature Branch with Merge Back
+```yaml
+- id: implement-feature
+  repo: my-app
+  branch: feature/new-feature      # Working branch
+  base_branch: main                # Create from main
+  merge_into: main                 # Merge back when done
+```
+Agent creates `feature/new-feature` from `main`, does work, then merges back to `main`.
+
+### Pattern 2: Development on a Shared Branch
+```yaml
+- id: add-component
+  repo: my-app
+  branch: develop                  # Work directly on develop
+  # No base_branch - branch already exists
+  # No merge_into - no merge needed
+```
+Agent works directly on `develop` branch without creating new branches.
+
+### Pattern 3: Sequential Tasks on Same Branch
+```yaml
+- id: task-1
+  repo: my-app
+  branch: feature/big-feature
+  base_branch: main
+  # No merge_into - don't merge yet
+
+- id: task-2
+  depends_on: [task-1]
+  repo: my-app
+  branch: feature/big-feature      # Same branch
+  merge_into: main                 # Merge after all work done
+```
+Multiple tasks work on the same branch, only the last one merges.
+
+### Git Configuration
+Enable `push_to_remote: true` in the `git:` section to automatically push after each task.
+
 ## Complete Example
 
 ```yaml
+git:
+  push_to_remote: true
+  auto_cleanup_merged: true
+
 tasks:
   # ===========================================================================
   # Phase 1: Setup
@@ -118,8 +172,9 @@ tasks:
     status: todo
     phase: 1
     depends_on: []
-    repo: ./packages/core
-    worktree: phase-1-setup
+    repo: core-package
+    branch: feature/phase-1-setup
+    base_branch: main
     instructions: Create base directory layout and config files
     acceptance_criteria:
       - src/ directory exists with index.ts
@@ -131,8 +186,8 @@ tasks:
     phase: 1
     depends_on:
       - setup-project-structure
-    repo: ./packages/core
-    worktree: phase-1-setup
+    repo: core-package
+    branch: feature/phase-1-setup
     instructions: Add zod and yaml packages
     acceptance_criteria:
       - zod installed for schema validation
@@ -144,11 +199,13 @@ tasks:
     title: "[CHECKPOINT] Validate phase 1 setup"
     status: todo
     phase: 1
+    checkpoint: true
     depends_on:
       - setup-project-structure
       - setup-dependencies
-    repo: ./packages/core
-    worktree: phase-1-setup
+    repo: core-package
+    branch: feature/phase-1-setup
+    merge_into: main
     instructions: |
       VALIDATION CHECKPOINT - Human review required.
 
@@ -156,7 +213,7 @@ tasks:
       - bun install succeeds
       - tsc --noEmit passes
 
-      After validation, merge worktree and mark done.
+      After validation, merge to main and mark done.
     acceptance_criteria:
       - "`bun install` succeeds"
       - "`tsc --noEmit` passes"

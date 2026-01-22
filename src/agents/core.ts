@@ -6,6 +6,8 @@ export interface AgentRunOptions {
   agentName?: string;
   /** Task ID for context */
   taskId?: string;
+  /** Session ID to resume a previous session */
+  sessionId?: string;
 }
 
 export interface AgentRunResult {
