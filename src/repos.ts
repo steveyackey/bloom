@@ -312,6 +312,10 @@ export async function createRepo(
   // Set default branch
   runGit(["symbolic-ref", "HEAD", `refs/heads/${defaultBranch}`], bareRepoPath);
 
+  // Configure git user for commits (needed in CI where global config may not exist)
+  runGit(["config", "user.email", "bloom@localhost"], bareRepoPath);
+  runGit(["config", "user.name", "Bloom"], bareRepoPath);
+
   // Create worktree for default branch with orphan (no commits yet)
   const worktreePath = getWorktreePath(bloomDir, name, defaultBranch);
   console.log(`Creating worktree for '${defaultBranch}' branch...`);
@@ -372,6 +376,10 @@ export async function createRepo(
   const readmeContent = `# ${name}\n\nA new repository created with bloom.\n`;
   const readmePath = join(worktreePath, "README.md");
   await Bun.write(readmePath, readmeContent);
+
+  // Configure git user for commits (needed in CI where global config may not exist)
+  runGit(["config", "user.email", "bloom@localhost"], worktreePath);
+  runGit(["config", "user.name", "Bloom"], worktreePath);
 
   runGit(["add", "README.md"], worktreePath);
   runGit(["commit", "-m", "Initial commit"], worktreePath);
