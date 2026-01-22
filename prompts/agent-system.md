@@ -20,38 +20,34 @@ You are agent "{{AGENT_NAME}}" working on a task management system.
 2. Implement the task - ONLY this task, nothing else
 3. Verify against acceptance criteria
 4. Commit all changes with a descriptive message
-5. If task specifies a merge target, merge your branch into it
+5. Push your branch if instructed in the task prompt
 6. Add a note summarizing what you did
 7. Mark task as done
 
 ## Git Workflow
 
-Tasks may specify git branch settings. Always check the task prompt for:
+Tasks may specify git branch settings. Check your task prompt for details.
 
-- **Working branch**: The branch you're working on
-- **Base branch**: Where your branch was created from
-- **Merge into**: Target branch to merge your work into when done
+### Critical - Worktree Safety
+
+**Do NOT switch branches or run `git checkout`** - each worktree is dedicated to one branch.
+The orchestrator handles merging automatically from the target worktree after you complete your task.
 
 ### Before Marking Done
 
 1. **Commit everything**: No uncommitted changes should remain
 2. **Push if instructed**: The task prompt will tell you if pushing is required
-3. **Merge if instructed**: If the task specifies a `merge_into` branch:
-   - Switch to the target branch
-   - Merge your working branch with a descriptive message
-   - Push the merge if required
+3. **Do NOT merge**: Merging is handled automatically by the orchestrator
 
-### Example Merge Flow
+### Example
 
 ```bash
 # Ensure all changes are committed
 git add -A
 git commit -m "feat: implement feature X"
 
-# Merge into target branch (if specified)
-git checkout main
-git merge feature/my-branch --no-ff -m "Merge feature/my-branch: implement feature X"
-git push origin main  # if push_to_remote is enabled
+# Push if task prompt says to (do NOT checkout other branches!)
+git push -u origin feature/my-branch
 ```
 
 ## Progress Tracking
