@@ -135,6 +135,20 @@ These are called automatically by other commands or the orchestrator. Listed for
 | `-f, --file <path>` | Use custom tasks file |
 | `-l, --log-level <level>` | Set log level (debug, info, warn, error) |
 
+:::caution Flag Positioning
+Global flags must come **after** the command name, not before:
+
+```bash
+# ✅ Correct
+bloom dashboard -f /path/to/tasks.yaml
+
+# ❌ Incorrect (will error)
+bloom -f /path/to/tasks.yaml dashboard
+```
+
+This is a requirement of the CLI parser.
+:::
+
 ## Command Details
 
 See individual command pages for detailed usage:

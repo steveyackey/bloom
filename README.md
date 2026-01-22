@@ -283,9 +283,11 @@ bloom update                 # Update bloom to the latest version
 ### Custom Tasks File
 
 ```bash
-bloom -f project.yaml run
-bloom -f project.yaml plan
+bloom run -f project.yaml
+bloom plan -f project.yaml
 ```
+
+> **Note:** Global flags must come after the command name, not before.
 
 ### Shell Completions
 

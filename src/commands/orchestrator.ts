@@ -632,19 +632,20 @@ async function startTUI(agents: Set<string>): Promise<void> {
   const agentConfigs: AgentConfig[] = [];
   // Always pass the tasks file explicitly since subprocesses run in BLOOM_DIR,
   // not the original pwd where the user ran `bloom run`
-  const tasksFileArg = ["-f", getTasksFile()];
+  // Note: Global flags must come AFTER the command name for Clerc CLI parsing
+  const tasksFile = getTasksFile();
 
   // Dashboard pane
-  agentConfigs.push({ name: "dashboard", command: ["bloom", ...tasksFileArg, "dashboard"], cwd: BLOOM_DIR });
+  agentConfigs.push({ name: "dashboard", command: ["bloom", "dashboard", "-f", tasksFile], cwd: BLOOM_DIR });
 
   // Human Questions pane
-  agentConfigs.push({ name: "questions", command: ["bloom", ...tasksFileArg, "questions-dashboard"], cwd: BLOOM_DIR });
+  agentConfigs.push({ name: "questions", command: ["bloom", "questions-dashboard", "-f", tasksFile], cwd: BLOOM_DIR });
 
   // Agent panes
   for (const agentName of [...agents].sort()) {
     agentConfigs.push({
       name: agentName,
-      command: ["bloom", ...tasksFileArg, "agent", "run", agentName],
+      command: ["bloom", "agent", "run", agentName, "-f", tasksFile],
       cwd: BLOOM_DIR,
     });
   }
@@ -652,7 +653,7 @@ async function startTUI(agents: Set<string>): Promise<void> {
   // Floating agent
   agentConfigs.push({
     name: FLOATING_AGENT,
-    command: ["bloom", ...tasksFileArg, "agent", "run", FLOATING_AGENT],
+    command: ["bloom", "agent", "run", FLOATING_AGENT, "-f", tasksFile],
     cwd: BLOOM_DIR,
   });
 
