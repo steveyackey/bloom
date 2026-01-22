@@ -6,6 +6,17 @@
 import { resolve } from "node:path";
 import { Cli, completionsPlugin } from "clerc";
 
+import {
+  registerAgentCommands,
+  registerConfigCommands,
+  registerInterjectionCommands,
+  registerPlanningCommands,
+  registerQuestionCommands,
+  registerRepoCommands,
+  registerSetupCommands,
+  registerTaskCommands,
+  registerUtilityCommands,
+} from "./commands/cli";
 import { setTasksFile } from "./commands/context";
 import { type LogLevel, setLogLevel } from "./logger";
 import { VERSION } from "./version";
@@ -66,5 +77,16 @@ const cli = Cli()
     },
   })
   .use(completionsPlugin());
+
+// Register command groups
+registerAgentCommands(cli);
+registerConfigCommands(cli);
+registerInterjectionCommands(cli);
+registerPlanningCommands(cli);
+registerQuestionCommands(cli);
+registerRepoCommands(cli);
+registerSetupCommands(cli);
+registerTaskCommands(cli);
+registerUtilityCommands(cli);
 
 cli.parse();
