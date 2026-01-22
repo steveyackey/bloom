@@ -5,44 +5,12 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../agents";
-import { loadPrompt } from "../prompts";
 import { pullAllDefaultBranches } from "../repos";
+import { runGenerateSession } from "../services/planning-service";
 import { BLOOM_DIR } from "./context";
-import { buildReposContext } from "./plan-command";
 
-// =============================================================================
-// Run Generate Session
-// =============================================================================
-
-export async function runGenerateSession(workingDir: string, tasksFile: string): Promise<void> {
-  // Build repos context
-  const reposContext = await buildReposContext(BLOOM_DIR);
-
-  const systemPrompt = await loadPrompt("generate", {
-    WORKING_DIR: workingDir,
-    TASKS_FILE: tasksFile,
-    REPOS_CONTEXT: reposContext,
-  });
-
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
-
-  console.log(`${chalk.bold("Generate session")} - tasks will be written to: ${chalk.cyan(tasksFile)}\n`);
-
-  const initialPrompt = `Please read the plan.md and generate a tasks.yaml file. Start by reading the plan, then create the task definitions.
-
-IMPORTANT: After writing tasks.yaml, you MUST validate it by running \`bloom validate\`. If validation fails (especially YAML parsing errors with strings containing special characters like backticks, quotes, or colons), fix the quoting issues and re-validate until it passes.`;
-
-  // Run Claude from the working directory
-  await agent.run({
-    systemPrompt,
-    prompt: initialPrompt,
-    startingDirectory: workingDir,
-  });
-}
+// Re-export for backwards compatibility
+export { runGenerateSession } from "../services/planning-service";
 
 // =============================================================================
 // Command Handler
@@ -79,7 +47,7 @@ export async function cmdGenerate(): Promise<void> {
     console.log("");
   }
 
-  await runGenerateSession(workingDir, tasksFile);
+  await runGenerateSession(workingDir, tasksFile, BLOOM_DIR);
 
   console.log(chalk.dim(`\n---`));
   console.log(`${chalk.green("Tasks generated to:")} ${chalk.cyan(tasksFile)}`);

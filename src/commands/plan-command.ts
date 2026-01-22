@@ -5,72 +5,12 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../agents";
-import { loadPrompt } from "../prompts";
-import { listRepos, pullAllDefaultBranches } from "../repos";
-import { BLOOM_DIR, findGitRoot } from "./context";
+import { pullAllDefaultBranches } from "../repos";
+import { runPlanSession } from "../services/planning-service";
+import { BLOOM_DIR } from "./context";
 
-// =============================================================================
-// Build Repos Context
-// =============================================================================
-
-export async function buildReposContext(bloomDir: string): Promise<string> {
-  const repos = await listRepos(bloomDir);
-
-  if (repos.length === 0) {
-    return "No repositories configured. Run `bloom repo clone <url>` to add repositories.";
-  }
-
-  const lines: string[] = ["## Configured Repositories", ""];
-
-  for (const repo of repos) {
-    lines.push(`### ${repo.name}`);
-    lines.push(`- URL: ${repo.url}`);
-    lines.push(`- Default Branch: ${repo.defaultBranch}`);
-    lines.push(`- Status: ${repo.exists ? "Cloned" : "Not cloned"}`);
-
-    if (repo.worktrees.length > 0) {
-      lines.push(`- Worktrees: ${repo.worktrees.join(", ")}`);
-    }
-
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
-// =============================================================================
-// Run Planning Session
-// =============================================================================
-
-export async function runPlanSession(workingDir: string, planFile: string): Promise<void> {
-  const gitRoot = findGitRoot() || workingDir;
-
-  // Build repos context
-  const reposContext = await buildReposContext(BLOOM_DIR);
-
-  const systemPrompt = await loadPrompt("plan", {
-    WORKING_DIR: workingDir,
-    PLAN_FILE: planFile,
-    REPOS_CONTEXT: reposContext,
-  });
-
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
-
-  console.log(`${chalk.bold("Planning session")} - plan will be written to: ${chalk.cyan(planFile)}\n`);
-
-  const initialPrompt = `Let's create an implementation plan. First, read the PRD.md to understand what we're building, then summarize the key requirements and ask me any clarifying questions before we draft the plan.`;
-
-  // Run Claude from git root but tell it about the working directory
-  await agent.run({
-    systemPrompt,
-    prompt: initialPrompt,
-    startingDirectory: gitRoot,
-  });
-}
+// Re-export for backwards compatibility
+export { buildReposContext, runPlanSession } from "../services/planning-service";
 
 // =============================================================================
 // Command Handler
@@ -107,7 +47,7 @@ export async function cmdPlan(): Promise<void> {
     console.log("");
   }
 
-  await runPlanSession(workingDir, planFile);
+  await runPlanSession(workingDir, planFile, BLOOM_DIR);
 
   console.log(chalk.dim(`\n---`));
   console.log(`${chalk.green("Plan saved to:")} ${chalk.cyan(planFile)}`);
