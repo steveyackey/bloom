@@ -21,6 +21,10 @@ export function registerInterjectionCommands(cli: Clerc): Clerc {
     .on("interject", async () => {
       await cmdInterjections();
     })
+    .command("interject list", "List pending interjections")
+    .on("interject list", async () => {
+      await cmdInterjections();
+    })
     .command("interject resume", "Resume an interjected Claude session", {
       parameters: [
         {
