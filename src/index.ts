@@ -320,6 +320,15 @@ export async function main(): Promise<void> {
         await runAgentWorkLoop(args[2]);
       } else if (args[1] === "list") {
         await cmdAgents();
+      } else if (args[1] === "interject") {
+        if (!args[2]) {
+          console.error("Usage: bloom agent interject <name> [reason]");
+          process.exit(1);
+        }
+        const { triggerInterject } = await import("./human-queue");
+        const reason = args.slice(3).join(" ") || undefined;
+        await triggerInterject(args[2], reason);
+        console.log(`Interject triggered for agent: ${args[2]}`);
       } else {
         console.error(`Unknown agent subcommand: ${args[1]}`);
         process.exit(1);

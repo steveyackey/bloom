@@ -26,20 +26,28 @@ Bloom adapts to how you work:
 Unlike other tools, Bloom enables planning across multiple repositories in a single project. Build features that span your backend, frontend, mobile app, and shared libraries—all coordinated through one plan with proper dependency ordering.
 
 ```yaml
-# A single project can orchestrate work across repos
+git:
+  push_to_remote: true
+  auto_cleanup_merged: true
+
 tasks:
   - id: api-models
-    repo: ./repos/backend
-    worktree: feature/auth
+    repo: backend
+    branch: feature/auth
+    base_branch: main
+    merge_into: main
 
   - id: shared-types
-    repo: ./repos/shared-types
-    worktree: feature/auth
+    repo: shared-types
+    branch: feature/auth
+    base_branch: main
     depends_on: [api-models]
 
   - id: frontend-integration
-    repo: ./repos/frontend
-    worktree: feature/auth
+    repo: frontend
+    branch: feature/auth
+    base_branch: main
+    merge_into: main
     depends_on: [shared-types]
 ```
 
@@ -141,7 +149,7 @@ repos/
     └── feature-api/          # Worktree for agent 2
 ```
 
-When you run `bloom run`, worktrees are **automatically created** as needed based on task definitions—you don't need to manage them manually. The manual commands are only needed if you want to work outside of Bloom:
+When you run `bloom run`, worktrees are **automatically created** as needed based on task `branch` definitions—you don't need to manage them manually. The manual commands are only needed if you want to work outside of Bloom:
 
 ```bash
 bloom repo worktree add backend feature/auth
@@ -294,14 +302,21 @@ bloom -f project.yaml plan
 ## Task Schema
 
 ```yaml
+# Top-level git configuration
+git:
+  push_to_remote: false          # Push branches to remote after each task
+  auto_cleanup_merged: false     # Delete local branches after merge
+
 tasks:
   - id: kebab-case-id
     title: Short description
     status: todo                    # todo|ready_for_agent|assigned|in_progress|done|blocked
     phase: 1                        # Group related tasks
     depends_on: [other-task-id]     # Must complete first
-    repo: ./path/to/repo            # Working directory
-    worktree: branch-name           # Git worktree for isolation
+    repo: repo-name                 # Repository name (from bloom repo list)
+    branch: feature/my-work         # Working branch for this task
+    base_branch: main               # Branch to create from (default: repo's default)
+    merge_into: main                # Branch to merge into when done
     agent_name: claude-code         # Assign to specific agent
     checkpoint: true                # Requires human approval before downstream tasks
     instructions: |                 # Detailed instructions
@@ -312,10 +327,64 @@ tasks:
     subtasks: []                    # Nested tasks
 ```
 
+## Git Workflow
+
+Bloom manages git branches automatically to enable parallel agent work without conflicts.
+
+### How It Works
+
+1. **Lazy Worktree Creation**: Worktrees are created only when an agent picks up a task
+2. **Auto Pull**: Before creating a worktree, Bloom pulls the latest from the base branch
+3. **Post-Task Validation**: After task completion, Bloom checks for uncommitted changes
+4. **Auto Push**: If `push_to_remote: true`, Bloom pushes completed work
+5. **Auto Cleanup**: If `auto_cleanup_merged: true`, merged branches are deleted
+
+### Branching Patterns
+
+**Pattern 1: Feature Branch with Merge**
+```yaml
+- id: implement-feature
+  repo: my-app
+  branch: feature/new-feature
+  base_branch: main
+  merge_into: main
+```
+Agent creates branch from `main`, does work, merges back to `main`.
+
+**Pattern 2: Sequential Tasks on Same Branch**
+```yaml
+- id: task-1
+  repo: my-app
+  branch: feature/big-feature
+  base_branch: main
+  # No merge - intermediate task
+
+- id: task-2
+  depends_on: [task-1]
+  repo: my-app
+  branch: feature/big-feature
+  merge_into: main  # Only final task merges
+```
+
+**Pattern 3: Work on Existing Branch**
+```yaml
+- id: add-component
+  repo: my-app
+  branch: develop
+  # No base_branch - branch exists
+  # No merge_into - no merge needed
+```
+
+### Git Configuration
+
+Set in `tasks.yaml`:
+- `push_to_remote: true` - Push to remote after each task completes
+- `auto_cleanup_merged: true` - Delete local branches that have been merged
+
 ## Key Concepts
 
 - **Phases**: Group tasks into numbered phases (1, 2, 3...)
 - **Checkpoints**: Tasks with `checkpoint: true` at phase boundaries require human approval
 - **Dependencies**: `depends_on` enforces task ordering
-- **Worktrees**: Git worktrees isolate parallel work (one agent per worktree)
+- **Branches**: Each task specifies a working branch; worktrees are created automatically
 - **Priming**: Tasks auto-change from `todo` to `ready_for_agent` when deps complete

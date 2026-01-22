@@ -312,6 +312,10 @@ export async function createRepo(
   // Set default branch
   runGit(["symbolic-ref", "HEAD", `refs/heads/${defaultBranch}`], bareRepoPath);
 
+  // Configure git user for commits (needed in CI where global config may not exist)
+  runGit(["config", "user.email", "bloom@localhost"], bareRepoPath);
+  runGit(["config", "user.name", "Bloom"], bareRepoPath);
+
   // Create worktree for default branch with orphan (no commits yet)
   const worktreePath = getWorktreePath(bloomDir, name, defaultBranch);
   console.log(`Creating worktree for '${defaultBranch}' branch...`);
@@ -372,6 +376,10 @@ export async function createRepo(
   const readmeContent = `# ${name}\n\nA new repository created with bloom.\n`;
   const readmePath = join(worktreePath, "README.md");
   await Bun.write(readmePath, readmeContent);
+
+  // Configure git user for commits (needed in CI where global config may not exist)
+  runGit(["config", "user.email", "bloom@localhost"], worktreePath);
+  runGit(["config", "user.name", "Bloom"], worktreePath);
 
   runGit(["add", "README.md"], worktreePath);
   runGit(["commit", "-m", "Initial commit"], worktreePath);
@@ -648,7 +656,7 @@ export async function addWorktree(
   bloomDir: string,
   repoName: string,
   branch: string,
-  options?: { create?: boolean }
+  options?: { create?: boolean; baseBranch?: string }
 ): Promise<{ success: boolean; path: string; error?: string }> {
   const bareRepoPath = getBareRepoPath(bloomDir, repoName);
   const worktreePath = getWorktreePath(bloomDir, repoName, branch);
@@ -662,9 +670,32 @@ export async function addWorktree(
   }
 
   let result: { success: boolean; output: string; error: string };
+
   if (options?.create) {
     // Create new branch and worktree
-    result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+    if (options.baseBranch) {
+      // Create from specific base branch
+      // First check if base branch exists locally or remotely
+      const baseExists = branchExists(bareRepoPath, options.baseBranch);
+      let startPoint: string;
+
+      if (baseExists.local) {
+        startPoint = options.baseBranch;
+      } else if (baseExists.remote) {
+        startPoint = `origin/${options.baseBranch}`;
+      } else {
+        return {
+          success: false,
+          path: "",
+          error: `Base branch '${options.baseBranch}' does not exist locally or remotely`,
+        };
+      }
+
+      result = runGit(["worktree", "add", "-b", branch, worktreePath, startPoint], bareRepoPath);
+    } else {
+      // Create from current HEAD
+      result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+    }
   } else {
     // Checkout existing branch
     result = runGit(["worktree", "add", worktreePath, branch], bareRepoPath);
@@ -744,4 +775,361 @@ export async function listWorktrees(
 
   // Filter out the bare repo itself
   return worktrees.filter((w) => w.branch !== "");
+}
+
+// =============================================================================
+// Git Status and Validation
+// =============================================================================
+
+export interface GitStatusResult {
+  exists: boolean;
+  clean: boolean;
+  hasUncommittedChanges: boolean;
+  hasUntrackedFiles: boolean;
+  hasStagedChanges: boolean;
+  modifiedFiles: string[];
+  untrackedFiles: string[];
+  stagedFiles: string[];
+}
+
+/**
+ * Check if a worktree has uncommitted changes.
+ */
+export function getWorktreeStatus(worktreePath: string): GitStatusResult {
+  if (!existsSync(worktreePath)) {
+    return {
+      exists: false,
+      clean: true,
+      hasUncommittedChanges: false,
+      hasUntrackedFiles: false,
+      hasStagedChanges: false,
+      modifiedFiles: [],
+      untrackedFiles: [],
+      stagedFiles: [],
+    };
+  }
+
+  const result = runGit(["status", "--porcelain"], worktreePath);
+  if (!result.success) {
+    return {
+      exists: true,
+      clean: true,
+      hasUncommittedChanges: false,
+      hasUntrackedFiles: false,
+      hasStagedChanges: false,
+      modifiedFiles: [],
+      untrackedFiles: [],
+      stagedFiles: [],
+    };
+  }
+
+  // Don't use trim() - leading spaces are significant in git status porcelain format
+  const lines = result.output.split("\n").filter((line) => line.length > 0);
+  const modifiedFiles: string[] = [];
+  const untrackedFiles: string[] = [];
+  const stagedFiles: string[] = [];
+
+  for (const line of lines) {
+    const indexStatus = line[0];
+    const workTreeStatus = line[1];
+    const file = line.slice(3);
+
+    if (indexStatus === "?") {
+      untrackedFiles.push(file);
+    } else {
+      if (indexStatus !== " " && indexStatus !== "?") {
+        stagedFiles.push(file);
+      }
+      if (workTreeStatus !== " " && workTreeStatus !== "?") {
+        modifiedFiles.push(file);
+      }
+    }
+  }
+
+  return {
+    exists: true,
+    clean: lines.length === 0,
+    hasUncommittedChanges: modifiedFiles.length > 0 || stagedFiles.length > 0,
+    hasUntrackedFiles: untrackedFiles.length > 0,
+    hasStagedChanges: stagedFiles.length > 0,
+    modifiedFiles,
+    untrackedFiles,
+    stagedFiles,
+  };
+}
+
+/**
+ * Check if a branch exists locally or remotely.
+ */
+export function branchExists(bareRepoPath: string, branch: string): { local: boolean; remote: boolean } {
+  const localResult = runGit(["rev-parse", "--verify", `refs/heads/${branch}`], bareRepoPath);
+  const remoteResult = runGit(["rev-parse", "--verify", `refs/remotes/origin/${branch}`], bareRepoPath);
+
+  return {
+    local: localResult.success,
+    remote: remoteResult.success,
+  };
+}
+
+/**
+ * Push a branch to remote.
+ */
+export function pushBranch(
+  worktreePath: string,
+  branch: string,
+  options?: { setUpstream?: boolean }
+): { success: boolean; error?: string } {
+  const args = ["push"];
+  if (options?.setUpstream) {
+    args.push("-u", "origin", branch);
+  } else {
+    args.push("origin", branch);
+  }
+
+  const result = runGit(args, worktreePath);
+  return {
+    success: result.success,
+    error: result.success ? undefined : result.error,
+  };
+}
+
+/**
+ * Get the current branch of a worktree.
+ */
+export function getCurrentBranch(worktreePath: string): string | null {
+  const result = runGit(["rev-parse", "--abbrev-ref", "HEAD"], worktreePath);
+  if (!result.success) return null;
+  return result.output.trim();
+}
+
+/**
+ * Merge a source branch into the current branch (target worktree).
+ * Must be run from the target worktree where the target branch is checked out.
+ */
+export function mergeBranch(
+  worktreePath: string,
+  sourceBranch: string,
+  options?: { message?: string; noFf?: boolean }
+): { success: boolean; error?: string; output?: string } {
+  const args = ["merge"];
+
+  if (options?.noFf) {
+    args.push("--no-ff");
+  }
+
+  if (options?.message) {
+    args.push("-m", options.message);
+  }
+
+  args.push(sourceBranch);
+
+  const result = runGit(args, worktreePath);
+  return {
+    success: result.success,
+    error: result.success ? undefined : result.error,
+    output: result.output,
+  };
+}
+
+/**
+ * Delete a local branch (after it's been merged).
+ */
+export function deleteLocalBranch(
+  bareRepoPath: string,
+  branch: string,
+  options?: { force?: boolean }
+): { success: boolean; error?: string } {
+  const args = ["branch", options?.force ? "-D" : "-d", branch];
+  const result = runGit(args, bareRepoPath);
+  return {
+    success: result.success,
+    error: result.success ? undefined : result.error,
+  };
+}
+
+/**
+ * Find branches that have been merged into a target branch.
+ */
+export function getMergedBranches(bareRepoPath: string, targetBranch: string): string[] {
+  const result = runGit(["branch", "--merged", targetBranch], bareRepoPath);
+  if (!result.success) return [];
+
+  return result.output
+    .split("\n")
+    .map((line) => line.trim().replace(/^\* /, ""))
+    .filter((branch) => branch && branch !== targetBranch);
+}
+
+/**
+ * Clean up merged branches.
+ * Returns list of deleted branches.
+ */
+export async function cleanupMergedBranches(
+  bloomDir: string,
+  repoName: string,
+  targetBranch: string
+): Promise<{ deleted: string[]; failed: Array<{ branch: string; error: string }> }> {
+  const bareRepoPath = getBareRepoPath(bloomDir, repoName);
+  const mergedBranches = getMergedBranches(bareRepoPath, targetBranch);
+
+  const deleted: string[] = [];
+  const failed: Array<{ branch: string; error: string }> = [];
+
+  // Get list of worktrees to avoid deleting branches with active worktrees
+  const worktrees = await listWorktrees(bloomDir, repoName);
+  const worktreeBranches = new Set(worktrees.map((w) => w.branch));
+
+  for (const branch of mergedBranches) {
+    // Skip if there's an active worktree for this branch
+    if (worktreeBranches.has(branch)) {
+      // First remove the worktree
+      const removeResult = await removeWorktree(bloomDir, repoName, branch);
+      if (!removeResult.success) {
+        failed.push({ branch, error: `Cannot remove worktree: ${removeResult.error}` });
+        continue;
+      }
+    }
+
+    const deleteResult = deleteLocalBranch(bareRepoPath, branch);
+    if (deleteResult.success) {
+      deleted.push(branch);
+    } else {
+      failed.push({ branch, error: deleteResult.error || "Unknown error" });
+    }
+  }
+
+  return { deleted, failed };
+}
+
+// =============================================================================
+// Merge Lock - Prevents concurrent merges to the same branch
+// =============================================================================
+
+export interface MergeLock {
+  agentName: string;
+  sourceBranch: string;
+  targetBranch: string;
+  acquiredAt: string;
+  pid: number;
+}
+
+function getMergeLockDir(bloomDir: string): string {
+  return join(bloomDir, ".merge-locks");
+}
+
+function getMergeLockPath(bloomDir: string, repoName: string, targetBranch: string): string {
+  // Sanitize branch name for filename
+  const safeBranch = targetBranch.replace(/\//g, "_");
+  return join(getMergeLockDir(bloomDir), `${repoName}-${safeBranch}.lock`);
+}
+
+/**
+ * Acquire a merge lock for a target branch. Returns true if lock acquired.
+ * If another agent holds the lock, returns false with info about the holder.
+ */
+export async function acquireMergeLock(
+  bloomDir: string,
+  repoName: string,
+  targetBranch: string,
+  agentName: string,
+  sourceBranch: string
+): Promise<{ acquired: boolean; holder?: MergeLock }> {
+  const lockDir = getMergeLockDir(bloomDir);
+  const lockPath = getMergeLockPath(bloomDir, repoName, targetBranch);
+
+  // Ensure lock directory exists
+  if (!existsSync(lockDir)) {
+    mkdirSync(lockDir, { recursive: true });
+  }
+
+  // Check if lock exists
+  if (existsSync(lockPath)) {
+    try {
+      const content = await Bun.file(lockPath).text();
+      const holder: MergeLock = JSON.parse(content);
+
+      // Check if lock is stale (older than 10 minutes or process is dead)
+      const lockAge = Date.now() - new Date(holder.acquiredAt).getTime();
+      const isStale = lockAge > 10 * 60 * 1000; // 10 minutes
+
+      // Check if holder process is still alive
+      let processAlive = false;
+      try {
+        process.kill(holder.pid, 0); // Signal 0 just checks if process exists
+        processAlive = true;
+      } catch {
+        processAlive = false;
+      }
+
+      if (!isStale && processAlive) {
+        return { acquired: false, holder };
+      }
+      // Lock is stale or process is dead, we can take it
+    } catch {
+      // Invalid lock file, we can take it
+    }
+  }
+
+  // Acquire the lock
+  const lock: MergeLock = {
+    agentName,
+    sourceBranch,
+    targetBranch,
+    acquiredAt: new Date().toISOString(),
+    pid: process.pid,
+  };
+
+  await Bun.write(lockPath, JSON.stringify(lock, null, 2));
+  return { acquired: true };
+}
+
+/**
+ * Release a merge lock.
+ */
+export function releaseMergeLock(bloomDir: string, repoName: string, targetBranch: string): void {
+  const lockPath = getMergeLockPath(bloomDir, repoName, targetBranch);
+  if (existsSync(lockPath)) {
+    rmSync(lockPath);
+  }
+}
+
+/**
+ * Wait for a merge lock to become available, with progress callback.
+ * Returns when lock is acquired.
+ */
+export async function waitForMergeLock(
+  bloomDir: string,
+  repoName: string,
+  targetBranch: string,
+  agentName: string,
+  sourceBranch: string,
+  options?: {
+    pollIntervalMs?: number;
+    onWaiting?: (holder: MergeLock, waitTimeMs: number) => void;
+    maxWaitMs?: number;
+  }
+): Promise<{ acquired: boolean; timedOut?: boolean }> {
+  const pollInterval = options?.pollIntervalMs ?? 5000;
+  const maxWait = options?.maxWaitMs ?? 5 * 60 * 1000; // 5 minutes default
+  const startTime = Date.now();
+
+  while (true) {
+    const result = await acquireMergeLock(bloomDir, repoName, targetBranch, agentName, sourceBranch);
+
+    if (result.acquired) {
+      return { acquired: true };
+    }
+
+    const waitTime = Date.now() - startTime;
+
+    if (waitTime >= maxWait) {
+      return { acquired: false, timedOut: true };
+    }
+
+    if (options?.onWaiting && result.holder) {
+      options.onWaiting(result.holder, waitTime);
+    }
+
+    await Bun.sleep(pollInterval);
+  }
 }

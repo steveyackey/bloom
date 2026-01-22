@@ -99,12 +99,12 @@ export async function cmdDashboard(): Promise<void> {
       console.log(chalk.bold.green("═══════════════════════════════════════════════\n"));
     }
 
-    const activeAgents = new Map<string, { task: string; worktree?: string }[]>();
+    const activeAgents = new Map<string, { task: string; branch?: string }[]>();
     function collectActive(tasks: Task[]) {
       for (const task of tasks) {
         if (task.agent_name && (task.status === "in_progress" || task.status === "assigned")) {
           const existing = activeAgents.get(task.agent_name) || [];
-          existing.push({ task: task.id, worktree: task.worktree });
+          existing.push({ task: task.id, branch: task.branch });
           activeAgents.set(task.agent_name, existing);
         }
         collectActive(task.subtasks);
@@ -116,8 +116,8 @@ export async function cmdDashboard(): Promise<void> {
       console.log(chalk.bold("Active Agents:"));
       for (const [agent, tasks] of [...activeAgents.entries()].sort()) {
         const taskList = tasks.map((t) => chalk.yellow(t.task)).join(", ");
-        const worktree = tasks[0]?.worktree ? chalk.dim(` [${tasks[0].worktree}]`) : "";
-        console.log(`  ${chalk.cyan.bold(agent)}: ${taskList}${worktree}`);
+        const branchInfo = tasks[0]?.branch ? chalk.dim(` [${tasks[0].branch}]`) : "";
+        console.log(`  ${chalk.cyan.bold(agent)}: ${taskList}${branchInfo}`);
       }
       console.log();
     }
@@ -129,8 +129,8 @@ export async function cmdDashboard(): Promise<void> {
       for (const task of tasks!) {
         const icon = colorStatusIcon(task.status);
         const agent = task.agent_name ? chalk.dim(` (${task.agent_name})`) : "";
-        const worktree = task.worktree ? chalk.blue(` [${task.worktree}]`) : "";
-        console.log(`    ${icon} ${chalk.yellow(task.id)}: ${task.title}${agent}${worktree}`);
+        const branchInfo = task.branch ? chalk.blue(` [${task.branch}]`) : "";
+        console.log(`    ${icon} ${chalk.yellow(task.id)}: ${task.title}${agent}${branchInfo}`);
 
         for (const sub of task.subtasks) {
           const subIcon = colorStatusIcon(sub.status);
@@ -195,7 +195,7 @@ export async function cmdShow(taskId: string): Promise<void> {
   console.log(`${chalk.bold("Status:")}      ${colorStatus(task.status)}`);
   if (task.phase) console.log(`${chalk.bold("Phase:")}       ${chalk.magenta(task.phase)}`);
   if (task.repo) console.log(`${chalk.bold("Repo:")}        ${chalk.blue(task.repo)}`);
-  if (task.worktree) console.log(`${chalk.bold("Worktree:")}    ${chalk.blue(task.worktree)}`);
+  if (task.branch) console.log(`${chalk.bold("Branch:")}      ${chalk.blue(task.branch)}`);
   if (task.agent_name) console.log(`${chalk.bold("Agent:")}       ${chalk.cyan(task.agent_name)}`);
   if (task.depends_on.length)
     console.log(`${chalk.bold("Depends on:")}  ${task.depends_on.map((d) => chalk.yellow(d)).join(", ")}`);
@@ -351,25 +351,25 @@ export async function cmdValidate(): Promise<void> {
   const tasksFile = await loadTasks(getTasksFile());
   let hasErrors = false;
 
-  const worktreeAgents = new Map<string, { taskId: string; agent: string }[]>();
+  const branchAgents = new Map<string, { taskId: string; agent: string }[]>();
 
-  function collectWorktrees(tasks: Task[]) {
+  function collectBranches(tasks: Task[]) {
     for (const task of tasks) {
-      if (task.worktree && task.agent_name && (task.status === "in_progress" || task.status === "assigned")) {
-        const existing = worktreeAgents.get(task.worktree) || [];
+      if (task.branch && task.agent_name && (task.status === "in_progress" || task.status === "assigned")) {
+        const existing = branchAgents.get(task.branch) || [];
         existing.push({ taskId: task.id, agent: task.agent_name });
-        worktreeAgents.set(task.worktree, existing);
+        branchAgents.set(task.branch, existing);
       }
-      collectWorktrees(task.subtasks);
+      collectBranches(task.subtasks);
     }
   }
-  collectWorktrees(tasksFile.tasks);
+  collectBranches(tasksFile.tasks);
 
-  for (const [worktree, agents] of worktreeAgents) {
+  for (const [branch, agents] of branchAgents) {
     const uniqueAgents = new Set(agents.map((a) => a.agent));
     if (uniqueAgents.size > 1) {
       hasErrors = true;
-      console.error(chalk.red(`ERROR: Multiple agents in worktree '${worktree}':`));
+      console.error(chalk.red(`ERROR: Multiple agents on branch '${branch}':`));
       for (const { taskId, agent } of agents) {
         console.error(chalk.red(`  - ${agent} (task: ${taskId})`));
       }

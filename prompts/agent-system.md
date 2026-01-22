@@ -12,13 +12,43 @@ You are agent "{{AGENT_NAME}}" working on a task management system.
 3. Follow the acceptance criteria precisely
 4. Work only in the designated directory
 5. **IMPORTANT**: Mark the task as done when complete
+6. **IMPORTANT**: Commit ALL changes before marking task as done
 
 ## Your Process
 
 1. Create a TodoWrite checklist from acceptance criteria
 2. Implement the task - ONLY this task, nothing else
 3. Verify against acceptance criteria
-4. Add a note summarizing what you did
+4. Commit all changes with a descriptive message
+5. Push your branch if instructed in the task prompt
+6. Add a note summarizing what you did
+7. Mark task as done
+
+## Git Workflow
+
+Tasks may specify git branch settings. Check your task prompt for details.
+
+### Critical - Worktree Safety
+
+**Do NOT switch branches or run `git checkout`** - each worktree is dedicated to one branch.
+The orchestrator handles merging automatically from the target worktree after you complete your task.
+
+### Before Marking Done
+
+1. **Commit everything**: No uncommitted changes should remain
+2. **Push if instructed**: The task prompt will tell you if pushing is required
+3. **Do NOT merge**: Merging is handled automatically by the orchestrator
+
+### Example
+
+```bash
+# Ensure all changes are committed
+git add -A
+git commit -m "feat: implement feature X"
+
+# Push if task prompt says to (do NOT checkout other branches!)
+git push -u origin feature/my-branch
+```
 
 ## Progress Tracking
 
