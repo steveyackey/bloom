@@ -581,19 +581,14 @@ export async function removeRepo(bloomDir: string, repoName: string): Promise<{ 
     return { success: false, error: `Repository '${repoName}' not found in config` };
   }
 
-  const bareRepoPath = getBareRepoPath(bloomDir, repoName);
   const worktreesDir = getWorktreesDir(bloomDir, repoName);
 
-  // Remove worktrees directory
+  // Remove the entire repo directory (includes bare repo and all worktrees)
+  // The bare repo lives at {worktreesDir}/{repoName}.git, so removing worktreesDir
+  // removes everything
   if (existsSync(worktreesDir)) {
-    console.log(`Removing worktrees: ${worktreesDir}`);
+    console.log(`Removing repository: ${worktreesDir}`);
     rmSync(worktreesDir, { recursive: true, force: true });
-  }
-
-  // Remove bare repo
-  if (existsSync(bareRepoPath)) {
-    console.log(`Removing bare repo: ${bareRepoPath}`);
-    rmSync(bareRepoPath, { recursive: true, force: true });
   }
 
   // Update repos file

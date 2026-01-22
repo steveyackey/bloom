@@ -2,6 +2,7 @@
 // Task File I/O and Helper Functions
 // =============================================================================
 
+import { existsSync } from "node:fs";
 import YAML from "yaml";
 import { askQuestion } from "./human-queue";
 import { type Task, type TaskStatus, type TasksFile, validateTasksFile } from "./task-schema";
@@ -11,6 +12,9 @@ import { type Task, type TaskStatus, type TasksFile, validateTasksFile } from ".
 // =============================================================================
 
 export async function loadTasks(tasksFile: string): Promise<TasksFile> {
+  if (!existsSync(tasksFile)) {
+    throw new Error(`Tasks file not found: ${tasksFile}`);
+  }
   const content = await Bun.file(tasksFile).text();
   const parsed = YAML.parse(content);
   return validateTasksFile(parsed);
