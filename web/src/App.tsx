@@ -33,14 +33,15 @@ function App() {
 
       {/* Hero */}
       <section className="hero">
+        <div className="hero-background">
+          <img src="/bloom-hero.jpg" alt="" className="hero-bg-image" />
+          <div className="hero-overlay" />
+        </div>
         <div className="container hero-container">
-          <div className="hero-glow" />
-          <img src="/bloom-logo.png" alt="Bloom" className="hero-logo" />
-          <h1 className="hero-title">
-            Multi-Agent<br />Task Orchestration
-          </h1>
+          <h1 className="hero-brand">BLOOM</h1>
+          <p className="hero-tagline">Multi-Agent Task Orchestration</p>
           <p className="hero-subtitle">
-            For teams and solo developers. From PRD to production with AI agents.<br />
+            From PRD to production with AI agents.<br />
             Collaborate on requirements, validate at checkpoints, ship faster.
           </p>
           <div className="hero-actions">
