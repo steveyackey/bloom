@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { formatProjectName, createProject } from "../../src/services/project-service";
+import { join } from "node:path";
+import { createProject, formatProjectName } from "../../src/services/project-service";
 
 describe("project-service", () => {
   describe("formatProjectName", () => {

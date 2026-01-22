@@ -4,21 +4,20 @@
  */
 
 export {
-  formatProjectName,
+  buildReposContext,
+  type RefineFile,
+  runGenerateSession,
+  runPlanSession,
+  runRefineSession,
+} from "./planning-service";
+export {
   createProject,
+  formatProjectName,
   runCreateSession,
 } from "./project-service";
 
 export {
-  buildReposContext,
-  runPlanSession,
-  runGenerateSession,
-  runRefineSession,
-  type RefineFile,
-} from "./planning-service";
-
-export {
   formatPullResults,
-  pullAndLogResults,
   type PullResult,
+  pullAndLogResults,
 } from "./repo-service";

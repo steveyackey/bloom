@@ -7,8 +7,8 @@ import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
 import { ClaudeAgentProvider } from "../agents";
-import { loadPrompt } from "../prompts";
 import { BLOOM_DIR } from "../commands/context";
+import { loadPrompt } from "../prompts";
 
 // =============================================================================
 // Types
@@ -86,7 +86,7 @@ export function formatProjectName(input: string | string[]): FormattedProjectNam
 export async function createProject(
   projectName: string,
   baseDir?: string,
-  workspaceDir?: string,
+  workspaceDir?: string
 ): Promise<CreateResult> {
   const cwd = baseDir || process.cwd();
   const projectDir = resolve(cwd, projectName);

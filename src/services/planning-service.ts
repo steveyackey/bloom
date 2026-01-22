@@ -61,11 +61,7 @@ export async function buildReposContext(bloomDir: string): Promise<string> {
 /**
  * Runs a planning session with the AI.
  */
-export async function runPlanSession(
-  workingDir: string,
-  planFile: string,
-  bloomDir: string,
-): Promise<void> {
+export async function runPlanSession(workingDir: string, planFile: string, bloomDir: string): Promise<void> {
   const gitRoot = findGitRoot() || workingDir;
 
   // Build repos context
@@ -101,11 +97,7 @@ export async function runPlanSession(
 /**
  * Runs a task generation session.
  */
-export async function runGenerateSession(
-  workingDir: string,
-  tasksFile: string,
-  bloomDir: string,
-): Promise<void> {
+export async function runGenerateSession(workingDir: string, tasksFile: string, bloomDir: string): Promise<void> {
   // Build repos context
   const reposContext = await buildReposContext(bloomDir);
 
@@ -141,11 +133,7 @@ IMPORTANT: After writing tasks.yaml, you MUST validate it by running \`bloom val
 /**
  * Runs a refinement session for PRD or plan.
  */
-export async function runRefineSession(
-  workingDir: string,
-  selectedFile: RefineFile,
-  bloomDir: string,
-): Promise<void> {
+export async function runRefineSession(workingDir: string, selectedFile: RefineFile, bloomDir: string): Promise<void> {
   // bloomDir is accepted for API consistency but not used directly in this function
   // (the refine session doesn't need repos context - it works on local project files)
   void bloomDir;

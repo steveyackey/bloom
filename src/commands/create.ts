@@ -1,6 +1,6 @@
 // Create Command - Create a new project with PRD template
 import chalk from "chalk";
-import { formatProjectName, createProject, runCreateSession } from "../services";
+import { createProject, formatProjectName, runCreateSession } from "../services";
 
 export { createProject }; // Re-export for backwards compatibility
 

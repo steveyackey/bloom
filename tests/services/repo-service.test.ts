@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { formatPullResults, pullAndLogResults, type PullAllResult } from "../../src/services/repo-service";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { formatPullResults, type PullAllResult, pullAndLogResults } from "../../src/services/repo-service";
 
 describe("repo-service", () => {
   describe("formatPullResults", () => {
