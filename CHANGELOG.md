@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.19](https://github.com/steveyackey/bloom/compare/bloom-v0.1.18...bloom-v0.1.19) (2026-01-22)
+
+
+### Features
+
+* search upward for bloom.config.yaml to find workspace root ([52b5c4b](https://github.com/steveyackey/bloom/commit/52b5c4bf99d779fed0286d5b8a502fa8f0133da4))
+* **web:** redesign hero section with full-width background image ([30247ef](https://github.com/steveyackey/bloom/commit/30247ef54d0b65fe40af9d36af700747e462466c))
+
 ## [0.1.18](https://github.com/steveyackey/bloom/compare/bloom-v0.1.17...bloom-v0.1.18) (2026-01-21)
 
 
