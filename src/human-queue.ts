@@ -362,6 +362,94 @@ export async function dismissInterjection(id: string): Promise<boolean> {
 }
 
 // =============================================================================
+// Interjection Triggers (for programmatic interject requests)
+// =============================================================================
+
+export interface InterjectTrigger {
+  agentName: string;
+  reason?: string;
+  createdAt: string;
+}
+
+function getTriggerDir(): string {
+  return join(dirname(getTasksFile()), ".interjections", "triggers");
+}
+
+function getTriggerPath(agentName: string): string {
+  return join(getTriggerDir(), `${agentName}.json`);
+}
+
+/**
+ * Create a trigger file to request interject of a running agent.
+ * The TUI watches for these and processes them.
+ */
+export async function triggerInterject(agentName: string, reason?: string): Promise<void> {
+  ensureDir(getTriggerDir());
+
+  const trigger: InterjectTrigger = {
+    agentName,
+    reason,
+    createdAt: new Date().toISOString(),
+  };
+
+  await writeJson(getTriggerPath(agentName), trigger);
+  logger.info(`Interject trigger created for ${agentName}`);
+}
+
+/**
+ * List pending interject triggers.
+ */
+export async function listTriggers(): Promise<InterjectTrigger[]> {
+  ensureDir(getTriggerDir());
+  const files = readdirSync(getTriggerDir()).filter((f) => f.endsWith(".json"));
+  const triggers: InterjectTrigger[] = [];
+
+  for (const file of files) {
+    try {
+      const trigger = await readJson<InterjectTrigger>(join(getTriggerDir(), file));
+      if (trigger) triggers.push(trigger);
+    } catch {
+      /* skip invalid files */
+    }
+  }
+
+  return triggers;
+}
+
+/**
+ * Consume (delete) a trigger after processing it.
+ */
+export function consumeTrigger(agentName: string): boolean {
+  const path = getTriggerPath(agentName);
+  if (!existsSync(path)) return false;
+  unlinkSync(path);
+  logger.info(`Trigger consumed for ${agentName}`);
+  return true;
+}
+
+/**
+ * Watch for new interject triggers.
+ */
+export function watchTriggers(handler: (trigger: InterjectTrigger) => void): () => void {
+  ensureDir(getTriggerDir());
+
+  const watcher = watch(getTriggerDir(), async (_, filename) => {
+    if (!filename?.endsWith(".json")) return;
+
+    const agentName = filename.replace(".json", "");
+    const trigger = await readJson<InterjectTrigger>(getTriggerPath(agentName));
+
+    if (trigger) {
+      handler(trigger);
+    }
+  });
+
+  return () => {
+    watcher.close();
+  };
+}
+
+// =============================================================================
 // Answer Helpers
 // =============================================================================
 

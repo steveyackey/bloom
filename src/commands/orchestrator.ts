@@ -15,10 +15,13 @@ import {
   getWorktreeStatus,
   listRepos,
   listWorktrees,
+  mergeBranch,
   pullDefaultBranch,
   pushBranch,
+  releaseMergeLock,
+  waitForMergeLock,
 } from "../repos";
-import { type GitConfig, getTaskBranch, getTaskMergeTarget, type Task } from "../task-schema";
+import { type GitConfig, getTaskBranch, getTaskMergeTarget } from "../task-schema";
 import {
   getAllAgents,
   getAllRepos,
@@ -51,6 +54,8 @@ interface TaskGetResult {
   prompt?: string;
   taskCli?: string;
   gitConfig?: GitConfig;
+  /** Existing session ID if resuming interrupted work */
+  sessionId?: string;
 }
 
 interface AgentConfig {
@@ -129,30 +134,22 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
     prompt += `- **Base branch**: \`${gitInfo.baseBranch}\`\n`;
 
     if (gitInfo.mergeInto) {
-      prompt += `- **Merge into**: \`${gitInfo.mergeInto}\` when task is complete\n\n`;
-      prompt += `### Before marking done:\n`;
-      prompt += `1. Commit all changes with a descriptive message\n`;
-      prompt += `2. Merge \`${gitInfo.branch}\` into \`${gitInfo.mergeInto}\`:\n`;
+      prompt += `- **Merge target**: \`${gitInfo.mergeInto}\` (handled automatically after task completes)\n\n`;
+    }
+
+    // IMPORTANT: Agents should NOT switch branches or merge - worktrees require each branch
+    // to be checked out in only one place. The CLI handles merging from the target worktree.
+    prompt += `### Important - Worktree Safety\n`;
+    prompt += `**Do NOT switch branches or run \`git checkout\`** - this worktree is dedicated to \`${gitInfo.branch}\`.\n`;
+    prompt += `The merge will be handled automatically by the orchestrator after you mark the task done.\n\n`;
+
+    prompt += `### Before marking done:\n`;
+    prompt += `1. Commit all changes with a descriptive message\n`;
+    if (gitConfig?.push_to_remote) {
+      prompt += `2. Push your branch to remote:\n`;
       prompt += `   \`\`\`bash\n`;
-      prompt += `   git checkout ${gitInfo.mergeInto}\n`;
-      prompt += `   git merge ${gitInfo.branch} --no-ff -m "Merge ${gitInfo.branch}: ${task.title}"\n`;
+      prompt += `   git push -u origin ${gitInfo.branch}\n`;
       prompt += `   \`\`\`\n`;
-      if (gitConfig?.push_to_remote) {
-        prompt += `3. Push the merge to remote:\n`;
-        prompt += `   \`\`\`bash\n`;
-        prompt += `   git push origin ${gitInfo.mergeInto}\n`;
-        prompt += `   \`\`\`\n`;
-      }
-    } else {
-      prompt += `- **No merge required** - work stays on this branch\n\n`;
-      prompt += `### Before marking done:\n`;
-      prompt += `1. Commit all changes with a descriptive message\n`;
-      if (gitConfig?.push_to_remote) {
-        prompt += `2. Push to remote:\n`;
-        prompt += `   \`\`\`bash\n`;
-        prompt += `   git push -u origin ${gitInfo.branch}\n`;
-        prompt += `   \`\`\`\n`;
-      }
     }
     prompt += `\n`;
   }
@@ -176,7 +173,30 @@ Begin working on the task now.`;
     prompt,
     taskCli,
     gitConfig,
+    sessionId: task.session_id, // Resume existing session if available
   };
+}
+
+/**
+ * Save the session ID to a task for later resumption.
+ */
+async function saveTaskSessionId(taskId: string, sessionId: string): Promise<void> {
+  const tasksFile = await loadTasks(getTasksFile());
+
+  function updateSession(tasks: import("../task-schema").Task[]): boolean {
+    for (const task of tasks) {
+      if (task.id === taskId) {
+        task.session_id = sessionId;
+        return true;
+      }
+      if (updateSession(task.subtasks)) return true;
+    }
+    return false;
+  }
+
+  if (updateSession(tasksFile.tasks)) {
+    await saveTasks(getTasksFile(), tasksFile);
+  }
 }
 
 export async function runAgentWorkLoop(agentName: string): Promise<void> {
@@ -277,8 +297,14 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         startingDirectory: workingDir,
         agentName,
         taskId: taskResult.taskId,
+        sessionId: taskResult.sessionId, // Resume existing session if available
       });
       const duration = Math.round((Date.now() - startTime) / 1000);
+
+      // Save session ID for future resumption
+      if (result.sessionId && taskResult.taskId) {
+        await saveTaskSessionId(taskResult.taskId, result.sessionId);
+      }
 
       if (result.success) {
         agentLog.info(`Task ${taskResult.taskId} completed successfully (${duration}s)`);
@@ -316,9 +342,14 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
               taskId: taskResult.taskId,
               sessionId: result.sessionId, // Resume the same session
             });
+
+            // Save updated session ID
+            if (result.sessionId && taskResult.taskId) {
+              await saveTaskSessionId(taskResult.taskId, result.sessionId);
+            }
           }
 
-          // Push if configured and branch work is done
+          // Push source branch if configured
           if (taskResult.gitConfig?.push_to_remote && taskResult.gitInfo.branch) {
             const postStatus = getWorktreeStatus(taskResult.gitInfo.worktreePath);
             if (postStatus.clean) {
@@ -330,6 +361,147 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
                 agentLog.info(`Pushed ${taskResult.gitInfo.branch} successfully`);
               } else {
                 agentLog.warn(`Failed to push: ${pushResult.error}`);
+              }
+            }
+          }
+
+          // Auto merge into target branch if configured
+          // IMPORTANT: We do this from the TARGET worktree, not the source worktree
+          if (taskResult.gitInfo.mergeInto && taskResult.repo) {
+            const targetWorktreePath = getWorktreePath(BLOOM_DIR, taskResult.repo, taskResult.gitInfo.mergeInto);
+            const targetBranch = taskResult.gitInfo.mergeInto;
+            const sourceBranch = taskResult.gitInfo.branch;
+
+            // Acquire merge lock to prevent concurrent merges to same branch
+            agentLog.info(`Waiting for merge lock on ${targetBranch}...`);
+            const lockResult = await waitForMergeLock(
+              BLOOM_DIR,
+              taskResult.repo,
+              targetBranch,
+              agentName,
+              sourceBranch,
+              {
+                pollIntervalMs: 5000,
+                maxWaitMs: 5 * 60 * 1000, // 5 minutes
+                onWaiting: (holder, waitTimeMs) => {
+                  const waitSecs = Math.round(waitTimeMs / 1000);
+                  agentLog.info(
+                    `Waiting for merge lock (${waitSecs}s) - held by ${holder.agentName} merging ${holder.sourceBranch}`
+                  );
+                },
+              }
+            );
+
+            if (lockResult.timedOut) {
+              agentLog.warn(`Timed out waiting for merge lock on ${targetBranch}. Skipping merge.`);
+            } else {
+              // We have the lock - proceed with merge
+              try {
+                // Check if target worktree exists
+                const targetStatus = getWorktreeStatus(targetWorktreePath);
+                if (targetStatus.exists) {
+                  // Make sure target worktree is clean before merging
+                  if (targetStatus.clean) {
+                    agentLog.info(`Merging ${sourceBranch} into ${targetBranch} from target worktree...`);
+                    const mergeResult = mergeBranch(targetWorktreePath, sourceBranch, {
+                      noFf: true,
+                      message: `Merge ${sourceBranch}: ${taskResult.title}`,
+                    });
+                    if (mergeResult.success) {
+                      agentLog.info(`Merged ${sourceBranch} into ${targetBranch} successfully`);
+
+                      // Push merged target branch if configured
+                      if (taskResult.gitConfig?.push_to_remote) {
+                        agentLog.info(`Pushing ${targetBranch} to remote...`);
+                        const targetPush = pushBranch(targetWorktreePath, targetBranch);
+                        if (targetPush.success) {
+                          agentLog.info(`Pushed ${targetBranch} successfully`);
+                        } else {
+                          agentLog.warn(`Failed to push ${targetBranch}: ${targetPush.error}`);
+                        }
+                      }
+                    } else {
+                      // Merge failed - likely conflicts. Have the agent resolve them.
+                      // NOTE: We still hold the merge lock during conflict resolution,
+                      // so other agents will wait in queue until we're done.
+                      agentLog.warn(`Merge failed: ${mergeResult.error}`);
+                      agentLog.info("Resuming agent to resolve merge conflicts (merge lock held)...");
+
+                      const conflictPrompt = `## Merge Conflict Resolution Required
+
+The merge of \`${sourceBranch}\` into \`${targetBranch}\` has conflicts.
+
+### Context
+- **Task**: ${taskResult.title} (${taskResult.taskId})
+- **Source branch**: \`${sourceBranch}\`
+- **Target branch**: \`${targetBranch}\`
+- **Working directory**: \`${targetWorktreePath}\` (the TARGET worktree, not your original worktree)
+- **Merge lock**: You have exclusive access - other agents are waiting for you to finish
+
+### Your Goal
+Resolve the merge conflicts while preserving the intent of the original task:
+${taskResult.prompt?.split("## Instructions")[1]?.split("## Acceptance Criteria")[0]?.trim() || "See original task instructions."}
+
+### Steps
+1. You are now in the TARGET worktree (\`${targetBranch}\` branch)
+2. Use \`git status\` to see conflicting files
+3. Open each conflicting file and resolve the conflicts
+4. Stage resolved files: \`git add <file>\`
+5. Complete the merge: \`git commit -m "Merge ${sourceBranch}: ${taskResult.title}"\`
+${taskResult.gitConfig?.push_to_remote ? `6. Push the result: \`git push origin ${targetBranch}\`` : ""}
+
+### Important
+- Do NOT switch branches - stay on \`${targetBranch}\`
+- Prioritize preserving the functionality from the task while keeping the target branch stable
+- Work efficiently - other agents may be waiting for this merge lock
+- If conflicts are too complex, abort with \`git merge --abort\` and report the issue`;
+
+                      const conflictResult = await agent.run({
+                        systemPrompt,
+                        prompt: conflictPrompt,
+                        startingDirectory: targetWorktreePath, // Work from target worktree
+                        agentName,
+                        taskId: taskResult.taskId,
+                        sessionId: result.sessionId, // Resume same session for context
+                      });
+
+                      if (conflictResult.sessionId && taskResult.taskId) {
+                        await saveTaskSessionId(taskResult.taskId, conflictResult.sessionId);
+                      }
+
+                      if (conflictResult.success) {
+                        agentLog.info("Agent resolved merge conflicts successfully");
+
+                        // Push if configured
+                        if (taskResult.gitConfig?.push_to_remote) {
+                          const finalStatus = getWorktreeStatus(targetWorktreePath);
+                          if (finalStatus.clean) {
+                            agentLog.info(`Pushing ${targetBranch} to remote...`);
+                            const targetPush = pushBranch(targetWorktreePath, targetBranch);
+                            if (targetPush.success) {
+                              agentLog.info(`Pushed ${targetBranch} successfully`);
+                            } else {
+                              agentLog.warn(`Failed to push ${targetBranch}: ${targetPush.error}`);
+                            }
+                          }
+                        }
+                      } else {
+                        agentLog.warn("Agent could not resolve merge conflicts. Manual intervention needed.");
+                      }
+                    }
+                  } else {
+                    agentLog.warn(`Cannot merge: target worktree (${targetBranch}) has uncommitted changes`);
+                  }
+                } else {
+                  agentLog.warn(
+                    `Cannot merge: target worktree for ${targetBranch} does not exist. ` +
+                      `Create it with: bloom repo worktree add ${taskResult.repo} ${targetBranch}`
+                  );
+                }
+              } finally {
+                // Always release the lock
+                releaseMergeLock(BLOOM_DIR, taskResult.repo, targetBranch);
+                agentLog.debug(`Released merge lock on ${targetBranch}`);
               }
             }
           }

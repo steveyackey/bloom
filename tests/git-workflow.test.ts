@@ -3,14 +3,11 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   addWorktree,
-  branchExists,
-  cleanupMergedBranches,
   createRepo,
   getCurrentBranch,
   getWorktreePath,
   getWorktreeStatus,
   listWorktrees,
-  pushBranch,
 } from "../src/repos";
 import {
   createTask,
@@ -18,7 +15,6 @@ import {
   getTaskBranch,
   getTaskMergeTarget,
   sanitizeBranchName,
-  type Task,
   validateTasksFile,
 } from "../src/task-schema";
 

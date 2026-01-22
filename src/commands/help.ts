@@ -92,6 +92,11 @@ ${section("Human Queue Commands:")}
   ${cmd("wait-answer")} ${arg("<id>")}          Wait for answer (for agents)
   ${cmd("clear-answered")}            Delete all answered questions
 
+${section("Agent Commands:")}
+  ${cmd("agent list")}                List all agents with task counts
+  ${cmd("agent interject")} ${arg("<name>")}   Trigger human takeover for running agent
+    ${chalk.dim("When running in TUI, opens interactive session and auto-resumes agent when done")}
+
 ${section("Interjection Commands:")}
   ${cmd("interject list")}            List pending interjections
   ${cmd("interject resume")} ${arg("<id>")}     Resume an interjected session interactively
@@ -117,6 +122,7 @@ ${section("TUI Controls:")}
   ${chalk.yellow("hjkl/arrows")}   Navigate panes
   ${chalk.yellow("Enter")}         Focus pane
   ${chalk.yellow("Ctrl+B")}        Exit focus
+  ${chalk.yellow("i")}             Interject agent (human takeover)
   ${chalk.yellow("r")}             Restart pane
   ${chalk.yellow("q")}             Quit
 `);

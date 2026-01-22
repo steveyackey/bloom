@@ -46,6 +46,8 @@ export type Task = {
   validation_task_id?: string;
   /** If true, this task requires human approval before downstream tasks can proceed */
   checkpoint?: boolean;
+  /** Claude session ID for resuming interrupted work */
+  session_id?: string;
 };
 
 export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
@@ -66,6 +68,7 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     subtasks: z.array(TaskSchema).default([]),
     validation_task_id: z.string().optional(),
     checkpoint: z.boolean().optional(),
+    session_id: z.string().optional(),
   })
 );
 

@@ -4,7 +4,7 @@ import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
 import { interjectSession } from "./agents";
 import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
-import { createInterjection } from "./human-queue";
+import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 import { spawnTerminal, type TerminalProcess } from "./terminal";
 
@@ -25,6 +25,8 @@ interface Pane {
   config: AgentConfig;
   term: Terminal;
   status: "running" | "stopped" | "error";
+  /** If this is a human takeover pane, the name of the original agent pane */
+  humanTakeoverSource?: string;
 }
 
 type ViewMode = "tiled" | "single";
@@ -43,6 +45,7 @@ export class OrchestratorTUI {
   private rows: number;
   private renderScheduled = false;
   private agentConfigs: AgentConfig[] = [];
+  private stopTriggerWatch?: () => void;
 
   constructor(configs?: AgentConfig[]) {
     this.cols = process.stdout.columns || 80;
@@ -81,6 +84,18 @@ export class OrchestratorTUI {
       this.createPane(config);
     }
 
+    // Watch for interject triggers from CLI/agents
+    this.stopTriggerWatch = watchTriggers((trigger) => {
+      // Find the pane for this agent and interject it
+      const paneIndex = this.panes.findIndex((p) => p.config.name === trigger.agentName);
+      const pane = this.panes[paneIndex];
+      if (paneIndex !== -1 && pane) {
+        pane.term.write(`\r\n[Interject triggered${trigger.reason ? `: ${trigger.reason}` : ""}]\r\n`);
+        consumeTrigger(trigger.agentName);
+        this.interjectPane(paneIndex);
+      }
+    });
+
     // Select first pane (dashboard) after all agents are spawned
     this.selectedIndex = 0;
 
@@ -88,6 +103,11 @@ export class OrchestratorTUI {
   }
 
   private cleanup() {
+    // Stop watching for triggers
+    if (this.stopTriggerWatch) {
+      this.stopTriggerWatch();
+    }
+
     this.panes.forEach((p) => {
       try {
         p.proc?.kill();
@@ -311,6 +331,19 @@ export class OrchestratorTUI {
 
           pane.status = code === 0 ? "stopped" : "error";
           pane.term.write(`\r\n[Process exited with code ${code}]\r\n`);
+
+          // Auto-restart source agent if this was a human takeover pane
+          if (pane.humanTakeoverSource) {
+            pane.term.write(`\r\n[Closing human pane and resuming agent...]\r\n`);
+            // Use setImmediate to avoid issues with the current call stack
+            setImmediate(() => {
+              const paneIndex = this.panes.indexOf(pane);
+              if (paneIndex !== -1) {
+                this.deletePane(paneIndex);
+              }
+            });
+          }
+
           this.scheduleRender();
         },
       });
@@ -359,6 +392,9 @@ export class OrchestratorTUI {
     const pane = this.panes[index];
     if (!pane) return;
 
+    // Check if this is a human takeover pane - need to auto-restart the source agent
+    const sourceAgentName = pane.humanTakeoverSource;
+
     try {
       pane.proc?.kill();
       pane.term.dispose();
@@ -373,8 +409,27 @@ export class OrchestratorTUI {
       this.focusedIndex = null;
     }
 
+    // Auto-restart the source agent pane if this was a human takeover
+    if (sourceAgentName) {
+      this.autoRestartAgent(sourceAgentName);
+    }
+
     this.resizeAllPanes();
     this.scheduleRender();
+  }
+
+  /**
+   * Auto-restart an agent pane after human takeover completes.
+   */
+  private autoRestartAgent(agentName: string) {
+    const agentPaneIndex = this.panes.findIndex((p) => p.config.name === agentName);
+    const agentPane = this.panes[agentPaneIndex];
+    if (agentPaneIndex === -1 || !agentPane) return;
+
+    agentPane.term.write(`\r\n━━━ HUMAN TAKEOVER COMPLETE ━━━\r\n`);
+    agentPane.term.write(`Auto-resuming agent...\r\n\r\n`);
+
+    this.restartPane(agentPaneIndex);
   }
 
   private async interjectPane(index: number) {
@@ -430,9 +485,12 @@ export class OrchestratorTUI {
     this.selectedIndex = newPaneIndex;
     this.focusedIndex = newPaneIndex;
 
-    // Write context info to the new pane
+    // Track the source agent for auto-restart and write context info
     const newPane = this.panes[newPaneIndex];
     if (newPane) {
+      // Mark this as a human takeover pane so we can auto-restart the agent when done
+      newPane.humanTakeoverSource = pane.config.name;
+
       newPane.term.write(`━━━ HUMAN TAKEOVER: ${pane.config.name} ━━━\r\n`);
       newPane.term.write(`Interjection ID: ${interjectionId}\r\n`);
       if (session?.taskId) {
@@ -442,7 +500,8 @@ export class OrchestratorTUI {
       if (session?.sessionId) {
         newPane.term.write(`Resuming session: ${session.sessionId}\r\n`);
       }
-      newPane.term.write(`Ctrl+B to exit focus, "X" to close when done\r\n\r\n`);
+      newPane.term.write(`\r\nWhen you exit Claude, the agent will auto-resume.\r\n`);
+      newPane.term.write(`Press Ctrl+B to exit focus mode, then "X" to close pane.\r\n\r\n`);
     }
 
     this.scheduleRender();
