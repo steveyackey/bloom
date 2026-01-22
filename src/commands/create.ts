@@ -4,13 +4,13 @@ import { formatProjectName, createProject, runCreateSession } from "../services"
 
 export { createProject }; // Re-export for backwards compatibility
 
-export async function cmdCreate(projectName: string | string[]): Promise<void> {
-  if (!projectName || (Array.isArray(projectName) && projectName.length === 0)) {
+export async function cmdCreate(nameArgs: string[]): Promise<void> {
+  if (!nameArgs || nameArgs.length === 0) {
     console.error(chalk.red("Usage: bloom create <projectName>"));
     process.exit(1);
   }
 
-  const { slug, displayName } = formatProjectName(projectName);
+  const { slug, displayName } = formatProjectName(nameArgs);
   console.log(`${chalk.bold.cyan("Creating project")} '${chalk.yellow(displayName)}'...\n`);
 
   const result = await createProject(slug);
