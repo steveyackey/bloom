@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { formatPullResults, type PullAllResult, pullAndLogResults } from "../../src/services/repo-service";
 
 describe("repo-service", () => {

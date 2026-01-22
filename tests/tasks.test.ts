@@ -51,6 +51,11 @@ describe("Task Persistence", () => {
     }
   });
 
+  test("loadTasks throws with clear error when file does not exist", async () => {
+    const nonExistentFile = join(TEST_DIR, "does-not-exist.yaml");
+    await expect(loadTasks(nonExistentFile)).rejects.toThrow("Tasks file not found");
+  });
+
   test("empty tasks file loads as empty task list", async () => {
     const tasksFile = await loadTasks(TEST_TASKS_FILE);
     expect(tasksFile.tasks).toEqual([]);
