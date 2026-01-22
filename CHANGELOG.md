@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/steveyackey/bloom/compare/bloom-v0.2.1...bloom-v0.2.2) (2026-01-22)
+
+
+### Features
+
+* **cli:** add beautiful error handling and command grouping ([5ccc699](https://github.com/steveyackey/bloom/commit/5ccc699426876517299d49c1ff4a422691ac1b29))
+
 ## [0.2.1](https://github.com/steveyackey/bloom/compare/bloom-v0.2.0...bloom-v0.2.1) (2026-01-22)
 
 
