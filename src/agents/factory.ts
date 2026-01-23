@@ -5,6 +5,7 @@
 import type { AgentConfig } from "../user-config";
 import { loadUserConfig } from "../user-config";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
+import { ClineAgentProvider, type ClineProviderOptions } from "./cline";
 import type { Agent } from "./core";
 import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
 
@@ -14,6 +15,7 @@ import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode"
 
 const agentRegistry = {
   claude: ClaudeAgentProvider,
+  cline: ClineAgentProvider,
   opencode: OpenCodeAgentProvider,
 } as const;
 
@@ -52,6 +54,8 @@ export async function createAgent(mode: AgentMode): Promise<Agent> {
   switch (agentName) {
     case "claude":
       return createClaudeAgent(isInteractive, model);
+    case "cline":
+      return createClineAgent(isInteractive, model);
     case "opencode":
       return createOpenCodeAgent(isInteractive, model);
     default:
@@ -77,6 +81,24 @@ function createClaudeAgent(interactive: boolean, model?: string): ClaudeAgentPro
   }
 
   return new ClaudeAgentProvider(options);
+}
+
+/**
+ * Creates a Cline agent with the specified mode and optional model.
+ * Cline uses task-based session management with Plan/Act modes.
+ */
+function createClineAgent(interactive: boolean, model?: string): ClineAgentProvider {
+  const options: ClineProviderOptions = {
+    mode: interactive ? "interactive" : "streaming",
+    // Act mode for autonomous execution, Plan mode for interactive review
+    clineMode: interactive ? "plan" : "act",
+    // Skip approvals in non-interactive (act) mode
+    yolo: !interactive,
+    streamOutput: true,
+    model: model,
+  };
+
+  return new ClineAgentProvider(options);
 }
 
 /**
