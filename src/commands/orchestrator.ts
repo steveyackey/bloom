@@ -448,6 +448,12 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
           // Auto merge into target branch if configured
           // IMPORTANT: We do this from the TARGET worktree, not the source worktree
           if (taskResult.gitInfo.mergeInto && taskResult.repo) {
+            // Set status to done_pending_merge before attempting merge
+            // This ensures we can recover if the orchestrator is killed mid-merge
+            agentLog.info(`Setting task ${taskResult.taskId} to done_pending_merge...`);
+            const pendingTasksFile = await loadTasks(getTasksFile());
+            updateTaskStatus(pendingTasksFile.tasks, taskResult.taskId!, "done_pending_merge");
+            await saveTasks(getTasksFile(), pendingTasksFile);
             const targetWorktreePath = getWorktreePath(BLOOM_DIR, taskResult.repo, taskResult.gitInfo.mergeInto);
             const targetBranch = taskResult.gitInfo.mergeInto;
             const sourceBranch = taskResult.gitInfo.branch;
@@ -512,6 +518,12 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
                           agentLog.warn(`Failed to push ${targetBranch}: ${targetPush.error}`);
                         }
                       }
+
+                      // Merge successful - update status from done_pending_merge to done
+                      agentLog.info(`Setting task ${taskResult.taskId} to done (merge complete)...`);
+                      const doneTasksFile = await loadTasks(getTasksFile());
+                      updateTaskStatus(doneTasksFile.tasks, taskResult.taskId!, "done");
+                      await saveTasks(getTasksFile(), doneTasksFile);
                     } else {
                       // Merge failed - likely conflicts. Have the agent resolve them.
                       // NOTE: We still hold the merge lock during conflict resolution,
@@ -577,8 +589,17 @@ ${taskResult.gitConfig?.push_to_remote ? `6. Push the result: \`git push origin 
                             }
                           }
                         }
+
+                        // Merge successful after conflict resolution - update status to done
+                        agentLog.info(
+                          `Setting task ${taskResult.taskId} to done (merge complete after conflict resolution)...`
+                        );
+                        const conflictDoneTasksFile = await loadTasks(getTasksFile());
+                        updateTaskStatus(conflictDoneTasksFile.tasks, taskResult.taskId!, "done");
+                        await saveTasks(getTasksFile(), conflictDoneTasksFile);
                       } else {
                         agentLog.warn("Agent could not resolve merge conflicts. Manual intervention needed.");
+                        // Task remains in done_pending_merge status for manual intervention
                       }
                     }
                   } else {

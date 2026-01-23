@@ -24,6 +24,8 @@ function colorStatus(status: TaskStatus): string {
   switch (status) {
     case "done":
       return chalk.green(status);
+    case "done_pending_merge":
+      return chalk.yellow(status);
     case "in_progress":
       return chalk.cyan(status);
     case "assigned":
@@ -44,6 +46,8 @@ function colorStatusIcon(status: TaskStatus): string {
   switch (status) {
     case "done":
       return chalk.green(icon);
+    case "done_pending_merge":
+      return chalk.yellow(icon);
     case "in_progress":
       return chalk.cyan(icon);
     case "assigned":
@@ -69,7 +73,15 @@ export async function cmdDashboard(): Promise<void> {
       `${chalk.bold.cyan("Bloom Dashboard")} ${chalk.dim(`(updated ${now})`)} ${chalk.dim("- Ctrl+C to exit")}\n`
     );
 
-    const stats = { todo: 0, ready_for_agent: 0, assigned: 0, in_progress: 0, done: 0, blocked: 0 };
+    const stats = {
+      todo: 0,
+      ready_for_agent: 0,
+      assigned: 0,
+      in_progress: 0,
+      done_pending_merge: 0,
+      done: 0,
+      blocked: 0,
+    };
     const allTasks: Task[] = [];
     function collectAll(tasks: Task[]) {
       for (const task of tasks) {
@@ -81,12 +93,15 @@ export async function cmdDashboard(): Promise<void> {
     collectAll(tasksFile.tasks);
 
     const total = allTasks.length;
-    const progress = total > 0 ? Math.round((stats.done / total) * 100) : 0;
+    // Count done_pending_merge as done for progress purposes
+    const completedCount = stats.done + stats.done_pending_merge;
+    const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
     const filledBar = chalk.green("█".repeat(Math.floor(progress / 5)));
     const emptyBar = chalk.gray("░".repeat(20 - Math.floor(progress / 5)));
 
+    const pendingMergeInfo = stats.done_pending_merge > 0 ? `, ${stats.done_pending_merge} pending merge` : "";
     console.log(
-      `${chalk.bold("Progress:")} [${filledBar}${emptyBar}] ${chalk.bold.green(`${progress}%`)} ${chalk.dim(`(${stats.done}/${total} done)`)}`
+      `${chalk.bold("Progress:")} [${filledBar}${emptyBar}] ${chalk.bold.green(`${progress}%`)} ${chalk.dim(`(${completedCount}/${total} done${pendingMergeInfo})`)}`
     );
     console.log(
       `${chalk.bold("Status:")}   ${chalk.cyan(stats.in_progress)} in_progress, ${chalk.blue(stats.assigned)} assigned, ${chalk.yellow(stats.ready_for_agent)} ready, ${chalk.gray(stats.todo)} todo, ${chalk.red(stats.blocked)} blocked\n`
@@ -439,7 +454,15 @@ export async function cmdValidate(): Promise<void> {
   } else {
     console.log(chalk.green.bold("Validation passed"));
 
-    const stats = { todo: 0, ready_for_agent: 0, assigned: 0, in_progress: 0, done: 0, blocked: 0 };
+    const stats = {
+      todo: 0,
+      ready_for_agent: 0,
+      assigned: 0,
+      in_progress: 0,
+      done_pending_merge: 0,
+      done: 0,
+      blocked: 0,
+    };
     let checkpointCount = 0;
     const branchTasks: { taskId: string; repo: string; branch: string; status: TaskStatus }[] = [];
 
@@ -459,7 +482,7 @@ export async function cmdValidate(): Promise<void> {
 
     console.log(`\n${chalk.bold("Task summary:")}`);
     console.log(
-      `  ${chalk.green(stats.done)} done, ${chalk.cyan(stats.in_progress)} in_progress, ${chalk.blue(stats.assigned)} assigned`
+      `  ${chalk.green(stats.done)} done, ${chalk.yellow(stats.done_pending_merge)} pending merge, ${chalk.cyan(stats.in_progress)} in_progress, ${chalk.blue(stats.assigned)} assigned`
     );
     console.log(
       `  ${chalk.yellow(stats.ready_for_agent)} ready, ${chalk.gray(stats.todo)} todo, ${chalk.red(stats.blocked)} blocked`
@@ -475,7 +498,15 @@ export async function cmdValidate(): Promise<void> {
         console.log(`  ${chalk.blue(repo)}:`);
         // Sort by status: in_progress first, then assigned, then rest
         const sorted = tasks!.sort((a, b) => {
-          const order = { in_progress: 0, assigned: 1, ready_for_agent: 2, todo: 3, done: 4, blocked: 5 };
+          const order = {
+            in_progress: 0,
+            assigned: 1,
+            ready_for_agent: 2,
+            todo: 3,
+            done_pending_merge: 4,
+            done: 5,
+            blocked: 6,
+          };
           return order[a.status] - order[b.status];
         });
         for (const { taskId, branch, status } of sorted) {
