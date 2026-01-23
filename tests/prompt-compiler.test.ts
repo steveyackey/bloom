@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
-  PromptCompiler,
+  type AgentCapabilities,
   compilePrompt,
   generateCapabilitiesSection,
-  type AgentCapabilities,
+  PromptCompiler,
   type TaskContext,
 } from "../src/prompts/compiler";
 
@@ -205,13 +205,7 @@ export const FIXTURE_TASK_CONTEXT = {
  * Expected capability section outputs for different capability sets.
  */
 export const FIXTURE_EXPECTED_CAPABILITY_SECTIONS = {
-  fullCapabilities: [
-    "Read files",
-    "Run terminal commands",
-    "Git operations",
-    "Web search",
-    "MCP tools",
-  ],
+  fullCapabilities: ["Read files", "Run terminal commands", "Git operations", "Web search", "MCP tools"],
   limitedCapabilities: ["Read files", "Run terminal commands"],
   // Items that should NOT appear
   limitedCapabilitiesExcluded: ["Git operations", "Web search", "MCP tools"],

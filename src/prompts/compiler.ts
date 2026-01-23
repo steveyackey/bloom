@@ -154,11 +154,7 @@ export class PromptCompiler {
    * @param fileName - Optional file name for error messages
    * @returns Content with conditionals resolved
    */
-  private processConditionals(
-    content: string,
-    capabilities: AgentCapabilities,
-    fileName?: string
-  ): string {
+  private processConditionals(content: string, capabilities: AgentCapabilities, fileName?: string): string {
     // Validate conditional structure first
     this.validateConditionalStructure(content, fileName);
 
@@ -174,9 +170,7 @@ export class PromptCompiler {
     }
 
     if (iterations >= maxIterations) {
-      throw new Error(
-        this.formatError("Maximum iteration limit reached while processing conditionals", fileName)
-      );
+      throw new Error(this.formatError("Maximum iteration limit reached while processing conditionals", fileName));
     }
 
     return result;
@@ -198,8 +192,7 @@ export class PromptCompiler {
     // - <!-- @if capabilityName --> (with optional whitespace)
     // - Content that does NOT contain another <!-- @if
     // - <!-- @endif --> (with optional whitespace)
-    const conditionalRegex =
-      /<!-- @if\s+(\w+)\s*-->([\s\S]*?)<!-- @endif\s*-->/;
+    const conditionalRegex = /<!-- @if\s+(\w+)\s*-->([\s\S]*?)<!-- @endif\s*-->/;
 
     let result = content;
     let match: RegExpExecArray | null;
@@ -265,11 +258,7 @@ export class PromptCompiler {
       if (endifMatch) {
         if (stack.length === 0) {
           throw new Error(
-            this.formatError(
-              `Unexpected @endif at line ${lineNumber}: no matching @if found`,
-              fileName,
-              lineNumber
-            )
+            this.formatError(`Unexpected @endif at line ${lineNumber}: no matching @if found`, fileName, lineNumber)
           );
         }
         stack.pop();
