@@ -1001,31 +1001,45 @@ export function getMergedBranches(bareRepoPath: string, targetBranch: string): s
 /**
  * Clean up merged branches.
  * Returns list of deleted branches.
+ *
+ * IMPORTANT: This will never delete the default branch (main/master) or branches
+ * with active worktrees to prevent accidental loss of important branches.
  */
 export async function cleanupMergedBranches(
   bloomDir: string,
   repoName: string,
   targetBranch: string
-): Promise<{ deleted: string[]; failed: Array<{ branch: string; error: string }> }> {
+): Promise<{ deleted: string[]; skipped: string[]; failed: Array<{ branch: string; error: string }> }> {
   const bareRepoPath = getBareRepoPath(bloomDir, repoName);
   const mergedBranches = getMergedBranches(bareRepoPath, targetBranch);
 
   const deleted: string[] = [];
+  const skipped: string[] = [];
   const failed: Array<{ branch: string; error: string }> = [];
 
-  // Get list of worktrees to avoid deleting branches with active worktrees
+  // Get the default branch to protect it from deletion
+  const reposFile = await loadReposFile(bloomDir);
+  const repo = reposFile.repos.find((r) => r.name === repoName);
+  const defaultBranch = repo?.defaultBranch || "main";
+
+  // Protected branches that should never be deleted
+  const protectedBranches = new Set([defaultBranch, "main", "master"]);
+
+  // Get list of worktrees - branches with active worktrees should be skipped
   const worktrees = await listWorktrees(bloomDir, repoName);
   const worktreeBranches = new Set(worktrees.map((w) => w.branch));
 
   for (const branch of mergedBranches) {
-    // Skip if there's an active worktree for this branch
+    // Never delete protected branches (default branch, main, master)
+    if (protectedBranches.has(branch)) {
+      skipped.push(branch);
+      continue;
+    }
+
+    // Skip branches with active worktrees - don't remove them automatically
     if (worktreeBranches.has(branch)) {
-      // First remove the worktree
-      const removeResult = await removeWorktree(bloomDir, repoName, branch);
-      if (!removeResult.success) {
-        failed.push({ branch, error: `Cannot remove worktree: ${removeResult.error}` });
-        continue;
-      }
+      skipped.push(branch);
+      continue;
     }
 
     const deleteResult = deleteLocalBranch(bareRepoPath, branch);
@@ -1036,7 +1050,7 @@ export async function cleanupMergedBranches(
     }
   }
 
-  return { deleted, failed };
+  return { deleted, skipped, failed };
 }
 
 // =============================================================================
