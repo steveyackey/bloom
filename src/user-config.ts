@@ -12,8 +12,21 @@ import { z } from "zod";
 // Schema
 // =============================================================================
 
+/**
+ * Schema for agent configuration.
+ * Defines which agent to use and optionally which model variant.
+ */
+export const AgentConfigSchema = z.object({
+  agent: z.string().default("claude"),
+  model: z.string().optional(),
+});
+
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+
 const UserConfigSchema = z.object({
   gitProtocol: z.enum(["ssh", "https"]).default("ssh"),
+  interactiveAgent: AgentConfigSchema.optional(),
+  nonInteractiveAgent: AgentConfigSchema.optional(),
 });
 
 export type UserConfig = z.infer<typeof UserConfigSchema>;
