@@ -994,7 +994,7 @@ export function getMergedBranches(bareRepoPath: string, targetBranch: string): s
 
   return result.output
     .split("\n")
-    .map((line) => line.trim().replace(/^\* /, ""))
+    .map((line) => line.trim().replace(/^[*+] /, "")) // Strip * (current) or + (other worktree) prefix
     .filter((branch) => branch && branch !== targetBranch);
 }
 
