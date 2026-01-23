@@ -161,6 +161,12 @@ export interface AgentCapabilities {
    * Examples: "Use TodoWrite tool", "Has GitHub MCP by default"
    */
   specialInstructions?: string[];
+
+  /**
+   * Index signature to allow dynamic capability access.
+   * Required for compatibility with PromptCompiler's conditional processing.
+   */
+  [key: string]: boolean | string[] | number | undefined;
 }
 
 /**
