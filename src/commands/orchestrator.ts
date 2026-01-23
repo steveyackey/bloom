@@ -4,7 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { ClaudeAgentProvider } from "../agents";
+import { createAgent } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { loadAgentPrompt } from "../prompts";
@@ -215,11 +215,7 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
   const agentLog = logger.agent(agentName);
   agentLog.info(`Starting work loop (polling every ${POLL_INTERVAL_MS / 1000}s)...`);
 
-  const agent = new ClaudeAgentProvider({
-    interactive: false,
-    dangerouslySkipPermissions: true,
-    streamOutput: true,
-  });
+  const agent = await createAgent("nonInteractive");
 
   while (true) {
     try {

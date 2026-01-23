@@ -5,7 +5,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../agents";
+import { createAgent } from "../agents";
 import { findGitRoot } from "./context";
 
 // =============================================================================
@@ -24,10 +24,7 @@ This is an open-ended session - help the user with whatever they need.
 
 You have access to the entire git repository for context, but you're starting in the project directory.`;
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   await agent.run({
     systemPrompt,

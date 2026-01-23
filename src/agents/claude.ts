@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createLogger } from "../logger";
-import type { Agent, AgentRunOptions, AgentRunResult } from "./core";
+import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 
 const logger = createLogger("claude-provider");
 
@@ -22,47 +22,85 @@ export interface StreamEvent {
 }
 
 // =============================================================================
-// Provider Options
+// Provider Options (Claude-specific)
+// =============================================================================
+//
+// These options extend the generic AgentConfig with Claude-specific features:
+// - dangerouslySkipPermissions: Claude's --dangerously-skip-permissions flag
+// - activityTimeoutMs/heartbeatIntervalMs: Streaming mode monitoring
+// - onEvent/onHeartbeat/onTimeout: Event callbacks for stream processing
+//
+// Note: Claude doesn't support model selection via CLI flags (uses configured model)
 // =============================================================================
 
-export interface ClaudeProviderOptions {
+export interface ClaudeProviderOptions extends AgentConfig {
+  /**
+   * @deprecated Use `mode` instead. Will be removed in future version.
+   */
   interactive?: boolean;
+  /**
+   * PROVIDER-SPECIFIC: Skip Claude's permission prompts.
+   * Maps to --dangerously-skip-permissions flag.
+   */
   dangerouslySkipPermissions?: boolean;
-  /** Stream output to stdout/stderr while capturing */
-  streamOutput?: boolean;
-  /** Timeout in ms before considering agent dead (default: 600000 = 10 min) */
+  /**
+   * PROVIDER-SPECIFIC: Timeout in ms before considering agent dead.
+   * Default: 600000 (10 min). Only applies in streaming mode.
+   */
   activityTimeoutMs?: number;
-  /** Interval for heartbeat output when waiting (default: 10000 = 10s) */
+  /**
+   * PROVIDER-SPECIFIC: Interval for heartbeat output when waiting.
+   * Default: 10000 (10s). Only applies in streaming mode.
+   */
   heartbeatIntervalMs?: number;
-  /** Callback for stream events */
+  /**
+   * PROVIDER-SPECIFIC: Callback for stream events.
+   * Only applies in streaming mode.
+   */
   onEvent?: (event: StreamEvent) => void;
-  /** Callback for heartbeat */
+  /**
+   * PROVIDER-SPECIFIC: Callback for heartbeat.
+   * Only applies in streaming mode.
+   */
   onHeartbeat?: (lastActivityMs: number) => void;
-  /** Callback for activity timeout (agent presumed dead) */
+  /**
+   * PROVIDER-SPECIFIC: Callback for activity timeout.
+   * Only applies in streaming mode.
+   */
   onTimeout?: () => void;
+  /** Model to use (e.g., 'claude-sonnet-4-20250514'). If not specified, uses Claude CLI default. */
+  model?: string;
 }
 
 // =============================================================================
 // Running Session (for interjection support)
 // =============================================================================
+//
+// RunningSession extends AgentSession with Claude-specific process tracking.
+// The `proc` field is needed for interjection (killing the Claude process).
+// =============================================================================
 
-export interface RunningSession {
-  sessionId?: string;
+export interface RunningSession extends AgentSession {
+  /** Claude child process - needed for interjection */
   proc: ChildProcess;
-  startTime: number;
-  lastActivity: number;
-  taskId?: string;
-  agentName?: string;
-  workingDirectory: string;
 }
 
-// Track active sessions for interjection
+// Track active sessions for interjection by agent name
 const activeSessions = new Map<string, RunningSession>();
 
+/**
+ * Get an active session by agent name.
+ * This is a module-level function for cross-instance access.
+ */
 export function getActiveSession(agentName: string): RunningSession | undefined {
   return activeSessions.get(agentName);
 }
 
+/**
+ * Interject (kill) an active session by agent name.
+ * Returns the session that was interjected, or undefined if not found.
+ * This is a module-level function since it needs to access internal process state.
+ */
 export function interjectSession(agentName: string): RunningSession | undefined {
   const session = activeSessions.get(agentName);
   if (session) {
@@ -80,7 +118,7 @@ export function interjectSession(agentName: string): RunningSession | undefined 
 // =============================================================================
 
 export class ClaudeAgentProvider implements Agent {
-  private interactive: boolean;
+  private mode: "interactive" | "streaming";
   private dangerouslySkipPermissions: boolean;
   private streamOutput: boolean;
   private activityTimeoutMs: number;
@@ -88,9 +126,16 @@ export class ClaudeAgentProvider implements Agent {
   private onEvent?: (event: StreamEvent) => void;
   private onHeartbeat?: (lastActivityMs: number) => void;
   private onTimeout?: () => void;
+  private currentAgentName?: string;
+  private model?: string;
 
   constructor(options: ClaudeProviderOptions = {}) {
-    this.interactive = options.interactive ?? false;
+    // Support both new `mode` and deprecated `interactive` option
+    if (options.mode !== undefined) {
+      this.mode = options.mode;
+    } else {
+      this.mode = options.interactive ? "interactive" : "streaming";
+    }
     this.dangerouslySkipPermissions = options.dangerouslySkipPermissions ?? true;
     this.streamOutput = options.streamOutput ?? true;
     this.activityTimeoutMs = options.activityTimeoutMs ?? 600_000; // 10 min
@@ -98,10 +143,23 @@ export class ClaudeAgentProvider implements Agent {
     this.onEvent = options.onEvent;
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
+    this.model = options.model;
+  }
+
+  /**
+   * Get the currently active session for this agent instance.
+   * Returns the session from the global tracking map if we have one.
+   */
+  getActiveSession(): AgentSession | undefined {
+    if (this.currentAgentName) {
+      return activeSessions.get(this.currentAgentName);
+    }
+    return undefined;
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
-    return this.interactive ? this.runInteractive(options) : this.runStreaming(options);
+    this.currentAgentName = options.agentName;
+    return this.mode === "interactive" ? this.runInteractive(options) : this.runStreaming(options);
   }
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
@@ -327,6 +385,10 @@ export class ClaudeAgentProvider implements Agent {
       args.push("--dangerously-skip-permissions");
     }
 
+    if (this.model) {
+      args.push("--model", this.model);
+    }
+
     args.push("--append-system-prompt", options.systemPrompt);
 
     // Add initial prompt so Claude starts with context instead of blank slate
@@ -343,6 +405,10 @@ export class ClaudeAgentProvider implements Agent {
 
     if (this.dangerouslySkipPermissions) {
       args.push("--dangerously-skip-permissions");
+    }
+
+    if (this.model) {
+      args.push("--model", this.model);
     }
 
     // Resume previous session if sessionId provided

@@ -1,14 +1,11 @@
 #!/usr/bin/env bun
-import { ClaudeAgentProvider } from "./agents";
+import { createAgent } from "./agents";
 import { loadPlanningPrompt } from "./prompts";
 
 export async function runPlanningSession(tasksFile: string): Promise<void> {
   const systemPrompt = await loadPlanningPrompt(tasksFile);
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   console.log(`Planning session - tasks will be written to: ${tasksFile}\n`);
 

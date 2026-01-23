@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../agents";
+import { createAgent } from "../agents";
 import { findGitRoot } from "../commands/context";
 import { loadPrompt } from "../prompts";
 import { listRepos } from "../repos";
@@ -89,10 +89,7 @@ export async function runPlanSession(workingDir: string, planFile: string, bloom
     REPOS_CONTEXT: reposContext,
   });
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   console.log(`${chalk.bold("Planning session")} - plan will be written to: ${chalk.cyan(planFile)}\n`);
 
@@ -123,10 +120,7 @@ export async function runGenerateSession(workingDir: string, tasksFile: string, 
     REPOS_CONTEXT: reposContext,
   });
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   console.log(`${chalk.bold("Generate session")} - tasks will be written to: ${chalk.cyan(tasksFile)}\n`);
 
@@ -212,10 +206,7 @@ When helping the user:
 
 Focus on making documents clear, complete, and actionable.`;
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   console.log(`${chalk.bold("Refining:")} ${chalk.cyan(selectedFile.name)}\n`);
 
