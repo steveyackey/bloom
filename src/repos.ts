@@ -227,15 +227,18 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
   // Set upstream tracking branch for the default branch
   runGit(["branch", "--set-upstream-to", `origin/${defaultBranch}`, defaultBranch], worktreePath);
 
-  // Save to repos file
+  // Save to repos file (only if not already present)
   const reposFile = await loadReposFile(bloomDir);
-  reposFile.repos.push({
-    name: repoName,
-    url: normalizedUrl,
-    defaultBranch,
-    addedAt: new Date().toISOString(),
-  });
-  await saveReposFile(bloomDir, reposFile);
+  const existingRepo = reposFile.repos.find((r) => r.name === repoName);
+  if (!existingRepo) {
+    reposFile.repos.push({
+      name: repoName,
+      url: normalizedUrl,
+      defaultBranch,
+      addedAt: new Date().toISOString(),
+    });
+    await saveReposFile(bloomDir, reposFile);
+  }
 
   return {
     success: true,
