@@ -387,12 +387,12 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
             if (taskResult.prompt) {
               // Extract instructions from prompt
               const instructionsMatch = taskResult.prompt.match(/## Instructions\n([\s\S]*?)(?=\n## |$)/);
-              if (instructionsMatch) {
+              if (instructionsMatch?.[1]) {
                 prBody += `## Summary\n${instructionsMatch[1].trim()}\n\n`;
               }
               // Extract acceptance criteria
               const acMatch = taskResult.prompt.match(/## Acceptance Criteria\n([\s\S]*?)(?=\n## |$)/);
-              if (acMatch) {
+              if (acMatch?.[1]) {
                 prBody += `## Acceptance Criteria\n${acMatch[1].trim()}\n`;
               }
             }
