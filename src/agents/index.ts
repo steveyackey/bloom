@@ -14,6 +14,9 @@ export {
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 // Claude provider with session management utilities
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
+export type { ClineMode, ClineProviderOptions, ClineRunningSession, ClineStreamEvent } from "./cline";
+// Cline provider with session management utilities
+export { ClineAgentProvider, getActiveClineSession, interjectClineSession } from "./cline";
 // Core interface and types
 export * from "./core";
 // Agent factory

@@ -746,10 +746,7 @@ describe("Output Accumulator", () => {
 
   test("should accumulate text from multiple assistant events", () => {
     // GIVEN: Multiple assistant events
-    const events = [
-      REAL_ASSISTANT_EVENT,
-      REAL_ASSISTANT_MULTI_BLOCK_EVENT,
-    ] as unknown as StreamEvent[];
+    const events = [REAL_ASSISTANT_EVENT, REAL_ASSISTANT_MULTI_BLOCK_EVENT] as unknown as StreamEvent[];
 
     // WHEN: Events are processed
     for (const event of events) {
