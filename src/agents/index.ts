@@ -2,6 +2,15 @@
 // Agent Providers - Re-exports
 // =============================================================================
 
+// Agent capability registry
+export type { AgentCapabilities, AgentCapabilityName, AgentName } from "./capabilities";
+export {
+  agentCapabilities,
+  getAgentCapabilities,
+  getRegisteredAgentNames,
+  hasCapability,
+  isValidAgentName,
+} from "./capabilities";
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 // Claude provider with session management utilities
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
