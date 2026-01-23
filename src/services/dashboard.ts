@@ -4,6 +4,7 @@
 // Renders the task dashboard directly to a terminal buffer instead of
 // spawning a subprocess.
 
+import { type FSWatcher, watch } from "node:fs";
 import chalk from "chalk";
 import type { InProcessService } from "../orchestrator-tui";
 import type { Task, TaskStatus, TasksFile } from "../task-schema";
@@ -130,13 +131,24 @@ function renderDashboard(tasksFile: TasksFile): string {
 
 /**
  * Create a dashboard service that runs in-process.
+ * Uses file watching for immediate updates with timer as fallback.
  */
 export function createDashboardService(tasksFile: string): InProcessService {
   return {
     start(write, _scheduleRender) {
       let intervalId: ReturnType<typeof setInterval> | null = null;
+      let watcher: FSWatcher | null = null;
+      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+      let lastUpdateTime = 0;
 
       const update = async () => {
+        const now = Date.now();
+        // Debounce rapid updates (min 500ms between updates)
+        if (now - lastUpdateTime < 500) {
+          return;
+        }
+        lastUpdateTime = now;
+
         try {
           const tasks = await loadTasks(tasksFile);
           // Clear screen and render
@@ -147,17 +159,45 @@ export function createDashboardService(tasksFile: string): InProcessService {
         }
       };
 
+      const debouncedUpdate = () => {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(update, 100);
+      };
+
       // Initial render
       update();
 
-      // Update every 10 seconds
-      intervalId = setInterval(update, 10000);
+      // Watch for file changes (event-based)
+      try {
+        watcher = watch(tasksFile, (eventType) => {
+          if (eventType === "change") {
+            debouncedUpdate();
+          }
+        });
+      } catch {
+        // File watching might not be available on all systems
+        write(chalk.dim("\r\n[File watching unavailable, using timer fallback]\r\n"));
+      }
+
+      // Fallback timer (less frequent since we have file watching)
+      // Also serves as a heartbeat to show the dashboard is still active
+      intervalId = setInterval(update, 30000);
 
       // Return cleanup function
       return () => {
         if (intervalId) {
           clearInterval(intervalId);
           intervalId = null;
+        }
+        if (watcher) {
+          watcher.close();
+          watcher = null;
+        }
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          debounceTimer = null;
         }
       };
     },

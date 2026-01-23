@@ -27,7 +27,7 @@ export function registerConfigCommands(cli: Clerc): Clerc {
   return cli
     .command("config", "Show configuration", {
       alias: "cfg",
-      help: { group: "config" },
+      help: { group: "system" },
     })
     .on("config", async () => {
       await showConfig();
@@ -47,7 +47,7 @@ export function registerConfigCommands(cli: Clerc): Clerc {
           },
         },
       ],
-      help: { group: "config" },
+      help: { group: "system" },
     })
     .on("config set-protocol", async (ctx) => {
       const protocol = ctx.parameters.protocol as Protocol;

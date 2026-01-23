@@ -23,15 +23,40 @@ Tasks file: {{TASKS_FILE}}
 
 ## Clarifying Questions
 
-After reading the plan, ask the user about git configuration if the workflow involves:
-- **Pull requests**: If any task has `merge_into` set (especially to main/master), or if the plan mentions creating PRs
-- **Team collaboration**: If multiple people might be working on related branches
-- **CI/CD**: If the plan mentions automated testing or deployment pipelines
+After reading the plan, ask the user about these configuration options:
 
-**Question to ask**:
+### 1. Git Configuration
+If the workflow involves pull requests, team collaboration, or CI/CD:
+
 > "I see this workflow will create pull requests / merge branches. Would you like to enable `push_to_remote: true`? This pushes branches to the remote after each task completes, which is recommended for PR workflows and provides backup of work in progress. (Default is false - local only)"
 
-If the user confirms, set `push_to_remote: true` in the git config. If they decline or the workflow is purely local development, leave it as false.
+If the user confirms, set `push_to_remote: true` in the git config.
+
+### 2. Validation Mode
+Ask about validation approach:
+
+> "How would you like to handle validation?
+>
+> **Option A: Human checkpoints** (default)
+> - `[CHECKPOINT]` tasks pause for human review at phase boundaries
+> - You manually review and approve before continuing
+> - Best for: critical work, learning the system, high-stakes projects
+>
+> **Option B: Auto mode** (agent validation until final merge)
+> - Agents run automated validation (tests, linting) at phase boundaries
+> - NO human pauses until the very end, right before final merge to main
+> - Single `[CHECKPOINT]` at the end for final human review before merge
+> - Best for: routine work, trusted test suites, faster iteration
+>
+> Which approach would you prefer?"
+
+Based on the answer:
+- **Option A**: Create `[CHECKPOINT]` tasks with `checkpoint: true` at each phase boundary
+- **Option B (Auto mode)**:
+  - Create regular validation tasks at phase boundaries that run tests/checks automatically
+  - These tasks do NOT have `checkpoint: true` - agents handle them
+  - Only ONE `[CHECKPOINT]` at the very end, right before the final `merge_into: main`
+  - This checkpoint is for human review before merging all work to main
 
 ## Task Schema
 
@@ -126,7 +151,12 @@ conflicts. Tasks working in different directories can use different agents.
    - Leading special chars: @, *, &, !, %, ?, |, >
    - Example: `- "\`bun test\` passes"` NOT `- \`bun test\` passes`
 
-## Git Branching Strategy
+## Git Branching Strategy (Worktrees)
+
+**How Bloom handles branches**: Each branch gets its own **worktree** (a separate directory) at `repos/{repo-name}/{branch-name}`. This means:
+- Multiple branches can be worked on simultaneously
+- No need for `git checkout` - each branch has its own folder
+- Branch names with slashes (`feature/foo`) become hyphenated paths (`feature-foo`)
 
 Use the `branch`, `base_branch`, and `merge_into` fields to control git workflow:
 
@@ -134,37 +164,58 @@ Use the `branch`, `base_branch`, and `merge_into` fields to control git workflow
 ```yaml
 - id: implement-feature
   repo: my-app
-  branch: feature/new-feature      # Working branch
+  branch: feature/new-feature      # Worktree at: repos/my-app/feature-new-feature
   base_branch: main                # Create from main
   merge_into: main                 # Merge back when done
 ```
-Agent creates `feature/new-feature` from `main`, does work, then merges back to `main`.
+Agent works in `repos/my-app/feature-new-feature/`, then merges to main.
 
-### Pattern 2: Development on a Shared Branch
+### Pattern 2: Work on Default Branch
 ```yaml
 - id: add-component
   repo: my-app
-  branch: develop                  # Work directly on develop
-  # No base_branch - branch already exists
-  # No merge_into - no merge needed
+  branch: main                     # Worktree at: repos/my-app/main
+  # No base_branch - use existing main
+  # No merge_into - working directly on main
 ```
-Agent works directly on `develop` branch without creating new branches.
+Agent works directly in the main worktree without creating new branches.
 
-### Pattern 3: Sequential Tasks on Same Branch
+### Pattern 3: Sequential Tasks, Shared Worktree
 ```yaml
 - id: task-1
   repo: my-app
-  branch: feature/big-feature
+  branch: feature/big-feature      # Worktree at: repos/my-app/feature-big-feature
   base_branch: main
+  agent_name: feature-agent        # SAME agent for all tasks on this branch
   # No merge_into - don't merge yet
 
 - id: task-2
   depends_on: [task-1]
   repo: my-app
-  branch: feature/big-feature      # Same branch
+  branch: feature/big-feature      # Same worktree
+  agent_name: feature-agent        # Must be same agent to avoid conflicts
   merge_into: main                 # Merge after all work done
 ```
-Multiple tasks work on the same branch, only the last one merges.
+Multiple tasks share the same worktree. **Important**: Use the same `agent_name` for tasks sharing a branch to prevent conflicts.
+
+### Pattern 4: Parallel Feature Branches
+```yaml
+- id: frontend-feature
+  repo: my-app
+  branch: feature/frontend         # Worktree: repos/my-app/feature-frontend
+  agent_name: frontend-agent       # Different agent
+
+- id: backend-feature
+  repo: my-app
+  branch: feature/backend          # Worktree: repos/my-app/feature-backend
+  agent_name: backend-agent        # Different agent
+```
+Different branches = different worktrees = can run in parallel with different agents.
+
+### Worktree Path Reference
+When validating or debugging, tasks are located at:
+- `repos/{repo-name}/{branch-with-slashes-as-hyphens}/`
+- Example: `branch: feature/auth/oauth` → `repos/my-app/feature-auth-oauth/`
 
 ### Git Configuration
 Enable `push_to_remote: true` in the `git:` section to automatically push after each task.

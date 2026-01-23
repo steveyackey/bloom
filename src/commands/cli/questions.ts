@@ -33,14 +33,14 @@ export function registerQuestionCommands(cli: Clerc): Clerc {
           alias: "a",
         },
       },
-      help: { group: "collab" },
+      help: { group: "monitor" },
     })
     .on("questions", async (ctx) => {
       await cmdQuestions(ctx.flags.all ?? false);
     })
     .command("questions-dashboard", "Interactive dashboard for answering questions", {
       alias: "qd",
-      help: { group: "collab" },
+      help: { group: "monitor" },
     })
     .on("questions-dashboard", async () => {
       await cmdQuestionsDashboard();

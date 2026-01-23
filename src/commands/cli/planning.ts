@@ -25,25 +25,25 @@ import { cmdRefine } from "../refine";
 export function registerPlanningCommands(cli: Clerc): Clerc {
   return cli
     .command("plan", "Generate implementation plan from PRD", {
-      help: { group: "planning" },
+      help: { group: "workflow" },
     })
     .on("plan", async () => {
       await cmdPlan();
     })
     .command("refine", "Interactively refine project documents", {
-      help: { group: "planning" },
+      help: { group: "workflow" },
     })
     .on("refine", async () => {
       await cmdRefine();
     })
     .command("generate", "Generate tasks.yaml from implementation plan", {
-      help: { group: "planning" },
+      help: { group: "workflow" },
     })
     .on("generate", async () => {
       await cmdGenerate();
     })
     .command("enter", "Open Claude Code session in project context", {
-      help: { group: "planning" },
+      help: { group: "system" },
     })
     .on("enter", async () => {
       await cmdEnter();

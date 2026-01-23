@@ -441,11 +441,16 @@ export async function cmdValidate(): Promise<void> {
 
     const stats = { todo: 0, ready_for_agent: 0, assigned: 0, in_progress: 0, done: 0, blocked: 0 };
     let checkpointCount = 0;
+    const branchTasks: { taskId: string; repo: string; branch: string; status: TaskStatus }[] = [];
+
     function countStats(tasks: Task[]) {
       for (const task of tasks) {
         stats[task.status]++;
         if (task.checkpoint === true || task.title.includes("[CHECKPOINT]")) {
           checkpointCount++;
+        }
+        if (task.branch && task.repo) {
+          branchTasks.push({ taskId: task.id, repo: task.repo, branch: task.branch, status: task.status });
         }
         countStats(task.subtasks);
       }
@@ -460,5 +465,28 @@ export async function cmdValidate(): Promise<void> {
       `  ${chalk.yellow(stats.ready_for_agent)} ready, ${chalk.gray(stats.todo)} todo, ${chalk.red(stats.blocked)} blocked`
     );
     console.log(`  ${chalk.magenta(checkpointCount)} checkpoint${checkpointCount !== 1 ? "s" : ""}`);
+
+    // Show branch information with worktree paths
+    if (branchTasks.length > 0) {
+      console.log(`\n${chalk.bold("Branch locations:")}`);
+      // Group by repo for cleaner display
+      const byRepo = Map.groupBy(branchTasks, (t) => t.repo);
+      for (const [repo, tasks] of [...byRepo.entries()].sort()) {
+        console.log(`  ${chalk.blue(repo)}:`);
+        // Sort by status: in_progress first, then assigned, then rest
+        const sorted = tasks!.sort((a, b) => {
+          const order = { in_progress: 0, assigned: 1, ready_for_agent: 2, todo: 3, done: 4, blocked: 5 };
+          return order[a.status] - order[b.status];
+        });
+        for (const { taskId, branch, status } of sorted) {
+          // Sanitize branch for filesystem path (slashes -> hyphens)
+          const safeBranch = branch.replace(/\//g, "-");
+          const worktreePath = `repos/${repo}/${safeBranch}`;
+          const statusIndicator = colorStatus(status);
+          console.log(`    ${chalk.yellow(taskId)}: ${chalk.cyan(branch)} [${statusIndicator}]`);
+          console.log(`      ${chalk.dim("cd")} ${worktreePath}`);
+        }
+      }
+    }
   }
 }
