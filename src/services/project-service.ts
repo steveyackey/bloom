@@ -380,10 +380,7 @@ export async function runCreateInPlaceSession(projectDir: string, projectName: s
     EXISTING_CONTEXT: existingContext,
   });
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   console.log(`${chalk.bold.cyan("Starting project creation session...")}\n`);
   console.log(chalk.dim("Claude will review existing files and help you create the PRD.\n"));
