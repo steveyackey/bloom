@@ -470,8 +470,20 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
             } else {
               // We have the lock - proceed with merge
               try {
-                // Check if target worktree exists
-                const targetStatus = getWorktreeStatus(targetWorktreePath);
+                // Check if target worktree exists, create it if not
+                let targetStatus = getWorktreeStatus(targetWorktreePath);
+                if (!targetStatus.exists) {
+                  agentLog.info(`Creating worktree for merge target: ${targetBranch}`);
+                  const createResult = await addWorktree(BLOOM_DIR, taskResult.repo, targetBranch, {
+                    create: false, // Checkout existing branch
+                  });
+                  if (!createResult.success) {
+                    agentLog.error(`Failed to create target worktree: ${createResult.error}`);
+                  } else {
+                    targetStatus = getWorktreeStatus(targetWorktreePath);
+                  }
+                }
+
                 if (targetStatus.exists) {
                   // Make sure target worktree is clean before merging
                   if (targetStatus.clean) {
@@ -566,10 +578,7 @@ ${taskResult.gitConfig?.push_to_remote ? `6. Push the result: \`git push origin 
                     agentLog.warn(`Cannot merge: target worktree (${targetBranch}) has uncommitted changes`);
                   }
                 } else {
-                  agentLog.warn(
-                    `Cannot merge: target worktree for ${targetBranch} does not exist. ` +
-                      `Create it with: bloom repo worktree add ${taskResult.repo} ${targetBranch}`
-                  );
+                  agentLog.warn(`Cannot merge: failed to create target worktree for ${targetBranch}`);
                 }
               } finally {
                 // Always release the lock
