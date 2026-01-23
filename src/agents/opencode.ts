@@ -1,25 +1,56 @@
 import { spawn } from "node:child_process";
-import type { Agent, AgentRunOptions, AgentRunResult } from "./core";
+import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 
-export interface OpenCodeProviderOptions {
+// =============================================================================
+// Provider-Specific Options (OpenCode)
+// =============================================================================
+//
+// These options are specific to OpenCode and don't belong in the generic interface:
+// - autoApprove: OpenCode's permission model (--config-content override)
+//
+// Generic options from AgentConfig are also supported:
+// - mode: "interactive" | "streaming"
+// - model: OpenCode model identifier
+// - streamOutput: Whether to stream output while capturing
+// =============================================================================
+
+export interface OpenCodeProviderOptions extends AgentConfig {
+  /**
+   * @deprecated Use `mode` instead. Will be removed in future version.
+   */
   interactive?: boolean;
+  /**
+   * PROVIDER-SPECIFIC: Auto-approve all tool calls via OPENCODE_CONFIG_CONTENT.
+   * This is OpenCode's security model - other providers have different mechanisms.
+   */
   autoApprove?: boolean;
-  model?: string;
-  /** Stream output to stdout/stderr while capturing */
-  streamOutput?: boolean;
 }
 
 export class OpenCodeAgentProvider implements Agent {
-  private interactive: boolean;
+  private mode: "interactive" | "streaming";
   private autoApprove: boolean;
   private model: string;
   private streamOutput: boolean;
+  private currentSession: AgentSession | undefined;
 
   constructor(options: OpenCodeProviderOptions = {}) {
-    this.interactive = options.interactive ?? false;
+    // Support both new `mode` and deprecated `interactive` option
+    if (options.mode !== undefined) {
+      this.mode = options.mode;
+    } else {
+      this.mode = options.interactive ? "interactive" : "streaming";
+    }
     this.autoApprove = options.autoApprove ?? true;
     this.model = options.model ?? "opencode/minimax-m2.1-free";
     this.streamOutput = options.streamOutput ?? true;
+  }
+
+  /**
+   * Get the currently active session for monitoring/interjection.
+   * Note: OpenCode doesn't support session resume, so sessionId is always undefined.
+   */
+  getActiveSession(): AgentSession | undefined {
+    return this.currentSession;
   }
 
   private getEnv(): NodeJS.ProcessEnv {
@@ -37,10 +68,21 @@ export class OpenCodeAgentProvider implements Agent {
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
-    return this.interactive ? this.runInteractive(options) : this.runNonInteractive(options);
+    return this.mode === "interactive" ? this.runInteractive(options) : this.runStreaming(options);
   }
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
+    const now = Date.now();
+
+    // Track session for monitoring
+    this.currentSession = {
+      startTime: now,
+      lastActivity: now,
+      taskId: options.taskId,
+      agentName: options.agentName,
+      workingDirectory: options.startingDirectory,
+    };
+
     return new Promise((resolve) => {
       // Interactive: opencode --prompt "..." -m model
       const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
@@ -53,6 +95,7 @@ export class OpenCodeAgentProvider implements Agent {
       });
 
       proc.on("error", (error) => {
+        this.currentSession = undefined;
         resolve({
           success: false,
           output: "",
@@ -61,6 +104,7 @@ export class OpenCodeAgentProvider implements Agent {
       });
 
       proc.on("close", (code) => {
+        this.currentSession = undefined;
         const exitCode = code ?? 0;
         resolve({
           success: exitCode === 0,
@@ -70,9 +114,20 @@ export class OpenCodeAgentProvider implements Agent {
     });
   }
 
-  private async runNonInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
+  private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
+    const now = Date.now();
+
+    // Track session for monitoring
+    this.currentSession = {
+      startTime: now,
+      lastActivity: now,
+      taskId: options.taskId,
+      agentName: options.agentName,
+      workingDirectory: options.startingDirectory,
+    };
+
     return new Promise((resolve) => {
-      // Non-interactive: opencode run "prompt" -m model
+      // Streaming: opencode run "prompt" -m model
       const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
       const args = ["run", fullPrompt, "-m", this.model];
 
@@ -88,6 +143,9 @@ export class OpenCodeAgentProvider implements Agent {
       proc.stdout?.on("data", (data) => {
         const chunk = data.toString();
         stdout += chunk;
+        if (this.currentSession) {
+          this.currentSession.lastActivity = Date.now();
+        }
         if (this.streamOutput) {
           process.stdout.write(chunk);
         }
@@ -96,12 +154,16 @@ export class OpenCodeAgentProvider implements Agent {
       proc.stderr?.on("data", (data) => {
         const chunk = data.toString();
         stderr += chunk;
+        if (this.currentSession) {
+          this.currentSession.lastActivity = Date.now();
+        }
         if (this.streamOutput) {
           process.stderr.write(chunk);
         }
       });
 
       proc.on("error", (error) => {
+        this.currentSession = undefined;
         resolve({
           success: false,
           output: stdout,
@@ -110,6 +172,7 @@ export class OpenCodeAgentProvider implements Agent {
       });
 
       proc.on("close", (code) => {
+        this.currentSession = undefined;
         const exitCode = code ?? 0;
         resolve({
           success: exitCode === 0,
