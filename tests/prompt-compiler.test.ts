@@ -579,9 +579,10 @@ describe("prompt compiler", () => {
 
       try {
         compilePrompt(prompt, { capabilities });
-        expect.fail("Should have thrown an error");
+        throw new Error("Should have thrown an error");
       } catch (error) {
         const message = (error as Error).message;
+        if (message === "Should have thrown an error") throw error;
         // Should mention the capability or provide context
         expect(message).toMatch(/supportsWebSearch|Web Search|line/i);
       }
@@ -623,9 +624,10 @@ describe("prompt compiler", () => {
 
       try {
         compilePrompt(prompt, { capabilities, fileName: "test-prompt.md" });
-        expect.fail("Should have thrown an error");
+        throw new Error("Should have thrown an error");
       } catch (error) {
         const message = (error as Error).message;
+        if (message === "Should have thrown an error") throw error;
         expect(message).toContain("test-prompt.md");
       }
     });

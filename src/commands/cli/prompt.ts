@@ -6,11 +6,12 @@ import chalk from "chalk";
 import { type Clerc, Types } from "clerc";
 
 import {
+  type AgentCapabilities,
   getAgentCapabilities,
   getRegisteredAgentNames,
   isValidAgentName,
 } from "../../agents/capabilities";
-import { PromptCompiler, type AgentCapabilities, type CompileOptions } from "../../prompts/compiler";
+import { PromptCompiler, type CompileOptions } from "../../prompts/compiler";
 import { findTask, loadTasks } from "../../tasks";
 import { getTasksFile } from "../context";
 

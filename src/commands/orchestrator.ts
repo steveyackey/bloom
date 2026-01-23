@@ -4,10 +4,10 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createAgent } from "../agents";
+import { createAgent, getAgentCapabilities } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
-import { loadAgentPrompt } from "../prompts";
+import { PromptCompiler } from "../prompts/compiler";
 import {
   addWorktree,
   cleanupMergedBranches,
@@ -294,7 +294,18 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         }
       }
 
-      const systemPrompt = await loadAgentPrompt(agentName, taskResult.taskId!, taskResult.taskCli!);
+      // Compile the agent system prompt using the PromptCompiler
+      // This allows capability-based conditional sections and variable substitution
+      const compiler = new PromptCompiler();
+      const agentCapabilities = getAgentCapabilities("claude") || {};
+      const systemPrompt = await compiler.loadAndCompile("agent-system", {
+        capabilities: agentCapabilities,
+        variables: {
+          AGENT_NAME: agentName,
+          TASK_ID: taskResult.taskId!,
+          TASK_CLI: taskResult.taskCli!,
+        },
+      });
 
       agentLog.info(`Starting Claude session in: ${workingDir}`);
 

@@ -40,7 +40,7 @@ export interface AgentCapabilities {
   supportsLinting?: boolean;
   supportsTypeChecking?: boolean;
   supportsFormatting?: boolean;
-  [key: string]: boolean | undefined;
+  [key: string]: boolean | string[] | number | undefined;
 }
 
 /**
@@ -206,7 +206,9 @@ export class PromptCompiler {
 
     // Process one conditional at a time to handle them correctly
     while ((match = conditionalRegex.exec(result)) !== null) {
-      const [fullMatch, capabilityName, innerContent] = match;
+      const fullMatch = match[0];
+      const capabilityName = match[1] ?? "";
+      const innerContent = match[2] ?? "";
 
       // Check if there's a nested @if inside - if so, skip this one for now
       if (innerContent.includes("<!-- @if ")) {
@@ -215,14 +217,15 @@ export class PromptCompiler {
         const afterMatch = result.slice(match.index + 1);
         const innerMatch = conditionalRegex.exec(afterMatch);
 
-        if (innerMatch && !innerMatch[2].includes("<!-- @if ")) {
+        if (innerMatch && innerMatch[2] && !innerMatch[2].includes("<!-- @if ")) {
           // Found an innermost one, process it
           const actualIndex = match.index + 1 + innerMatch.index;
           const before = result.slice(0, actualIndex);
           const after = result.slice(actualIndex + innerMatch[0].length);
 
-          const isEnabled = Boolean(capabilities[innerMatch[1]]);
-          const replacement = isEnabled ? innerMatch[2] : "";
+          const innerCapability = innerMatch[1] ?? "";
+          const isEnabled = Boolean(capabilities[innerCapability]);
+          const replacement = isEnabled ? (innerMatch[2] ?? "") : "";
           result = before + replacement + after;
           continue;
         }
@@ -248,12 +251,12 @@ export class PromptCompiler {
     const stack: Array<{ capability: string; line: number }> = [];
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+      const line = lines[i] ?? "";
       const lineNumber = i + 1;
 
       // Check for @if markers
       const ifMatch = line.match(/<!-- @if\s+(\w+)\s*-->/);
-      if (ifMatch) {
+      if (ifMatch && ifMatch[1]) {
         stack.push({ capability: ifMatch[1], line: lineNumber });
       }
 
@@ -275,7 +278,7 @@ export class PromptCompiler {
 
     // Check for unclosed conditionals
     if (stack.length > 0) {
-      const unclosed = stack[stack.length - 1];
+      const unclosed = stack[stack.length - 1]!;
       throw new Error(
         this.formatError(
           `Unclosed conditional @if ${unclosed.capability} starting at line ${unclosed.line}: missing @endif`,
