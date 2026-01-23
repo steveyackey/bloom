@@ -228,7 +228,15 @@ export async function primeTasks(
 
   // Create questions for checkpoint tasks that just became ready
   for (const task of checkpointTasks) {
-    const question = `[CHECKPOINT] Task "${task.title}" is ready for review.\n\n${task.instructions || "Please review and mark as done when complete."}\n\nMark task ${task.id} as done?`;
+    // Build location info if task has branch/repo
+    let locationInfo = "";
+    if (task.branch && task.repo) {
+      const safeBranch = task.branch.replace(/\//g, "-");
+      const worktreePath = `repos/${task.repo}/${safeBranch}`;
+      locationInfo = `\n\n📍 **Location:**\n  Repo: ${task.repo}\n  Branch: ${task.branch}\n  Path: cd ${worktreePath}`;
+    }
+
+    const question = `[CHECKPOINT] Task "${task.title}" is ready for review.${locationInfo}\n\n${task.instructions || "Please review and mark as done when complete."}\n\nMark task ${task.id} as done?`;
     await askQuestion("orchestrator", question, {
       taskId: task.id,
       questionType: "yes_no",

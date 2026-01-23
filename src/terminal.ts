@@ -187,15 +187,28 @@ export interface ProcessStats {
 /**
  * Get CPU and memory stats for a process.
  * Returns null if stats cannot be retrieved (process exited, etc.)
+ *
+ * Platform support:
+ * - Linux: reads from /proc/{pid}/stat (most accurate)
+ * - macOS: uses ps command
+ * - Windows: not yet supported (returns null)
  */
 export async function getProcessStats(pid: number): Promise<ProcessStats | null> {
   if (feature("WINDOWS")) {
-    // Windows: use tasklist - not as accurate but works
-    return null; // TODO: Windows support
+    // Windows: would need tasklist or wmic - not implemented yet
+    return null;
   }
 
+  // Try Linux /proc first (faster and more accurate)
+  const linuxStats = await getLinuxProcessStats(pid);
+  if (linuxStats) return linuxStats;
+
+  // Fall back to ps for macOS (and Linux if /proc fails)
+  return getPsProcessStats(pid);
+}
+
+async function getLinuxProcessStats(pid: number): Promise<ProcessStats | null> {
   try {
-    // Linux/macOS: read from /proc/{pid}/stat and /proc/{pid}/statm
     const statFile = Bun.file(`/proc/${pid}/stat`);
     const statmFile = Bun.file(`/proc/${pid}/statm`);
     const uptimeFile = Bun.file("/proc/uptime");
@@ -233,6 +246,39 @@ export async function getProcessStats(pid: number): Promise<ProcessStats | null>
     const rss = Number.parseInt(statmParts[1] || "0", 10); // resident pages
     const pageSize = 4096; // Assuming standard page size
     const memory = (rss * pageSize) / (1024 * 1024); // Convert to MB
+
+    return {
+      cpu: Math.min(100, Math.round(cpu * 10) / 10),
+      memory: Math.round(memory * 10) / 10,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getPsProcessStats(pid: number): Promise<ProcessStats | null> {
+  try {
+    // Use ps to get CPU% and RSS (resident set size in KB)
+    // Works on macOS and Linux
+    const proc = Bun.spawn(["ps", "-p", String(pid), "-o", "%cpu=,rss="], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const output = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0 || !output.trim()) {
+      return null;
+    }
+
+    // Parse output: "  5.2 12345" (cpu% and rss in KB)
+    const parts = output.trim().split(/\s+/);
+    if (parts.length < 2) return null;
+
+    const cpu = Number.parseFloat(parts[0] || "0");
+    const rssKb = Number.parseInt(parts[1] || "0", 10);
+    const memory = rssKb / 1024; // Convert KB to MB
 
     return {
       cpu: Math.min(100, Math.round(cpu * 10) / 10),

@@ -35,24 +35,28 @@ If the user confirms, set `push_to_remote: true` in the git config.
 ### 2. Validation Mode
 Ask about validation approach:
 
-> "How would you like to handle validation at phase boundaries?
+> "How would you like to handle validation?
 >
-> **Option A: Human validation only** (default)
-> - `[CHECKPOINT]` tasks pause for human review
+> **Option A: Human checkpoints** (default)
+> - `[CHECKPOINT]` tasks pause for human review at phase boundaries
 > - You manually review and approve before continuing
 > - Best for: critical work, learning the system, high-stakes projects
 >
-> **Option B: Agent validation at phase boundaries**
-> - Each phase ends with an agent-based validation task
-> - The validation agent runs tests, checks criteria, and auto-approves if passing
-> - Human checkpoints only at major milestones (e.g., end of all phases)
-> - Best for: routine work, high confidence in tests, faster iteration
+> **Option B: Auto mode** (agent validation until final merge)
+> - Agents run automated validation (tests, linting) at phase boundaries
+> - NO human pauses until the very end, right before final merge to main
+> - Single `[CHECKPOINT]` at the end for final human review before merge
+> - Best for: routine work, trusted test suites, faster iteration
 >
 > Which approach would you prefer?"
 
 Based on the answer:
-- **Option A**: Create `[CHECKPOINT]` tasks with `checkpoint: true` at phase boundaries
-- **Option B**: Create validation tasks that run automated checks (tests, linting, etc.) without `checkpoint: true`, and use `[CHECKPOINT]` sparingly for human review milestones only (e.g., final validation)
+- **Option A**: Create `[CHECKPOINT]` tasks with `checkpoint: true` at each phase boundary
+- **Option B (Auto mode)**:
+  - Create regular validation tasks at phase boundaries that run tests/checks automatically
+  - These tasks do NOT have `checkpoint: true` - agents handle them
+  - Only ONE `[CHECKPOINT]` at the very end, right before the final `merge_into: main`
+  - This checkpoint is for human review before merging all work to main
 
 ## Task Schema
 
