@@ -11,11 +11,11 @@
  * Each test includes a PRD requirement reference for traceability.
  */
 
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type AgentCapabilities, type AgentName, hasCapability } from "../../src/agents/capabilities";
+import { type AgentName, hasCapability } from "../../src/agents/capabilities";
 import type { Agent, AgentRunOptions, AgentRunResult, AgentSession } from "../../src/agents/core";
 
 // =============================================================================
@@ -975,7 +975,7 @@ describe("Agent Contract Tests", () => {
  */
 export async function runContractTestsForAgent(
   createAgentFn: () => Agent,
-  agentName: AgentName
+  _agentName: AgentName
 ): Promise<{ passed: number; failed: number; errors: string[] }> {
   const results = {
     passed: 0,
