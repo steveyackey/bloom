@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.7](https://github.com/steveyackey/bloom/compare/bloom-v0.2.6...bloom-v0.2.7) (2026-01-23)
+
+
+### Features
+
+* add done_pending_merge status for merge recovery ([07b1fab](https://github.com/steveyackey/bloom/commit/07b1fab6404c5419c68af0260435e14dbf3bdd36))
+* implement per-task agent provider selection ([3d67554](https://github.com/steveyackey/bloom/commit/3d675542b08afd506f8e7fcde0ecaa7ebdd7c33b))
+
+
+### Bug Fixes
+
+* clarify merge requirements in plan/generate prompts ([51af19f](https://github.com/steveyackey/bloom/commit/51af19f3fb0dbcfeb7bf5b53bde013f1567ee354))
+* emphasize PRs as primary workflow over direct merges ([db64a9b](https://github.com/steveyackey/bloom/commit/db64a9b9ed97586729291ffaab44de25a5149c4c))
+* remove unused imports and prefix unused parameter ([c4cd45b](https://github.com/steveyackey/bloom/commit/c4cd45b978fcd774138cdfb58518fd4f33d665d0))
+* resolve broken docs link and type errors in integration tests ([6951edf](https://github.com/steveyackey/bloom/commit/6951edff14419d8c1fd6b62c5435d01d804d7d94))
+* resolve multi-agent orchestrator bugs and test schema issues ([65b5ddf](https://github.com/steveyackey/bloom/commit/65b5ddf911fc8ee6190d73f2b85cd2e82e1c9afb))
+
 ## [0.2.6](https://github.com/steveyackey/bloom/compare/bloom-v0.2.5...bloom-v0.2.6) (2026-01-23)
 
 
