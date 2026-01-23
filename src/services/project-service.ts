@@ -3,7 +3,7 @@
  * Handles project creation and formatting operations.
  */
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
 import { createAgent } from "../agents";
@@ -242,13 +242,13 @@ export async function createProjectInPlace(projectDir: string, workspaceDir?: st
 // =============================================================================
 
 /**
- * Gathers information about existing files in a directory for context.
+ * Lists existing files in a directory (without reading contents).
+ * The AI will read files it finds relevant using its tools.
  *
  * @param projectDir - Directory to scan
- * @returns Object with file listing and contents of key files
+ * @returns List of files for the AI to review
  */
-function gatherExistingContext(projectDir: string): string {
-  const lines: string[] = [];
+function listExistingFiles(projectDir: string): string {
   const ignoredDirs = new Set([
     "node_modules",
     ".git",
@@ -263,36 +263,7 @@ function gatherExistingContext(projectDir: string): string {
   ]);
   const ignoredFiles = new Set(["package-lock.json", "yarn.lock", "pnpm-lock.yaml", ".DS_Store"]);
 
-  // Extensions we can safely read as text
-  const textExtensions = new Set([
-    ".md",
-    ".txt",
-    ".json",
-    ".yaml",
-    ".yml",
-    ".toml",
-    ".js",
-    ".ts",
-    ".jsx",
-    ".tsx",
-    ".py",
-    ".go",
-    ".rs",
-    ".sh",
-    ".bash",
-    ".css",
-    ".scss",
-    ".html",
-    ".xml",
-    ".sql",
-    ".env.example",
-    ".gitignore",
-    ".dockerignore",
-    "Dockerfile",
-    "Makefile",
-  ]);
-
-  lines.push("## Existing Files in Project Directory\n");
+  const lines: string[] = [];
 
   try {
     const entries = readdirSync(projectDir, { withFileTypes: true });
@@ -300,72 +271,18 @@ function gatherExistingContext(projectDir: string): string {
     const dirs: string[] = [];
 
     for (const entry of entries) {
-      if (entry.name.startsWith(".") && entry.name !== ".env.example") {
-        continue; // Skip hidden files except .env.example
-      }
-
-      if (entry.isDirectory()) {
-        if (!ignoredDirs.has(entry.name)) {
-          dirs.push(`${entry.name}/`);
-        }
-      } else if (entry.isFile()) {
-        if (!ignoredFiles.has(entry.name)) {
-          files.push(entry.name);
-        }
+      if (entry.name.startsWith(".")) continue;
+      if (entry.isDirectory() && !ignoredDirs.has(entry.name)) {
+        dirs.push(`${entry.name}/`);
+      } else if (entry.isFile() && !ignoredFiles.has(entry.name)) {
+        files.push(entry.name);
       }
     }
 
-    // List structure
-    lines.push("### Directory Structure\n```");
-    for (const dir of dirs.sort()) {
-      lines.push(dir);
-    }
-    for (const file of files.sort()) {
-      lines.push(file);
-    }
-    lines.push("```\n");
-
-    // Read contents of key files (limit to reasonable size)
-    const maxFileSize = 10000; // 10KB max per file
-    const maxTotalSize = 50000; // 50KB total
-    let totalSize = 0;
-
-    lines.push("### File Contents\n");
-
-    for (const file of files.sort()) {
-      const ext = file.includes(".") ? `.${file.split(".").pop()!}` : file;
-      const filePath = join(projectDir, file);
-
-      // Check if we should read this file
-      if (!textExtensions.has(ext) && !textExtensions.has(file)) {
-        continue;
-      }
-
-      try {
-        const stats = statSync(filePath);
-        if (stats.size > maxFileSize) {
-          lines.push(`**${file}** (too large, ${stats.size} bytes)\n`);
-          continue;
-        }
-
-        if (totalSize + stats.size > maxTotalSize) {
-          lines.push(`\n*Remaining files omitted due to size limit*\n`);
-          break;
-        }
-
-        const content = readFileSync(filePath, "utf-8");
-        totalSize += stats.size;
-
-        lines.push(`**${file}:**`);
-        lines.push("```");
-        lines.push(content.trim());
-        lines.push("```\n");
-      } catch {
-        // Skip files we can't read
-      }
-    }
+    for (const dir of dirs.sort()) lines.push(dir);
+    for (const file of files.sort()) lines.push(file);
   } catch {
-    lines.push("*Could not read directory contents*\n");
+    lines.push("(could not read directory)");
   }
 
   return lines.join("\n");
@@ -380,9 +297,8 @@ function gatherExistingContext(projectDir: string): string {
  * @param projectName - Name of the project (from folder name)
  */
 export async function runCreateInPlaceSession(projectDir: string, projectName: string): Promise<void> {
-  // Gather context from existing files
-  console.log(chalk.dim("Reading existing files for context...\n"));
-  const existingContext = gatherExistingContext(projectDir);
+  // List existing files (AI will read what it needs)
+  const existingFiles = listExistingFiles(projectDir);
 
   // Build repos context for the prompt
   const reposContext = await buildReposContext(BLOOM_DIR);
@@ -392,7 +308,7 @@ export async function runCreateInPlaceSession(projectDir: string, projectName: s
     {
       PROJECT_DIR: projectDir,
       PROJECT_NAME: projectName,
-      EXISTING_CONTEXT: existingContext,
+      EXISTING_FILES: existingFiles,
       BLOOM_DIR: BLOOM_DIR,
       REPOS_CONTEXT: reposContext,
     },
