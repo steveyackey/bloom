@@ -676,27 +676,38 @@ export async function addWorktree(
     } else if (targetBranchExists.remote) {
       // Branch exists on remote but not locally - create local tracking branch
       result = runGit(["worktree", "add", "-b", branch, worktreePath, `origin/${branch}`], bareRepoPath);
-    } else if (options.baseBranch) {
-      // Create new branch from specific base branch
-      const baseExists = branchExists(bareRepoPath, options.baseBranch);
-      let startPoint: string;
+    } else {
+      // Create new branch - determine the start point
+      let startPoint: string | undefined;
 
-      if (baseExists.local) {
-        startPoint = options.baseBranch;
-      } else if (baseExists.remote) {
-        startPoint = `origin/${options.baseBranch}`;
-      } else {
-        return {
-          success: false,
-          path: "",
-          error: `Base branch '${options.baseBranch}' does not exist locally or remotely`,
-        };
+      if (options.baseBranch) {
+        // Try the specified base branch first
+        const baseExists = branchExists(bareRepoPath, options.baseBranch);
+        if (baseExists.local) {
+          startPoint = options.baseBranch;
+        } else if (baseExists.remote) {
+          startPoint = `origin/${options.baseBranch}`;
+        }
+        // If base branch doesn't exist, fall through to use default branch
       }
 
-      result = runGit(["worktree", "add", "-b", branch, worktreePath, startPoint], bareRepoPath);
-    } else {
-      // Create from current HEAD
-      result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+      // Fall back to default branch if no valid start point yet
+      if (!startPoint) {
+        const defaultBranch = getDefaultBranch(bareRepoPath);
+        const defaultExists = branchExists(bareRepoPath, defaultBranch);
+        if (defaultExists.local) {
+          startPoint = defaultBranch;
+        } else if (defaultExists.remote) {
+          startPoint = `origin/${defaultBranch}`;
+        }
+      }
+
+      if (startPoint) {
+        result = runGit(["worktree", "add", "-b", branch, worktreePath, startPoint], bareRepoPath);
+      } else {
+        // Create from current HEAD as last resort
+        result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+      }
     }
   } else {
     // Checkout existing branch

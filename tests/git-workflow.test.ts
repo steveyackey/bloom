@@ -278,7 +278,7 @@ describe("Git Operations - Worktree Creation with Base Branch", () => {
     expect(featureWorktree).toBeDefined();
   });
 
-  it("fails when base branch does not exist", async () => {
+  it("falls back to default branch when base branch does not exist", async () => {
     const repoResult = await createRepo(TEST_DIR, "test-repo");
     expect(repoResult.success).toBe(true);
 
@@ -287,8 +287,9 @@ describe("Git Operations - Worktree Creation with Base Branch", () => {
       baseBranch: "nonexistent-branch",
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("does not exist");
+    // Should succeed by falling back to the default branch (main)
+    expect(result.success).toBe(true);
+    expect(result.path).toContain("feature-work");
   });
 
   it("creates worktree path with sanitized branch name", async () => {
