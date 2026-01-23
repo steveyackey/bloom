@@ -28,8 +28,7 @@ describe("plan command", () => {
       expect(context).toContain("bloom repo clone");
     });
 
-    it("should list configured repos", async () => {
-      // Create a bloom.config.yaml with repos
+    it("should list configured repos with paths", async () => {
       const configPath = join(TEST_DIR, "bloom.config.yaml");
       const config = {
         version: 1,
@@ -52,35 +51,11 @@ describe("plan command", () => {
 
       const context = await buildReposContext(TEST_DIR);
 
-      expect(context).toContain("## Configured Repositories");
-      expect(context).toContain("### backend");
-      expect(context).toContain("### frontend");
-      expect(context).toContain("https://github.com/org/backend");
-      expect(context).toContain("https://github.com/org/frontend");
-      expect(context).toContain("Default Branch: main");
-      expect(context).toContain("Default Branch: develop");
-    });
-
-    it("should show repo status", async () => {
-      // Create a bloom.config.yaml with repos
-      const configPath = join(TEST_DIR, "bloom.config.yaml");
-      const config = {
-        version: 1,
-        repos: [
-          {
-            name: "my-repo",
-            url: "https://github.com/org/my-repo",
-            defaultBranch: "main",
-            addedAt: new Date().toISOString(),
-          },
-        ],
-      };
-      await Bun.write(configPath, JSON.stringify(config));
-
-      const context = await buildReposContext(TEST_DIR);
-
-      // Since we haven't cloned the repo, it should show as not cloned
-      expect(context).toContain("Status: Not cloned");
+      expect(context).toContain("## Available Repositories");
+      expect(context).toContain("- backend:");
+      expect(context).toContain("- frontend:");
+      expect(context).toContain("/repos/backend/main");
+      expect(context).toContain("/repos/frontend/develop");
     });
   });
 });

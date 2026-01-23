@@ -27,8 +27,7 @@ describe("planning-service", () => {
       expect(context).toContain("bloom repo clone");
     });
 
-    it("returns markdown with '## Configured Repositories' header", async () => {
-      // Create a bloom.config.yaml with repos
+    it("returns markdown with '## Available Repositories' header", async () => {
       const configPath = join(testDir, "bloom.config.yaml");
       const config = {
         version: 1,
@@ -45,10 +44,10 @@ describe("planning-service", () => {
 
       const context = await buildReposContext(testDir);
 
-      expect(context).toContain("## Configured Repositories");
+      expect(context).toContain("## Available Repositories");
     });
 
-    it("includes repo name as ### header for each repo", async () => {
+    it("lists repos with name and full path", async () => {
       const configPath = join(testDir, "bloom.config.yaml");
       const config = {
         version: 1,
@@ -71,11 +70,13 @@ describe("planning-service", () => {
 
       const context = await buildReposContext(testDir);
 
-      expect(context).toContain("### backend");
-      expect(context).toContain("### frontend");
+      expect(context).toContain("- backend:");
+      expect(context).toContain("- frontend:");
+      expect(context).toContain("/repos/backend/main");
+      expect(context).toContain("/repos/frontend/main");
     });
 
-    it("includes URL, default branch for each repo", async () => {
+    it("uses sanitized branch name in path", async () => {
       const configPath = join(testDir, "bloom.config.yaml");
       const config = {
         version: 1,
@@ -92,88 +93,8 @@ describe("planning-service", () => {
 
       const context = await buildReposContext(testDir);
 
-      expect(context).toContain("- URL: https://github.com/org/my-repo");
-      expect(context).toContain("- Default Branch: develop");
-    });
-
-    it("shows 'Cloned' status when bare repo exists", async () => {
-      // Create config
-      const configPath = join(testDir, "bloom.config.yaml");
-      const config = {
-        version: 1,
-        repos: [
-          {
-            name: "cloned-repo",
-            url: "https://github.com/org/cloned-repo",
-            defaultBranch: "main",
-            addedAt: new Date().toISOString(),
-          },
-        ],
-      };
-      await Bun.write(configPath, JSON.stringify(config));
-
-      // Create the bare repo directory structure
-      const bareRepoPath = join(testDir, "repos", "cloned-repo", "cloned-repo.git");
-      mkdirSync(bareRepoPath, { recursive: true });
-
-      const context = await buildReposContext(testDir);
-
-      expect(context).toContain("Status: Cloned");
-    });
-
-    it("shows 'Not cloned' status when bare repo missing", async () => {
-      const configPath = join(testDir, "bloom.config.yaml");
-      const config = {
-        version: 1,
-        repos: [
-          {
-            name: "missing-repo",
-            url: "https://github.com/org/missing-repo",
-            defaultBranch: "main",
-            addedAt: new Date().toISOString(),
-          },
-        ],
-      };
-      await Bun.write(configPath, JSON.stringify(config));
-
-      // Don't create the bare repo directory
-
-      const context = await buildReposContext(testDir);
-
-      expect(context).toContain("Status: Not cloned");
-    });
-
-    it("includes worktree list when worktrees exist", async () => {
-      // Create config
-      const configPath = join(testDir, "bloom.config.yaml");
-      const config = {
-        version: 1,
-        repos: [
-          {
-            name: "repo-with-worktrees",
-            url: "https://github.com/org/repo-with-worktrees",
-            defaultBranch: "main",
-            addedAt: new Date().toISOString(),
-          },
-        ],
-      };
-      await Bun.write(configPath, JSON.stringify(config));
-
-      // Create the bare repo and worktree directories
-      const bareRepoPath = join(testDir, "repos", "repo-with-worktrees", "repo-with-worktrees.git");
-      mkdirSync(bareRepoPath, { recursive: true });
-
-      // Create worktree directories (they must have .git inside to be detected)
-      const worktree1Path = join(testDir, "repos", "repo-with-worktrees", "main");
-      const worktree2Path = join(testDir, "repos", "repo-with-worktrees", "feature-branch");
-      mkdirSync(join(worktree1Path, ".git"), { recursive: true });
-      mkdirSync(join(worktree2Path, ".git"), { recursive: true });
-
-      const context = await buildReposContext(testDir);
-
-      expect(context).toContain("- Active worktrees:");
-      expect(context).toContain("main");
-      expect(context).toContain("feature-branch");
+      expect(context).toContain("- my-repo:");
+      expect(context).toContain("/repos/my-repo/develop");
     });
   });
 

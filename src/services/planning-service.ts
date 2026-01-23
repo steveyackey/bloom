@@ -37,34 +37,14 @@ export async function buildReposContext(bloomDir: string): Promise<string> {
     return "No repositories configured. Run `bloom repo clone <url>` to add repositories.";
   }
 
-  const lines: string[] = ["## Configured Repositories", ""];
-  lines.push("When assigning tasks to repos, use the **repo name** (not the path).");
-  lines.push("The worktree paths are shown for reference only.");
+  const lines: string[] = ["## Available Repositories", ""];
+  lines.push("Use the repo name (first part) in tasks.yaml. Path shown for reference.");
   lines.push("");
 
   for (const repo of repos) {
-    // Sanitize default branch for path (slashes -> hyphens)
     const safeBranch = repo.defaultBranch.replace(/\//g, "-");
-    const defaultWorktreePath = `repos/${repo.name}/${safeBranch}`;
-
-    lines.push(`### ${repo.name}`);
-    lines.push(`- **Repo name for tasks.yaml**: \`${repo.name}\``);
-    lines.push(`- URL: ${repo.url}`);
-    lines.push(`- Default Branch: ${repo.defaultBranch}`);
-    lines.push(`- Status: ${repo.exists ? "Cloned" : "Not cloned"}`);
-
-    if (repo.exists) {
-      lines.push(`- Default worktree: \`${defaultWorktreePath}\``);
-    }
-
-    if (repo.worktrees.length > 0) {
-      lines.push(`- Active worktrees:`);
-      for (const worktree of repo.worktrees) {
-        lines.push(`  - \`repos/${repo.name}/${worktree}\` (branch: ${worktree.replace(/-/g, "/")})`);
-      }
-    }
-
-    lines.push("");
+    const fullPath = `${bloomDir}/repos/${repo.name}/${safeBranch}`;
+    lines.push(`- ${repo.name}: \`${fullPath}\``);
   }
 
   return lines.join("\n");
