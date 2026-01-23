@@ -667,10 +667,17 @@ export async function addWorktree(
   let result: { success: boolean; output: string; error: string };
 
   if (options?.create) {
-    // Create new branch and worktree
-    if (options.baseBranch) {
-      // Create from specific base branch
-      // First check if base branch exists locally or remotely
+    // Check if the branch already exists locally
+    const targetBranchExists = branchExists(bareRepoPath, branch);
+
+    if (targetBranchExists.local) {
+      // Branch already exists locally - just add the worktree pointing to it
+      result = runGit(["worktree", "add", worktreePath, branch], bareRepoPath);
+    } else if (targetBranchExists.remote) {
+      // Branch exists on remote but not locally - create local tracking branch
+      result = runGit(["worktree", "add", "-b", branch, worktreePath, `origin/${branch}`], bareRepoPath);
+    } else if (options.baseBranch) {
+      // Create new branch from specific base branch
       const baseExists = branchExists(bareRepoPath, options.baseBranch);
       let startPoint: string;
 
