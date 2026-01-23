@@ -5,6 +5,7 @@
 import type { AgentConfig } from "../user-config";
 import { loadUserConfig } from "../user-config";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
+import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
 import type { Agent } from "./core";
 import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
 
@@ -14,6 +15,7 @@ import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode"
 
 const agentRegistry = {
   claude: ClaudeAgentProvider,
+  codex: CodexAgentProvider,
   opencode: OpenCodeAgentProvider,
 } as const;
 
@@ -52,6 +54,8 @@ export async function createAgent(mode: AgentMode): Promise<Agent> {
   switch (agentName) {
     case "claude":
       return createClaudeAgent(isInteractive, model);
+    case "codex":
+      return createCodexAgent(isInteractive, model);
     case "opencode":
       return createOpenCodeAgent(isInteractive, model);
     default:
@@ -77,6 +81,20 @@ function createClaudeAgent(interactive: boolean, model?: string): ClaudeAgentPro
   }
 
   return new ClaudeAgentProvider(options);
+}
+
+/**
+ * Creates a Codex agent with the specified mode and optional model.
+ */
+function createCodexAgent(interactive: boolean, model?: string): CodexAgentProvider {
+  const options: CodexProviderOptions = {
+    interactive,
+    approvalMode: "full-auto",
+    streamOutput: true,
+    model: model,
+  };
+
+  return new CodexAgentProvider(options);
 }
 
 /**

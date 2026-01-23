@@ -14,6 +14,15 @@ export {
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 // Claude provider with session management utilities
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
+// Codex provider with session management and fork utilities
+export type {
+  CodexApprovalMode,
+  CodexProviderOptions,
+  CodexRunningSession,
+  CodexStreamEvent,
+  ForkResult,
+} from "./codex";
+export { CodexAgentProvider, forkCodexSession, getActiveCodexSession, interjectCodexSession } from "./codex";
 // Core interface and types
 export * from "./core";
 // Agent factory

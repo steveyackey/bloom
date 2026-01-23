@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as YAML from "yaml";
 import { ClaudeAgentProvider } from "../../src/agents/claude";
+import { CodexAgentProvider } from "../../src/agents/codex";
 import { createAgent, getRegisteredAgents, isAgentRegistered } from "../../src/agents/factory";
 import { OpenCodeAgentProvider } from "../../src/agents/opencode";
 
@@ -174,16 +175,45 @@ describe("agent factory", () => {
     });
   });
 
+  describe("codex agent selection", () => {
+    test("respects interactiveAgent config for codex", async () => {
+      await writeConfig({
+        interactiveAgent: { agent: "codex" },
+      });
+      const agent = await createAgent("interactive");
+      expect(agent).toBeInstanceOf(CodexAgentProvider);
+    });
+
+    test("respects nonInteractiveAgent config for codex", async () => {
+      await writeConfig({
+        nonInteractiveAgent: { agent: "codex" },
+      });
+      const agent = await createAgent("nonInteractive");
+      expect(agent).toBeInstanceOf(CodexAgentProvider);
+    });
+
+    test("passes model to CodexAgentProvider", async () => {
+      const customModel = "gpt-4o";
+      await writeConfig({
+        nonInteractiveAgent: { agent: "codex", model: customModel },
+      });
+      const agent = await createAgent("nonInteractive");
+      expect(agent).toBeInstanceOf(CodexAgentProvider);
+    });
+  });
+
   describe("utility functions", () => {
     test("getRegisteredAgents returns registered agent names", () => {
       const agents = getRegisteredAgents();
       expect(agents).toContain("claude");
+      expect(agents).toContain("codex");
       expect(agents).toContain("opencode");
-      expect(agents.length).toBe(2);
+      expect(agents.length).toBe(3);
     });
 
     test("isAgentRegistered returns true for registered agents", () => {
       expect(isAgentRegistered("claude")).toBe(true);
+      expect(isAgentRegistered("codex")).toBe(true);
       expect(isAgentRegistered("opencode")).toBe(true);
     });
 
