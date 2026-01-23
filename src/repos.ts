@@ -711,10 +711,32 @@ export async function addWorktree(
     }
   } else {
     // Checkout existing branch
-    result = runGit(["worktree", "add", worktreePath, branch], bareRepoPath);
-    if (!result.success) {
-      // Try with origin/branch
+    const targetExists = branchExists(bareRepoPath, branch);
+
+    if (targetExists.local) {
+      // Branch exists locally - just add the worktree
+      result = runGit(["worktree", "add", worktreePath, branch], bareRepoPath);
+    } else if (targetExists.remote) {
+      // Branch exists on remote - create local tracking branch
       result = runGit(["worktree", "add", "-b", branch, worktreePath, `origin/${branch}`], bareRepoPath);
+    } else {
+      // Branch doesn't exist anywhere - create from default branch
+      const defaultBranch = getDefaultBranch(bareRepoPath);
+      const defaultExists = branchExists(bareRepoPath, defaultBranch);
+      let startPoint: string | undefined;
+
+      if (defaultExists.local) {
+        startPoint = defaultBranch;
+      } else if (defaultExists.remote) {
+        startPoint = `origin/${defaultBranch}`;
+      }
+
+      if (startPoint) {
+        result = runGit(["worktree", "add", "-b", branch, worktreePath, startPoint], bareRepoPath);
+      } else {
+        // Last resort - create from HEAD
+        result = runGit(["worktree", "add", "-b", branch, worktreePath], bareRepoPath);
+      }
     }
   }
 
