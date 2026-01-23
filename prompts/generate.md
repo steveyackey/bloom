@@ -144,7 +144,8 @@ conflicts. Tasks working in different directories can use different agents.
 5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
 6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
 7. **SMALL TASKS**: Each task should be 1-4 hours of focused work
-8. **YAML QUOTING**: Quote strings containing special characters:
+8. **ALL WORK MUST REACH MAIN**: Every branch must reach main - typically via `open_pr: true`, or `merge_into: main` for internal branches.
+9. **YAML QUOTING**: Quote strings containing special characters:
    - Backticks: \`command\` -> "\`command\`"
    - Curly braces: { key: value } -> "{ key: value }"
    - Colons with space: foo: bar -> "foo: bar"
@@ -160,15 +161,20 @@ conflicts. Tasks working in different directories can use different agents.
 
 Use the `branch`, `base_branch`, and `merge_into` fields to control git workflow:
 
-### Pattern 1: Feature Branch with Merge Back
+### Pattern 1: Feature Branch with PR (typical)
 ```yaml
 - id: implement-feature
   repo: my-app
   branch: feature/new-feature      # Worktree at: repos/my-app/feature-new-feature
   base_branch: main                # Create from main
-  merge_into: main                 # Merge back when done
+  open_pr: true                    # Opens PR to main when done
 ```
-Agent works in `repos/my-app/feature-new-feature/`, then merges to main.
+Agent works in `repos/my-app/feature-new-feature/`, then opens a PR to main.
+
+**Alternative: Direct merge** (for internal branches or automation):
+```yaml
+  merge_into: main                 # Merges directly, no PR
+```
 
 ### Pattern 2: Work on Default Branch
 ```yaml
@@ -198,19 +204,34 @@ Agent works directly in the main worktree without creating new branches.
 ```
 Multiple tasks share the same worktree. **Important**: Use the same `agent_name` for tasks sharing a branch to prevent conflicts.
 
-### Pattern 4: Parallel Feature Branches
+### Pattern 4: Parallel Feature Branches (both open PRs)
 ```yaml
 - id: frontend-feature
   repo: my-app
   branch: feature/frontend         # Worktree: repos/my-app/feature-frontend
+  base_branch: main
   agent_name: frontend-agent       # Different agent
+  open_pr: true                    # ← Each branch opens its own PR
 
 - id: backend-feature
   repo: my-app
   branch: feature/backend          # Worktree: repos/my-app/feature-backend
+  base_branch: main
   agent_name: backend-agent        # Different agent
+  open_pr: true                    # ← Each branch opens its own PR
 ```
-Different branches = different worktrees = can run in parallel with different agents.
+Both branches open PRs to main. After human review, both get merged.
+
+**Alternative: Direct merge (for internal/automation workflows)**
+```yaml
+# If you need direct merge instead of PRs, use a consolidation task:
+- id: merge-all-features
+  depends_on: [frontend-feature, backend-feature]
+  repo: my-app
+  branch: feature/frontend
+  merge_into: main                 # Direct merge, no PR
+  instructions: Merge both feature branches to main, resolve conflicts
+```
 
 ### Worktree Path Reference
 When validating or debugging, tasks are located at:
@@ -220,16 +241,43 @@ When validating or debugging, tasks are located at:
 ### Git Configuration
 Enable `push_to_remote: true` in the `git:` section to automatically push after each task.
 
+## CRITICAL: All Work Must Reach Main
+
+**Every task list MUST end with all work in main** - typically via PR, or direct merge for internal branches.
+
+### Reaching main: Two options
+
+| Option | When to use | Task field |
+|--------|-------------|------------|
+| **PR (typical)** | Feature branches to main, needs review | `open_pr: true` |
+| **Direct merge** | Internal/phase branches, automation | `merge_into: main` |
+
+### What to check:
+1. **Trace every branch**: Follow each `branch` → does it have `open_pr: true` or `merge_into` leading to main?
+2. **Last task reaches main**: Final task(s) should have `open_pr: true` or `merge_into: main`
+3. **No orphaned branches**: A branch with no path to main is a bug
+
+### Common mistakes:
+- ❌ Parallel tasks without final PR/merge tasks to consolidate
+- ❌ `merge_into: some-feature-branch` without that branch ever reaching main
+- ❌ Checkpoint that validates but doesn't merge or open PR
+- ❌ Forgetting `open_pr: true` or `merge_into` on the last task of a phase
+
+### Self-check before saving:
+Ask yourself: "After all tasks complete and PRs are merged, will main contain all the work?" If no, add PR/merge tasks.
+
 ## Complete Example
+
+This example shows a two-phase project with parallel work that converges to main via PRs:
 
 ```yaml
 git:
-  push_to_remote: true
+  push_to_remote: true               # Required for PRs
   auto_cleanup_merged: true
 
 tasks:
   # ===========================================================================
-  # Phase 1: Setup
+  # Phase 1: Setup (sequential work → PR to main)
   # ===========================================================================
   - id: setup-project-structure
     title: Initialize project structure
@@ -238,7 +286,8 @@ tasks:
     depends_on: []
     repo: core-package
     branch: feature/phase-1-setup
-    base_branch: main
+    base_branch: main                # Branch from main
+    agent_name: setup-agent
     instructions: Create base directory layout and config files
     acceptance_criteria:
       - src/ directory exists with index.ts
@@ -248,45 +297,108 @@ tasks:
     title: Install core dependencies
     status: todo
     phase: 1
-    depends_on:
-      - setup-project-structure
+    depends_on: [setup-project-structure]
     repo: core-package
-    branch: feature/phase-1-setup
+    branch: feature/phase-1-setup    # Same branch as above (sequential)
+    agent_name: setup-agent          # Same agent (sequential)
     instructions: Add zod and yaml packages
     acceptance_criteria:
       - zod installed for schema validation
       - yaml installed for file parsing
-    validation_task_id: validate-phase-1
 
-  # CHECKPOINT - Human validates before next phase
+  # CHECKPOINT - Validates and opens PR for phase 1
   - id: validate-phase-1
-    title: "[CHECKPOINT] Validate phase 1 setup"
+    title: "[CHECKPOINT] Validate phase 1 and open PR"
     status: todo
     phase: 1
     checkpoint: true
-    depends_on:
-      - setup-project-structure
-      - setup-dependencies
+    depends_on: [setup-dependencies]
     repo: core-package
     branch: feature/phase-1-setup
-    merge_into: main
+    open_pr: true                    # ← PR TO MAIN (typical workflow)
+    agent_name: setup-agent
     instructions: |
       VALIDATION CHECKPOINT - Human review required.
-
-      Run these checks:
-      - bun install succeeds
-      - tsc --noEmit passes
-
-      After validation, merge to main and mark done.
+      1. Run: bun install && tsc --noEmit
+      2. Push branch and open PR to main
+      3. Wait for review/merge before phase 2 can branch from updated main
     acceptance_criteria:
       - "`bun install` succeeds"
       - "`tsc --noEmit` passes"
-      - Human has reviewed and approved
+      - PR opened and ready for review
+
+  # ===========================================================================
+  # Phase 2: Features (parallel work → both open PRs to main)
+  # ===========================================================================
+  - id: add-frontend-feature
+    title: Add frontend components
+    status: todo
+    phase: 2
+    depends_on: [validate-phase-1]   # Depends on phase 1 PR merge
+    repo: core-package
+    branch: feature/frontend         # Separate branch
+    base_branch: main                # Branch from updated main
+    agent_name: frontend-agent       # Different agent (parallel)
+    open_pr: true                    # ← PR TO MAIN
+    instructions: |
+      Create React components for the UI.
+      When done, push and open a PR to main.
+    acceptance_criteria:
+      - Components render without errors
+      - Unit tests pass
+      - PR opened to main
+
+  - id: add-backend-feature
+    title: Add backend API
+    status: todo
+    phase: 2
+    depends_on: [validate-phase-1]   # Same dep - runs in PARALLEL with frontend
+    repo: core-package
+    branch: feature/backend          # Separate branch
+    base_branch: main                # Branch from updated main
+    agent_name: backend-agent        # Different agent (parallel)
+    open_pr: true                    # ← PR TO MAIN
+    instructions: |
+      Create Express API endpoints.
+      When done, push and open a PR to main.
+    acceptance_criteria:
+      - API endpoints respond correctly
+      - Integration tests pass
+      - PR opened to main
+
+  # FINAL CHECKPOINT - Validates all PRs are ready
+  - id: validate-phase-2
+    title: "[CHECKPOINT] Final validation - all PRs ready"
+    status: todo
+    phase: 2
+    checkpoint: true
+    depends_on: [add-frontend-feature, add-backend-feature]  # Wait for BOTH
+    repo: core-package
+    branch: main                     # Work from main to verify
+    agent_name: frontend-agent
+    instructions: |
+      FINAL CHECKPOINT - Verify all PRs are ready for merge.
+
+      1. Check that frontend PR is open and CI passes
+      2. Check that backend PR is open and CI passes
+      3. Review for any conflicts between the two PRs
+      4. After human merges both PRs, main will contain all work
+    acceptance_criteria:
+      - Frontend PR open with passing CI
+      - Backend PR open with passing CI
+      - No merge conflicts between PRs
+      - Ready for human to merge both PRs
 ```
+
+**Path to main verification:**
+- Phase 1: `feature/phase-1-setup` → PR to main ✓
+- Phase 2: `feature/frontend` → PR to main ✓, `feature/backend` → PR to main ✓
+- **Result**: After PRs are merged, all work ends up in main ✓
 
 ## When Done
 
 After writing the tasks.yaml, let the user know:
 1. The tasks have been generated to `tasks.yaml`
-2. They can review and edit it if needed
-3. They should run `bloom run` to start the orchestrator and begin execution
+2. **Verify path to main**: List all branches and confirm each reaches main (via `open_pr: true` or `merge_into`)
+3. They can review and edit it if needed
+4. They should run `bloom run` to start the orchestrator and begin execution
