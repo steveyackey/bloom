@@ -46,7 +46,6 @@ export const FIXTURE_TASKS = {
         title: "Set up project structure",
         status: "ready_for_agent",
         agent_name: "phase-1",
-        agent: "claude",
         depends_on: [],
         acceptance_criteria: ["Create directory structure", "Initialize package.json"],
         ai_notes: [],
@@ -57,7 +56,6 @@ export const FIXTURE_TASKS = {
         title: "Implement core module",
         status: "todo",
         agent_name: "phase-1",
-        agent: "claude",
         depends_on: ["task-1"],
         acceptance_criteria: ["Create main.ts", "Export public API"],
         ai_notes: [],
@@ -68,7 +66,6 @@ export const FIXTURE_TASKS = {
         title: "Add tests",
         status: "todo",
         agent_name: "phase-1",
-        agent: "claude",
         depends_on: ["task-2"],
         acceptance_criteria: ["Unit tests for all functions", "Coverage > 80%"],
         ai_notes: [],
@@ -88,7 +85,6 @@ export const FIXTURE_TASKS = {
         title: "Research and plan implementation",
         status: "ready_for_agent",
         agent_name: "researcher",
-        agent: "claude",
         depends_on: [],
         acceptance_criteria: ["Document API requirements", "Create implementation plan"],
         ai_notes: [],
@@ -99,7 +95,6 @@ export const FIXTURE_TASKS = {
         title: "Implement planned features",
         status: "todo",
         agent_name: "implementer",
-        agent: "copilot",
         depends_on: ["task-claude"],
         acceptance_criteria: ["Implement all planned features", "Pass type checking"],
         ai_notes: [],
@@ -119,7 +114,6 @@ export const FIXTURE_TASKS = {
         title: "Research latest React patterns",
         status: "ready_for_agent",
         agent_name: "researcher",
-        agent: "cline",
         requires_capabilities: ["supportsWebSearch"],
         depends_on: [],
         acceptance_criteria: ["Document React 19 features"],
@@ -140,7 +134,6 @@ export const FIXTURE_TASKS = {
         title: "Build frontend components",
         status: "ready_for_agent",
         agent_name: "frontend-dev",
-        agent: "claude",
         depends_on: [],
         acceptance_criteria: ["Create React components"],
         ai_notes: [],
@@ -151,7 +144,6 @@ export const FIXTURE_TASKS = {
         title: "Build API endpoints",
         status: "ready_for_agent",
         agent_name: "backend-dev",
-        agent: "opencode",
         depends_on: [],
         acceptance_criteria: ["Create REST endpoints"],
         ai_notes: [],
@@ -170,7 +162,6 @@ export const FIXTURE_TASKS = {
         title: "Long-running implementation",
         status: "in_progress",
         agent_name: "worker",
-        agent: "claude",
         session_id: "abc123-previous-session",
         depends_on: [],
         acceptance_criteria: ["Complete implementation"],
@@ -370,10 +361,14 @@ describe("Multi-Agent Integration Tests", () => {
       const _orchestratorState = createMockOrchestratorState();
       let currentSessionId: string | undefined;
 
+      // The agent provider comes from config, not from tasks
+      const configuredAgent = FIXTURE_CONFIGS.defaultClaude.nonInteractiveAgent.agent;
+
       // Mock agent execution to track calls
       const mockExecutions: Array<{
         taskId: string;
-        agent: string;
+        agentName: string;
+        agentProvider: string;
         sessionId?: string;
       }> = [];
 
@@ -385,7 +380,8 @@ describe("Multi-Agent Integration Tests", () => {
 
         mockExecutions.push({
           taskId: task.id,
-          agent: task.agent,
+          agentName: task.agent_name,
+          agentProvider: configuredAgent, // Provider comes from config
           sessionId: currentSessionId,
         });
 
@@ -395,7 +391,10 @@ describe("Multi-Agent Integration Tests", () => {
 
       // Assertions
       expect(mockExecutions).toHaveLength(3);
-      expect(mockExecutions.every((e) => e.agent === "claude")).toBe(true);
+      // All tasks use the same agent provider (from config)
+      expect(mockExecutions.every((e) => e.agentProvider === "claude")).toBe(true);
+      // All tasks are in the same agent group
+      expect(mockExecutions.every((e) => e.agentName === "phase-1")).toBe(true);
 
       // Session should persist (later tasks should have session from earlier)
       expect(mockExecutions[1]?.sessionId).toBeDefined();
@@ -424,43 +423,52 @@ describe("Multi-Agent Integration Tests", () => {
   });
 
   // ===========================================================================
-  // 2. Agent Switching Mid-Workflow
+  // 2. Agent Groups and Provider Configuration
   // ===========================================================================
-  describe("2. Agent Switching Mid-Workflow", () => {
+  describe("2. Agent Groups and Provider Configuration", () => {
     /**
-     * GIVEN: tasks.yaml with 2 tasks
-     * AND: task 1 uses claude, task 2 uses copilot
+     * GIVEN: tasks.yaml with 2 tasks in different agent groups
+     * AND: config specifies claude as the provider
      * WHEN: bloom orchestrator runs
-     * THEN: task 1 uses Claude-compiled prompt
-     * AND: task 2 uses Copilot-compiled prompt
+     * THEN: all tasks use the configured provider (claude)
+     * AND: tasks are assigned to different agent groups
+     *
+     * NOTE: The current architecture uses a single provider for all tasks,
+     * determined by config. Per-task provider selection is not supported.
      */
-    test("switches agents between tasks and compiles prompts per-agent", async () => {
+    test("assigns tasks to different agent groups but uses same provider", async () => {
       writeTasks(FIXTURE_TASKS.twoTasksDifferentAgents);
+      writeConfig(FIXTURE_CONFIGS.defaultClaude);
 
-      const promptsCompiled: Array<{ taskId: string; agent: string }> = [];
+      const configuredProvider = FIXTURE_CONFIGS.defaultClaude.nonInteractiveAgent.agent;
+
+      const tasksProcessed: Array<{ taskId: string; agentName: string; provider: string }> = [];
 
       // Simulate orchestrator processing tasks
       for (const task of FIXTURE_TASKS.twoTasksDifferentAgents.tasks) {
-        promptsCompiled.push({
+        tasksProcessed.push({
           taskId: task.id,
-          agent: task.agent,
+          agentName: task.agent_name,
+          provider: configuredProvider, // All use same provider from config
         });
       }
 
-      // Verify different agents are used
-      expect(promptsCompiled[0]?.agent).toBe("claude");
-      expect(promptsCompiled[1]?.agent).toBe("copilot");
+      // Verify different agent groups
+      expect(tasksProcessed[0]?.agentName).toBe("researcher");
+      expect(tasksProcessed[1]?.agentName).toBe("implementer");
+
+      // All use same provider from config
+      expect(tasksProcessed.every((t) => t.provider === "claude")).toBe(true);
     });
 
-    test("generates agent-specific prompt sections for each task", () => {
+    test("supports multiple agent groups for parallel execution", () => {
       const task1 = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[0];
       const task2 = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[1];
 
-      // Claude prompt should have web search capability
-      expect(task1?.agent).toBe("claude");
-
-      // Copilot prompt should have GitHub MCP reference
-      expect(task2?.agent).toBe("copilot");
+      // Different agent groups allow parallel execution
+      expect(task1?.agent_name).toBe("researcher");
+      expect(task2?.agent_name).toBe("implementer");
+      expect(task1?.agent_name).not.toBe(task2?.agent_name);
     });
   });
 
@@ -485,20 +493,21 @@ describe("Multi-Agent Integration Tests", () => {
       expect(configAgent).toBe("claude"); // Original config unchanged
     });
 
-    test("task-level agent overrides config default", () => {
+    test("config determines provider for all tasks", () => {
       writeConfig(FIXTURE_CONFIGS.defaultClaude);
       writeTasks(FIXTURE_TASKS.twoTasksDifferentAgents);
 
-      // Task specifies its own agent, should override config
-      const task = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[1];
+      // Provider is determined by config, not by individual tasks
       const configDefault = FIXTURE_CONFIGS.defaultClaude.nonInteractiveAgent.agent;
 
-      expect(task?.agent).toBe("copilot");
+      // All tasks use the configured provider
       expect(configDefault).toBe("claude");
 
-      // Resolved agent should be task-level
-      const resolvedAgent = task?.agent ?? configDefault;
-      expect(resolvedAgent).toBe("copilot");
+      // Tasks have agent_name (group) but not agent (provider)
+      const task1 = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[0];
+      const task2 = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[1];
+      expect(task1?.agent_name).toBe("researcher");
+      expect(task2?.agent_name).toBe("implementer");
     });
   });
 
@@ -557,7 +566,7 @@ describe("Multi-Agent Integration Tests", () => {
     test("gracefully degrades when agent lacks required capability", () => {
       const task = FIXTURE_TASKS.taskWithWebSearch.tasks[0];
 
-      // Cline capabilities - does NOT support web search
+      // If config specifies cline as provider, capabilities would be:
       const clineCapabilities = {
         supportsWebSearch: false,
         supportsFileRead: true,
@@ -571,10 +580,10 @@ describe("Multi-Agent Integration Tests", () => {
       const expectedExclusions = FIXTURE_EXPECTED_PROMPTS.clinePromptSections.shouldExclude;
       expect(expectedExclusions).toContain("Web search");
 
-      // Agent is still Cline as specified
-      expect(task?.agent).toBe("cline");
+      // Task has agent_name (group), provider is determined by config
+      expect(task?.agent_name).toBe("researcher");
 
-      // Capability check
+      // Cline capability check - no web search support
       expect(clineCapabilities.supportsWebSearch).toBe(false);
     });
 
@@ -1113,10 +1122,13 @@ Done.`;
       const tasks = FIXTURE_TASKS.threeTaskSingleAgent.tasks;
       const orchestratorState = createMockOrchestratorState();
 
+      // Provider comes from config (simulating defaultClaude config)
+      const configuredProvider: AgentName = "claude";
+
       // Simulate orchestrator processing each task
       for (const task of tasks) {
-        // Get capabilities for the agent
-        const capabilities = getAgentCapabilities(task.agent);
+        // Get capabilities for the configured provider (not from task)
+        const capabilities = getAgentCapabilities(configuredProvider);
         expect(capabilities).toBeDefined();
 
         // Compile a task prompt (simulating what orchestrator does)
@@ -1127,10 +1139,10 @@ Done.`;
           sessionId: `session-${task.id}`,
         });
 
-        // Record execution
+        // Record execution - provider comes from config, agent_name from task
         orchestratorState.executedTasks.push({
           taskId: task.id,
-          agent: task.agent,
+          agent: configuredProvider,
           prompt: taskPrompt,
           sessionId: mockBehavior.sessionId,
           startTime: Date.now(),
@@ -1141,18 +1153,24 @@ Done.`;
       // Verify all tasks were "executed"
       expect(orchestratorState.executedTasks).toHaveLength(3);
       expect(orchestratorState.executedTasks.map((t) => t.taskId)).toEqual(["task-1", "task-2", "task-3"]);
+      // All use the same provider from config
       expect(orchestratorState.executedTasks.every((t) => t.agent === "claude")).toBe(true);
     });
 
-    test("simulates agent switching with different prompts per agent", async () => {
+    test("compiles prompts based on configured provider capabilities", async () => {
       const tasks = FIXTURE_TASKS.twoTasksDifferentAgents.tasks;
       const compiledPrompts: Map<string, string> = new Map();
 
-      // Simulate compiling prompts for each task based on its agent
-      for (const task of tasks) {
-        const capabilities = getAgentCapabilities(task.agent as AgentName);
+      // Simulate different config providers for demonstration
+      const providers: AgentName[] = ["claude", "cline"];
 
-        // Create agent-specific prompt section
+      // Compile prompts using different providers to show capability differences
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i]!;
+        const provider = providers[i % providers.length]!;
+        const capabilities = getAgentCapabilities(provider);
+
+        // Create agent-specific prompt section based on capabilities
         const agentSection = capabilities?.supportsWebSearch
           ? "Use web search when needed."
           : "No web search available.";
@@ -1161,16 +1179,15 @@ Done.`;
         compiledPrompts.set(task.id, prompt);
       }
 
-      // Verify prompts are different based on agent capabilities
+      // Verify prompts differ based on provider capabilities
       const claudePrompt = compiledPrompts.get("task-claude")!;
-      const copilotPrompt = compiledPrompts.get("task-copilot")!;
+      const clinePrompt = compiledPrompts.get("task-copilot")!;
 
       // Claude has web search
       expect(claudePrompt).toContain("web search when needed");
 
-      // Note: Copilot also has web search in our registry
-      // This test verifies the prompts are compiled per-agent
-      expect(copilotPrompt).toBeDefined();
+      // Cline does not have web search
+      expect(clinePrompt).toContain("No web search available");
     });
   });
 });

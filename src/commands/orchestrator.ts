@@ -4,7 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createAgent, getAgentCapabilities } from "../agents";
+import { type AgentName, createAgent, getAgentCapabilities } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { PromptCompiler } from "../prompts/compiler";
@@ -33,6 +33,7 @@ import {
   saveTasks,
   updateTaskStatus,
 } from "../tasks";
+import { getDefaultAgentName, loadUserConfig } from "../user-config";
 import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
 
 // =============================================================================
@@ -215,6 +216,11 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
   const agentLog = logger.agent(agentName);
   agentLog.info(`Starting work loop (polling every ${POLL_INTERVAL_MS / 1000}s)...`);
 
+  // Load user config to determine which agent provider to use
+  const userConfig = await loadUserConfig();
+  const agentProvider = getDefaultAgentName(userConfig) as AgentName;
+  agentLog.debug(`Using agent provider: ${agentProvider}`);
+
   const agent = await createAgent("nonInteractive");
 
   while (true) {
@@ -297,7 +303,7 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
       // Compile the agent system prompt using the PromptCompiler
       // This allows capability-based conditional sections and variable substitution
       const compiler = new PromptCompiler();
-      const agentCapabilities = getAgentCapabilities("claude") || {};
+      const agentCapabilities = getAgentCapabilities(agentProvider) || {};
       const systemPrompt = await compiler.loadAndCompile("agent-system", {
         capabilities: agentCapabilities,
         variables: {
@@ -307,7 +313,7 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         },
       });
 
-      agentLog.info(`Starting Claude session in: ${workingDir}`);
+      agentLog.info(`Starting ${agentProvider} session in: ${workingDir}`);
 
       const startTime = Date.now();
       let result = await agent.run({
