@@ -181,4 +181,53 @@ function validateTaskGitConfig(tasks: Task[]): void {
       validateTaskGitConfig(task.subtasks);
     }
   }
+  validateBranchNamingConflicts(tasks);
+}
+
+/**
+ * Validate that merge_into branches don't conflict with child branch naming.
+ * Git doesn't allow a branch 'foo/bar' to exist if 'foo/bar/baz' exists,
+ * because refs are stored as filesystem paths.
+ */
+function validateBranchNamingConflicts(tasks: Task[]): void {
+  // Collect all branches and merge targets grouped by repo
+  const repoInfo = new Map<string, { branches: Set<string>; mergeTargets: Set<string> }>();
+
+  function collectBranches(taskList: Task[]) {
+    for (const task of taskList) {
+      if (task.repo) {
+        if (!repoInfo.has(task.repo)) {
+          repoInfo.set(task.repo, { branches: new Set(), mergeTargets: new Set() });
+        }
+        const info = repoInfo.get(task.repo)!;
+        if (task.branch) {
+          info.branches.add(task.branch);
+        }
+        if (task.merge_into) {
+          info.mergeTargets.add(task.merge_into);
+        }
+      }
+      if (task.subtasks.length > 0) {
+        collectBranches(task.subtasks);
+      }
+    }
+  }
+
+  collectBranches(tasks);
+
+  // Check for conflicts: a merge target can't be a prefix of any branch
+  for (const [repo, info] of repoInfo) {
+    for (const mergeTarget of info.mergeTargets) {
+      const prefix = `${mergeTarget}/`;
+      for (const branch of info.branches) {
+        if (branch.startsWith(prefix)) {
+          throw new Error(
+            `Branch naming conflict in repo '${repo}': merge target '${mergeTarget}' conflicts with branch '${branch}'. ` +
+              `Git cannot create '${mergeTarget}' when '${branch}' exists because refs are stored as filesystem paths. ` +
+              `Rename the merge target to something like '${mergeTarget}-base' or '${mergeTarget}-integration'.`
+          );
+        }
+      }
+    }
+  }
 }
