@@ -2,11 +2,19 @@
 import { dirname, resolve } from "node:path";
 import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
-import { interjectSession } from "./agents";
+import {
+  type AgentAvailability,
+  checkAllAgentsAvailability,
+  getAgentDefaultModel,
+  getAgentModels,
+  getRegisteredAgents,
+  interjectSession,
+} from "./agents";
 import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
 import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 import { getProcessStatsBatch, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
+import { loadUserConfig, saveUserConfig, type UserConfig } from "./user-config";
 
 // =============================================================================
 // Types
@@ -80,6 +88,12 @@ export class OrchestratorTUI {
   private stopTriggerWatch?: () => void;
   private lastRenderedOutput = "";
   private statsUpdateInterval?: ReturnType<typeof setInterval>;
+  // Agent selection state
+  private agentAvailability: Map<string, AgentAvailability> = new Map();
+  private currentAgent: string = "claude";
+  private currentModel: string | undefined;
+  private userConfig: UserConfig | null = null;
+  private isShowingSelector = false;
 
   constructor(configs?: AgentConfig[]) {
     this.cols = process.stdout.columns || 80;
@@ -128,6 +142,9 @@ export class OrchestratorTUI {
 
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
+
+    // Load user config and agent availability
+    await this.loadAgentState();
 
     // Auto-create panes for configured services/agents
     for (const config of this.paneConfigs) {
@@ -190,6 +207,198 @@ export class OrchestratorTUI {
     if (changed) {
       this.scheduleRender();
     }
+  }
+
+  /**
+   * Load agent availability and user configuration.
+   */
+  private async loadAgentState() {
+    // Load user config
+    this.userConfig = await loadUserConfig();
+
+    // Set current agent from config
+    this.currentAgent = this.userConfig.interactiveAgent?.agent ?? "claude";
+    this.currentModel = this.userConfig.interactiveAgent?.model ?? getAgentDefaultModel(this.currentAgent);
+
+    // Check agent availability
+    this.agentAvailability = await checkAllAgentsAvailability();
+
+    // Refresh availability periodically (every 30 seconds)
+    setInterval(async () => {
+      this.agentAvailability = await checkAllAgentsAvailability();
+      this.scheduleRender();
+    }, 30000);
+  }
+
+  /**
+   * Show agent selector using inquirer.
+   * Temporarily exits raw mode to allow inquirer to work.
+   */
+  private async showAgentSelector() {
+    if (this.isShowingSelector) return;
+    this.isShowingSelector = true;
+
+    // Check if there are active agent sessions
+    const hasActiveSessions = this.panes.some(
+      (p) => p.status === "running" && p.config.name !== "dashboard" && p.config.name !== "questions"
+    );
+
+    try {
+      // Exit raw mode and alternate screen for inquirer
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+      process.stdout.write(ansi.showCursor + ansi.leaveAltScreen);
+
+      const select = (await import("@inquirer/select")).default;
+      const confirm = (await import("@inquirer/confirm")).default;
+
+      // Show confirmation if there are active sessions
+      if (hasActiveSessions) {
+        const shouldSwitch = await confirm({
+          message: "There are active agent sessions. Switching agents will affect new panes only. Continue?",
+          default: true,
+        });
+
+        if (!shouldSwitch) {
+          this.restoreScreen();
+          return;
+        }
+      }
+
+      // Build choices with availability info
+      const agents = getRegisteredAgents();
+      const choices = agents.map((agent) => {
+        const availability = this.agentAvailability.get(agent);
+        const isAvailable = availability?.available ?? false;
+        const isCurrent = agent === this.currentAgent;
+
+        let name = agent;
+        if (isCurrent) name = `${agent} (current)`;
+        if (!isAvailable) {
+          name = `${agent} [unavailable: ${availability?.unavailableReason || "unknown"}]`;
+        }
+
+        return {
+          name,
+          value: agent,
+          disabled: !isAvailable ? availability?.unavailableReason || "Not available" : false,
+        };
+      });
+
+      const selectedAgent = await select({
+        message: "Select an agent:",
+        choices,
+        default: this.currentAgent,
+      });
+
+      // Update current agent
+      this.currentAgent = selectedAgent;
+      this.currentModel = getAgentDefaultModel(selectedAgent);
+
+      // Save to user config
+      if (this.userConfig) {
+        this.userConfig.interactiveAgent = {
+          agent: selectedAgent,
+          model: this.currentModel,
+        };
+        await saveUserConfig(this.userConfig);
+      }
+
+      // Now show model selector
+      await this.showModelSelector();
+    } catch {
+      // User cancelled or error
+    } finally {
+      this.restoreScreen();
+    }
+  }
+
+  /**
+   * Show model selector using inquirer.
+   */
+  private async showModelSelector() {
+    try {
+      const select = (await import("@inquirer/select")).default;
+
+      const models = getAgentModels(this.currentAgent);
+      if (models.length === 0) {
+        console.log(chalk.yellow(`No models configured for ${this.currentAgent}`));
+        return;
+      }
+
+      const choices = models.map((model) => ({
+        name: model === this.currentModel ? `${model} (current)` : model,
+        value: model,
+      }));
+
+      const selectedModel = await select({
+        message: `Select a model for ${this.currentAgent}:`,
+        choices,
+        default: this.currentModel,
+      });
+
+      this.currentModel = selectedModel;
+
+      // Save to user config
+      if (this.userConfig) {
+        this.userConfig.interactiveAgent = {
+          agent: this.currentAgent,
+          model: selectedModel,
+        };
+        await saveUserConfig(this.userConfig);
+      }
+
+      console.log(chalk.green(`\nAgent: ${this.currentAgent}, Model: ${this.currentModel}`));
+      console.log(chalk.dim("Press any key to continue..."));
+
+      // Wait for keypress
+      await new Promise<void>((resolve) => {
+        const handler = () => {
+          process.stdin.removeListener("data", handler);
+          resolve();
+        };
+        process.stdin.once("data", handler);
+        process.stdin.resume();
+      });
+    } catch {
+      // User cancelled
+    }
+  }
+
+  /**
+   * Show model selector only (keyboard shortcut 'm').
+   */
+  private async showModelSelectorOnly() {
+    if (this.isShowingSelector) return;
+    this.isShowingSelector = true;
+
+    try {
+      // Exit raw mode and alternate screen for inquirer
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+      process.stdout.write(ansi.showCursor + ansi.leaveAltScreen);
+
+      await this.showModelSelector();
+    } catch {
+      // User cancelled or error
+    } finally {
+      this.restoreScreen();
+    }
+  }
+
+  /**
+   * Restore the TUI screen after showing selector.
+   */
+  private restoreScreen() {
+    this.isShowingSelector = false;
+    process.stdout.write(ansi.enterAltScreen + ansi.hideCursor + ansi.clearScreen);
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+    }
+    this.lastRenderedOutput = ""; // Force full re-render
+    this.render();
   }
 
   private cleanup() {
@@ -299,6 +508,14 @@ export class OrchestratorTUI {
       case "i":
         // Interject - mark pane for human takeover
         this.interjectPane(this.selectedIndex);
+        break;
+      case "a":
+        // Open agent selector
+        this.showAgentSelector();
+        break;
+      case "m":
+        // Open model selector
+        this.showModelSelectorOnly();
         break;
     }
   }
@@ -698,8 +915,15 @@ export class OrchestratorTUI {
     const agentPanes = this.panes.filter((p) => p.config.name !== "dashboard" && p.config.name !== "questions");
     const activeAgents = agentPanes.filter((p) => p.status === "running").length;
     const agentCount = chalk.green(`${activeAgents}/${agentPanes.length}`);
-    const keys = chalk.dim("n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit");
-    const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Agents:")} ${agentCount} ${chalk.dim("|")} ${keys}`;
+
+    // Current agent and model in status bar
+    const agentAvail = this.agentAvailability.get(this.currentAgent);
+    const agentStatus = agentAvail?.available ? chalk.green(this.currentAgent) : chalk.red(this.currentAgent);
+    const modelDisplay = this.currentModel ? chalk.cyan(this.currentModel) : chalk.dim("default");
+    const agentInfo = `${agentStatus}/${modelDisplay}`;
+
+    const keys = chalk.dim("a:agent m:model n:new r:restart x:kill i:interject v:view hjkl:nav Enter:focus q:quit");
+    const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Panes:")} ${agentCount} ${chalk.dim("|")} ${chalk.yellow("Agent:")} ${agentInfo} ${chalk.dim("|")} ${keys}`;
     // Pad to full width to overwrite any previous content
     output += header + " ".repeat(Math.max(0, this.cols - this.stripAnsi(header).length));
 

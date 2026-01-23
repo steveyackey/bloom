@@ -3,54 +3,56 @@ import chalk from "chalk";
 import { createLogger } from "../logger";
 import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 
-const logger = createLogger("opencode-provider");
+const logger = createLogger("copilot-provider");
 
 // =============================================================================
-// Stream JSON Event Types (from opencode --format json)
+// Stream JSON Event Types (from copilot streaming JSON output)
 // =============================================================================
 
-export interface OpenCodeStreamEvent {
+export interface CopilotStreamEvent {
   type: string;
-  timestamp?: number;
-  sessionID?: string;
+  subtype?: string;
   content?: string;
-  error?: {
-    name: string;
-    data?: {
-      message?: string;
-      statusCode?: number;
-      isRetryable?: boolean;
-      [key: string]: unknown;
-    };
-  };
+  tool_name?: string;
+  tool_input?: unknown;
+  session_id?: string;
+  result?: unknown;
+  cost_usd?: number;
+  duration_ms?: number;
   [key: string]: unknown;
 }
 
 // =============================================================================
-// Provider-Specific Options (OpenCode)
+// Provider Options (Copilot-specific)
 // =============================================================================
 //
-// These options are specific to OpenCode and don't belong in the generic interface:
-// - autoApprove: OpenCode's permission model (--config-content override)
-// - activityTimeoutMs/heartbeatIntervalMs: Streaming mode monitoring
-// - onEvent/onHeartbeat/onTimeout: Event callbacks for stream processing
+// These options extend the generic AgentConfig with Copilot-specific features:
+// - allowAllTools: Grant all tool permissions (--allow-all-tools)
+// - allowTools/denyTools: Fine-grained tool permission control
+// - Model selection: Claude, GPT-5, Gemini via --model flag
 //
-// Generic options from AgentConfig are also supported:
-// - mode: "interactive" | "streaming"
-// - model: OpenCode model identifier (REQUIRED in streaming mode)
-// - streamOutput: Whether to stream output while capturing
 // =============================================================================
 
-export interface OpenCodeProviderOptions extends AgentConfig {
+export interface CopilotProviderOptions extends AgentConfig {
   /**
    * @deprecated Use `mode` instead. Will be removed in future version.
    */
   interactive?: boolean;
   /**
-   * PROVIDER-SPECIFIC: Auto-approve all tool calls via OPENCODE_CONFIG_CONTENT.
-   * This is OpenCode's security model - other providers have different mechanisms.
+   * PROVIDER-SPECIFIC: Allow all tools without permission prompts.
+   * Maps to --allow-all-tools flag.
    */
-  autoApprove?: boolean;
+  allowAllTools?: boolean;
+  /**
+   * PROVIDER-SPECIFIC: List of tools to explicitly allow.
+   * Maps to --allow-tool flags.
+   */
+  allowTools?: string[];
+  /**
+   * PROVIDER-SPECIFIC: List of tools to explicitly deny.
+   * Maps to --deny-tool flags.
+   */
+  denyTools?: string[];
   /**
    * PROVIDER-SPECIFIC: Timeout in ms before considering agent dead.
    * Default: 600000 (10 min). Only applies in streaming mode.
@@ -63,9 +65,9 @@ export interface OpenCodeProviderOptions extends AgentConfig {
   heartbeatIntervalMs?: number;
   /**
    * PROVIDER-SPECIFIC: Callback for stream events.
-   * Only applies in streaming mode with JSON format.
+   * Only applies in streaming mode.
    */
-  onEvent?: (event: OpenCodeStreamEvent) => void;
+  onEvent?: (event: CopilotStreamEvent) => void;
   /**
    * PROVIDER-SPECIFIC: Callback for heartbeat.
    * Only applies in streaming mode.
@@ -77,42 +79,41 @@ export interface OpenCodeProviderOptions extends AgentConfig {
    */
   onTimeout?: () => void;
   /**
-   * Model to use in provider/model format (e.g., 'opencode/grok-code').
-   * REQUIRED in streaming mode - no default model is used.
+   * Model to use (e.g., 'claude', 'gpt-5', 'gemini').
+   * Copilot supports multi-model selection.
    */
   model?: string;
+  /**
+   * Enable verbose mode for additional event detail.
+   */
+  verbose?: boolean;
 }
 
 // =============================================================================
 // Running Session (for interjection support)
 // =============================================================================
-//
-// RunningSession extends AgentSession with OpenCode-specific process tracking.
-// The `proc` field is needed for interjection (killing the OpenCode process).
-// =============================================================================
 
-export interface RunningSession extends AgentSession {
-  /** OpenCode child process - needed for interjection */
+export interface CopilotRunningSession extends AgentSession {
+  /** Copilot child process - needed for interjection */
   proc: ChildProcess;
 }
 
 // Track active sessions for interjection by agent name
-const activeSessions = new Map<string, RunningSession>();
+const activeSessions = new Map<string, CopilotRunningSession>();
 
 /**
  * Get an active session by agent name.
  * This is a module-level function for cross-instance access.
  */
-export function getActiveSession(agentName: string): RunningSession | undefined {
+export function getCopilotActiveSession(agentName: string): CopilotRunningSession | undefined {
   return activeSessions.get(agentName);
 }
 
 /**
  * Interject (kill) an active session by agent name.
  * Returns the session that was interjected, or undefined if not found.
- * This is a module-level function since it needs to access internal process state.
  */
-export function interjectSession(agentName: string): RunningSession | undefined {
+export function interjectCopilotSession(agentName: string): CopilotRunningSession | undefined {
   const session = activeSessions.get(agentName);
   if (session) {
     logger.info(`Interjecting session for ${agentName}`);
@@ -125,62 +126,68 @@ export function interjectSession(agentName: string): RunningSession | undefined 
 }
 
 // =============================================================================
-// OpenCode Agent Provider
+// Installation Instructions
 // =============================================================================
 
-export class OpenCodeAgentProvider implements Agent {
+const INSTALLATION_INSTRUCTIONS = `
+GitHub Copilot CLI is not installed or not found in PATH.
+
+To install GitHub Copilot CLI:
+1. Ensure you have an active GitHub Copilot subscription
+2. Install via npm: npm install -g @githubnext/github-copilot-cli
+   Or via Homebrew (macOS): brew install gh && gh extension install github/gh-copilot
+3. Authenticate: copilot auth login
+
+For more information, visit: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
+`;
+
+// =============================================================================
+// Copilot Agent Provider
+// =============================================================================
+
+export class CopilotAgentProvider implements Agent {
   private mode: "interactive" | "streaming";
-  private autoApprove: boolean;
-  private model: string | undefined;
+  private allowAllTools: boolean;
+  private allowTools: string[];
+  private denyTools: string[];
   private streamOutput: boolean;
   private activityTimeoutMs: number;
   private heartbeatIntervalMs: number;
-  private onEvent?: (event: OpenCodeStreamEvent) => void;
+  private onEvent?: (event: CopilotStreamEvent) => void;
   private onHeartbeat?: (lastActivityMs: number) => void;
   private onTimeout?: () => void;
   private currentAgentName?: string;
+  private model?: string;
+  private verbose: boolean;
 
-  constructor(options: OpenCodeProviderOptions = {}) {
+  constructor(options: CopilotProviderOptions = {}) {
     // Support both new `mode` and deprecated `interactive` option
     if (options.mode !== undefined) {
       this.mode = options.mode;
     } else {
       this.mode = options.interactive ? "interactive" : "streaming";
     }
-    this.autoApprove = options.autoApprove ?? true;
-    // Model is REQUIRED in streaming mode - no silent default
-    this.model = options.model;
+    this.allowAllTools = options.allowAllTools ?? true;
+    this.allowTools = options.allowTools ?? [];
+    this.denyTools = options.denyTools ?? [];
     this.streamOutput = options.streamOutput ?? true;
     this.activityTimeoutMs = options.activityTimeoutMs ?? 600_000; // 10 min
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000; // 10s
     this.onEvent = options.onEvent;
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
+    this.model = options.model;
+    this.verbose = options.verbose ?? false;
   }
 
   /**
    * Get the currently active session for this agent instance.
-   * Returns the session from the global tracking map if we have one.
    */
   getActiveSession(): AgentSession | undefined {
     if (this.currentAgentName) {
       return activeSessions.get(this.currentAgentName);
     }
     return undefined;
-  }
-
-  private getEnv(): NodeJS.ProcessEnv {
-    const env = { ...process.env };
-
-    if (this.autoApprove) {
-      // Use OPENCODE_CONFIG_CONTENT to set permission: "*": "allow"
-      const configOverride = JSON.stringify({
-        permission: { "*": "allow" },
-      });
-      env.OPENCODE_CONFIG_CONTENT = configOverride;
-    }
-
-    return env;
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
@@ -190,31 +197,19 @@ export class OpenCodeAgentProvider implements Agent {
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
-      // Interactive mode: opencode --prompt "..." [-m model]
-      const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
-      const args = ["--prompt", fullPrompt];
+      const args = this.buildInteractiveArgs(options);
 
-      // Add model if specified
-      if (this.model) {
-        args.push("-m", this.model);
-      }
-
-      // Add session resume if provided
-      if (options.sessionId) {
-        args.push("-s", options.sessionId);
-      }
-
-      const proc = spawn("opencode", args, {
+      const proc = spawn("copilot", args, {
         cwd: options.startingDirectory,
         stdio: "inherit",
-        env: this.getEnv(),
       });
 
       proc.on("error", (error) => {
+        const errorMessage = this.formatSpawnError(error);
         resolve({
           success: false,
           output: "",
-          error: `Failed to spawn opencode: ${error.message}`,
+          error: errorMessage,
         });
       });
 
@@ -229,35 +224,12 @@ export class OpenCodeAgentProvider implements Agent {
   }
 
   private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
-    // Validate model is specified in streaming mode
-    if (!this.model) {
-      return {
-        success: false,
-        output: "",
-        error:
-          "Model selection is REQUIRED for OpenCode in streaming mode. Use provider/model format (e.g., opencode/grok-code).",
-      };
-    }
-
-    // Store model in local constant for closure access (TypeScript narrowing)
-    const model = this.model;
-
     return new Promise((resolve) => {
-      // Streaming: opencode run --format json -m model "prompt"
-      const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
-      const args: string[] = ["run", "--format", "json", "-m", model];
+      const args = this.buildStreamingArgs(options);
 
-      // Add session resume if provided
-      if (options.sessionId) {
-        args.push("-s", options.sessionId);
-      }
-
-      args.push(fullPrompt);
-
-      const proc = spawn("opencode", args, {
+      const proc = spawn("copilot", args, {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
-        env: this.getEnv(),
       });
 
       const now = Date.now();
@@ -268,7 +240,7 @@ export class OpenCodeAgentProvider implements Agent {
       let timedOut = false;
 
       // Track session for interjection support
-      const session: RunningSession = {
+      const session: CopilotRunningSession = {
         proc,
         startTime: now,
         lastActivity: now,
@@ -315,13 +287,13 @@ export class OpenCodeAgentProvider implements Agent {
         if (!line.trim()) return;
 
         try {
-          const event: OpenCodeStreamEvent = JSON.parse(line);
+          const event: CopilotStreamEvent = JSON.parse(line);
           lastActivity = Date.now();
           session.lastActivity = lastActivity;
 
           // Capture session ID for resume support
-          if (event.sessionID) {
-            sessionId = event.sessionID;
+          if (event.session_id) {
+            sessionId = event.session_id;
             session.sessionId = sessionId;
           }
 
@@ -367,10 +339,11 @@ export class OpenCodeAgentProvider implements Agent {
         if (options.agentName) {
           activeSessions.delete(options.agentName);
         }
+        const errorMessage = this.formatSpawnError(error);
         resolve({
           success: false,
           output: outputAccumulator.value,
-          error: `Failed to spawn opencode: ${error.message}`,
+          error: errorMessage,
           sessionId,
         });
       });
@@ -390,30 +363,31 @@ export class OpenCodeAgentProvider implements Agent {
         resolve({
           success: !timedOut && exitCode === 0,
           output: outputAccumulator.value,
-          error: timedOut ? "Agent execution timed out" : undefined,
+          error: timedOut ? "Agent timed out due to inactivity" : undefined,
           sessionId,
         });
       });
 
+      // Send prompt via stdin and close
+      proc.stdin?.write(options.prompt);
       proc.stdin?.end();
     });
   }
 
   /**
-   * Render OpenCode stream event to human-readable output
+   * Format spawn error with installation instructions when CLI not found.
    */
-  private renderEvent(event: OpenCodeStreamEvent, outputAccumulator?: { value: string }): void {
+  private formatSpawnError(error: NodeJS.ErrnoException): string {
+    if (error.code === "ENOENT") {
+      return `GitHub Copilot CLI not found: ${error.message}${INSTALLATION_INSTRUCTIONS}`;
+    }
+    return `Failed to spawn copilot: ${error.message}`;
+  }
+
+  private renderEvent(event: CopilotStreamEvent, outputAccumulator?: { value: string }): void {
     switch (event.type) {
       case "assistant": {
-        // Handle assistant text content
-        const content = event.content as string | undefined;
-        if (content) {
-          process.stdout.write(content);
-          if (outputAccumulator) {
-            outputAccumulator.value += content;
-          }
-        }
-        // Handle message content blocks if present
+        // Handle message content as array of content blocks
         const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
         if (message?.content) {
           for (const block of message.content) {
@@ -440,74 +414,96 @@ export class OpenCodeAgentProvider implements Agent {
         break;
       }
 
-      case "text": {
-        // Direct text output
-        const text = event.text as string | undefined;
-        if (text) {
-          process.stdout.write(text);
-          if (outputAccumulator) {
-            outputAccumulator.value += text;
-          }
-        }
-        break;
-      }
-
       case "tool_use":
-      case "tool_call":
         // Format tool name in cyan for visibility
-        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name || event.name || "unknown"}]`)}\n`);
+        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name}]`)}\n`);
         break;
 
-      case "tool_result":
-      case "tool_response": {
-        // Show result indicator in dim
-        process.stdout.write(`${chalk.dim("[result]")}\n`);
+      case "tool_result": {
+        // Show result indicator in dim, with optional content in verbose mode
+        const content = event.content as string | undefined;
+        if (this.verbose && content) {
+          const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+          process.stdout.write(`${chalk.dim("[result]")} ${truncated}\n`);
+        } else {
+          process.stdout.write(`${chalk.dim("[result]")}\n`);
+        }
         break;
       }
 
-      case "result":
-      case "done": {
-        // Session completed - show stats if available
-        const cost = event.cost_usd as number | undefined;
-        const duration = event.duration_ms as number | undefined;
+      case "result": {
+        const totalCost = (event.total_cost_usd ?? event.cost_usd) as number | undefined;
+        const durationMs = event.duration_ms as number | undefined;
 
-        if (cost !== undefined) {
-          process.stdout.write(`\n[cost: $${cost.toFixed(4)}]\n`);
+        if (totalCost !== undefined) {
+          process.stdout.write(`\n[cost: $${totalCost.toFixed(4)}]\n`);
         }
-        if (duration !== undefined) {
-          const durationSec = (duration / 1000).toFixed(1);
+        if (durationMs !== undefined) {
+          const durationSec = (durationMs / 1000).toFixed(1);
           process.stdout.write(`[duration: ${durationSec}s]\n`);
         }
         break;
       }
 
       case "error": {
-        // Error handling
-        const errorMessage = event.error?.data?.message || event.error?.name || "unknown error";
-        process.stdout.write(`\n${chalk.red(`[ERROR: ${errorMessage}]`)}\n`);
+        const errorObj = event.error as { message?: string } | undefined;
+        const errorMessage = errorObj?.message || event.content || "unknown error";
+        process.stdout.write(`\n[ERROR: ${errorMessage}]\n`);
         break;
       }
 
-      case "session": {
-        // Session info
-        if (event.sessionID) {
-          process.stdout.write(`[session: ${event.sessionID}]\n`);
+      case "system":
+        this.renderSystemEvent(event);
+        break;
+    }
+  }
+
+  /**
+   * Render system event subtypes
+   */
+  private renderSystemEvent(event: CopilotStreamEvent): void {
+    switch (event.subtype) {
+      case "init":
+        // Display session and model info
+        if (event.session_id) {
+          process.stdout.write(`[session: ${event.session_id}]\n`);
+        }
+        if (event.model) {
+          process.stdout.write(`[model: ${event.model}]\n`);
         }
         break;
+
+      case "hook_started": {
+        const hookName = (event.hook_name as string) || (event.name as string) || "unknown";
+        process.stdout.write(`${chalk.dim(`[hook: ${hookName}]`)}\n`);
+        break;
       }
+
+      case "hook_response":
+        if (this.verbose) {
+          const response = event.response as string | undefined;
+          if (response) {
+            process.stdout.write(`${chalk.dim(`[hook response: ${response}]`)}\n`);
+          } else {
+            process.stdout.write(`${chalk.dim("[hook response]")}\n`);
+          }
+        }
+        break;
+
+      default:
+        if (this.verbose && event.subtype) {
+          logger.debug(`Unhandled system subtype: ${event.subtype}`, event);
+        }
+        break;
     }
   }
 
   /**
    * Extract text from event without writing to stdout (for non-streaming mode)
    */
-  private extractTextFromEvent(event: OpenCodeStreamEvent, outputAccumulator: { value: string }): void {
+  private extractTextFromEvent(event: CopilotStreamEvent, outputAccumulator: { value: string }): void {
     switch (event.type) {
       case "assistant": {
-        const content = event.content as string | undefined;
-        if (content) {
-          outputAccumulator.value += content;
-        }
         const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
         if (message?.content) {
           for (const block of message.content) {
@@ -526,14 +522,70 @@ export class OpenCodeAgentProvider implements Agent {
         }
         break;
       }
+    }
+  }
 
-      case "text": {
-        const text = event.text as string | undefined;
-        if (text) {
-          outputAccumulator.value += text;
-        }
-        break;
-      }
+  private buildInteractiveArgs(options: AgentRunOptions): string[] {
+    // Interactive mode: no -p flag, Copilot runs in REPL mode
+    const args: string[] = [];
+
+    // Add tool permissions
+    this.addToolPermissionArgs(args);
+
+    // Add model selection
+    if (this.model) {
+      args.push("--model", this.model);
+    }
+
+    // Copilot doesn't support --append-system-prompt, so prepend system prompt to user prompt
+    // For interactive mode, we pass the initial prompt with system context
+    if (options.prompt) {
+      const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
+      args.push(fullPrompt);
+    }
+
+    return args;
+  }
+
+  private buildStreamingArgs(options: AgentRunOptions): string[] {
+    // Streaming/print mode: -p flag for single-shot execution
+    // -s flag for streaming JSON output
+    const args: string[] = ["-p", "-s"];
+
+    // Add tool permissions
+    this.addToolPermissionArgs(args);
+
+    // Add model selection
+    if (this.model) {
+      args.push("--model", this.model);
+    }
+
+    // Resume previous session if sessionId provided
+    if (options.sessionId) {
+      args.push("--resume", options.sessionId);
+    }
+
+    // Copilot doesn't support --append-system-prompt, so prepend system prompt
+    const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
+    args.push(fullPrompt);
+
+    return args;
+  }
+
+  /**
+   * Add tool permission arguments to the args array.
+   */
+  private addToolPermissionArgs(args: string[]): void {
+    if (this.allowAllTools) {
+      args.push("--allow-all-tools");
+    }
+
+    for (const tool of this.allowTools) {
+      args.push("--allow-tool", tool);
+    }
+
+    for (const tool of this.denyTools) {
+      args.push("--deny-tool", tool);
     }
   }
 }

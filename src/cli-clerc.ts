@@ -12,6 +12,7 @@ import {
   registerConfigCommands,
   registerInterjectionCommands,
   registerPlanningCommands,
+  registerPromptCommands,
   registerQuestionCommands,
   registerRepoCommands,
   registerSetupCommands,
@@ -121,6 +122,7 @@ registerAgentCommands(cli);
 registerConfigCommands(cli);
 registerInterjectionCommands(cli);
 registerPlanningCommands(cli);
+registerPromptCommands(cli);
 registerQuestionCommands(cli);
 registerRepoCommands(cli);
 registerSetupCommands(cli);

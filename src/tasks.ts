@@ -79,7 +79,9 @@ export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
 
   function collectIds(taskList: Task[]) {
     for (const task of taskList) {
-      if (task.status === "done") completedIds.add(task.id);
+      // done_pending_merge counts as completed for dependency purposes
+      // (the agent work is done, just waiting on merge)
+      if (task.status === "done" || task.status === "done_pending_merge") completedIds.add(task.id);
       collectIds(task.subtasks);
     }
   }
@@ -155,6 +157,8 @@ export function getStatusIcon(status: TaskStatus): string {
   switch (status) {
     case "done":
       return "✓";
+    case "done_pending_merge":
+      return "⏳";
     case "in_progress":
       return "▶";
     case "assigned":
@@ -188,7 +192,8 @@ export async function primeTasks(
 
   function collectCompleted(taskList: Task[]) {
     for (const task of taskList) {
-      if (task.status === "done") completedIds.add(task.id);
+      // done_pending_merge counts as completed for dependency purposes
+      if (task.status === "done" || task.status === "done_pending_merge") completedIds.add(task.id);
       collectCompleted(task.subtasks);
     }
   }

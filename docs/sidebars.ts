@@ -43,6 +43,19 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Agents',
+      collapsed: false,
+      items: [
+        'agents/README',
+        'agents/claude',
+        'agents/copilot',
+        'agents/codex',
+        'agents/cline',
+        'agents/opencode',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Best Practices',
       collapsed: true,
       items: [

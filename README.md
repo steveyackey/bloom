@@ -457,3 +457,59 @@ Set in `tasks.yaml`:
 - **Dependencies**: `depends_on` enforces task ordering
 - **Branches**: Each task specifies a working branch; worktrees are created automatically
 - **Priming**: Tasks auto-change from `todo` to `ready_for_agent` when deps complete
+
+## Multi-Agent Support
+
+Bloom supports multiple AI agents, allowing you to choose the best tool for your workflow. Configure different agents for interactive sessions vs. autonomous task execution.
+
+### Supported Agents
+
+| Agent | CLI | Best For | Unique Features |
+|-------|-----|----------|-----------------|
+| **Claude** | `claude` | General development | TodoWrite tracking, web search, human questions |
+| **Copilot** | `copilot` | GitHub integration | Multi-model support, GitHub MCP server |
+| **Codex** | `codex` | Structured output | Session forking, output schema enforcement |
+| **Cline** | `cline` | Careful planning | Plan/Act modes, explicit approval gates |
+| **OpenCode** | `opencode` | Code intelligence | Native LSP support, multi-provider |
+
+### Agent Capabilities
+
+| Feature | Claude | Copilot | Codex | Cline | OpenCode |
+|---------|--------|---------|-------|-------|----------|
+| Web Search | Yes | Yes | Yes | No | No |
+| Plan Mode | No | No | No | Yes | No |
+| Session Fork | No | No | Yes | No | No |
+| LSP Integration | No | No | No | No | Yes |
+| Human Questions | Yes | No | No | Yes | No |
+
+### Quick Configuration
+
+Configure agents in `~/.bloom/config.yaml`:
+
+```yaml
+# Default: Claude for both modes
+gitProtocol: ssh
+
+# Optional: Use different agents for different contexts
+interactiveAgent:
+  agent: claude          # For bloom enter, bloom refine
+  model: opus            # Optional model selection
+
+nonInteractiveAgent:
+  agent: opencode        # For bloom run (autonomous tasks)
+  model: anthropic/claude-sonnet-4
+```
+
+**Available agents**: `claude`, `copilot`, `codex`, `cline`, `opencode`
+
+### Agent-Specific Setup
+
+Each agent has its own CLI and configuration requirements:
+
+- **Claude**: `npm install -g @anthropic-ai/claude-code` - Uses Anthropic API key
+- **Copilot**: `gh extension install github/gh-copilot` - Uses GitHub authentication
+- **Codex**: `npm install -g @openai/codex` - Uses OpenAI API key
+- **Cline**: `npm install -g cline` - Requires Cline Core gRPC service
+- **OpenCode**: `go install github.com/sst/opencode@latest` - Multi-provider support
+
+See [Agent Documentation](docs/docs/agents/README.md) for detailed setup instructions, configuration examples, and troubleshooting guides

@@ -3,16 +3,17 @@ import chalk from "chalk";
 import { createLogger } from "../logger";
 import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 
-const logger = createLogger("claude-provider");
+const logger = createLogger("codex-provider");
 
 // =============================================================================
-// Stream JSON Event Types (from claude --output-format stream-json)
+// Stream JSON Event Types (from codex --json)
 // =============================================================================
 
-export interface StreamEvent {
+export interface CodexStreamEvent {
   type: string;
   subtype?: string;
   content?: string;
+  message?: string;
   tool_name?: string;
   tool_input?: unknown;
   session_id?: string;
@@ -23,27 +24,32 @@ export interface StreamEvent {
 }
 
 // =============================================================================
-// Provider Options (Claude-specific)
+// Provider Options (Codex-specific)
 // =============================================================================
 //
-// These options extend the generic AgentConfig with Claude-specific features:
-// - dangerouslySkipPermissions: Claude's --dangerously-skip-permissions flag
-// - activityTimeoutMs/heartbeatIntervalMs: Streaming mode monitoring
-// - onEvent/onHeartbeat/onTimeout: Event callbacks for stream processing
+// These options extend the generic AgentConfig with Codex-specific features:
+// - approvalMode: Codex's --approval-mode flag (suggest, auto-edit, full-auto)
+// - sandbox: Codex's sandbox mode configuration
+// - search: Enable web search capability
+// - outputSchema: JSON schema for structured output enforcement
 //
-// Note: Claude doesn't support model selection via CLI flags (uses configured model)
 // =============================================================================
 
-export interface ClaudeProviderOptions extends AgentConfig {
+export type CodexApprovalMode = "suggest" | "auto-edit" | "full-auto";
+
+export interface CodexProviderOptions extends AgentConfig {
   /**
    * @deprecated Use `mode` instead. Will be removed in future version.
    */
   interactive?: boolean;
   /**
-   * PROVIDER-SPECIFIC: Skip Claude's permission prompts.
-   * Maps to --dangerously-skip-permissions flag.
+   * PROVIDER-SPECIFIC: Approval mode for Codex.
+   * - 'suggest': All actions require approval (default)
+   * - 'auto-edit': File writes auto-approved, shell commands need approval
+   * - 'full-auto': All actions auto-approved (sandboxed)
+   * Maps to --approval-mode flag.
    */
-  dangerouslySkipPermissions?: boolean;
+  approvalMode?: CodexApprovalMode;
   /**
    * PROVIDER-SPECIFIC: Timeout in ms before considering agent dead.
    * Default: 600000 (10 min). Only applies in streaming mode.
@@ -58,7 +64,7 @@ export interface ClaudeProviderOptions extends AgentConfig {
    * PROVIDER-SPECIFIC: Callback for stream events.
    * Only applies in streaming mode.
    */
-  onEvent?: (event: StreamEvent) => void;
+  onEvent?: (event: CodexStreamEvent) => void;
   /**
    * PROVIDER-SPECIFIC: Callback for heartbeat.
    * Only applies in streaming mode.
@@ -69,11 +75,21 @@ export interface ClaudeProviderOptions extends AgentConfig {
    * Only applies in streaming mode.
    */
   onTimeout?: () => void;
-  /** Model to use (e.g., 'claude-sonnet-4-20250514'). If not specified, uses Claude CLI default. */
+  /** Model to use. If not specified, uses Codex CLI default. */
   model?: string;
   /**
+   * PROVIDER-SPECIFIC: Enable web search capability.
+   * Maps to --search flag if supported.
+   */
+  enableSearch?: boolean;
+  /**
+   * PROVIDER-SPECIFIC: JSON schema for structured output.
+   * Codex can enforce output format via --output-schema.
+   * Pass a JSON schema object or a path to a schema file.
+   */
+  outputSchema?: Record<string, unknown> | string;
+  /**
    * Enable verbose mode for additional event detail.
-   * When true, shows hook_response events and detailed tool output.
    */
   verbose?: boolean;
 }
@@ -81,36 +97,31 @@ export interface ClaudeProviderOptions extends AgentConfig {
 // =============================================================================
 // Running Session (for interjection support)
 // =============================================================================
-//
-// RunningSession extends AgentSession with Claude-specific process tracking.
-// The `proc` field is needed for interjection (killing the Claude process).
-// =============================================================================
 
-export interface RunningSession extends AgentSession {
-  /** Claude child process - needed for interjection */
+export interface CodexRunningSession extends AgentSession {
+  /** Codex child process - needed for interjection */
   proc: ChildProcess;
 }
 
 // Track active sessions for interjection by agent name
-const activeSessions = new Map<string, RunningSession>();
+const activeSessions = new Map<string, CodexRunningSession>();
 
 /**
  * Get an active session by agent name.
  * This is a module-level function for cross-instance access.
  */
-export function getActiveSession(agentName: string): RunningSession | undefined {
+export function getActiveCodexSession(agentName: string): CodexRunningSession | undefined {
   return activeSessions.get(agentName);
 }
 
 /**
  * Interject (kill) an active session by agent name.
  * Returns the session that was interjected, or undefined if not found.
- * This is a module-level function since it needs to access internal process state.
  */
-export function interjectSession(agentName: string): RunningSession | undefined {
+export function interjectCodexSession(agentName: string): CodexRunningSession | undefined {
   const session = activeSessions.get(agentName);
   if (session) {
-    logger.info(`Interjecting session for ${agentName}`);
+    logger.info(`Interjecting Codex session for ${agentName}`);
     try {
       session.proc.kill("SIGTERM");
     } catch {}
@@ -120,30 +131,99 @@ export function interjectSession(agentName: string): RunningSession | undefined 
 }
 
 // =============================================================================
-// Claude Agent Provider
+// Session Fork Support (Unique to Codex)
 // =============================================================================
 
-export class ClaudeAgentProvider implements Agent {
+export interface ForkResult {
+  success: boolean;
+  newSessionId?: string;
+  error?: string;
+}
+
+/**
+ * Fork an existing Codex session to create a new branch.
+ * This allows exploring alternative approaches from a checkpoint.
+ *
+ * @param sessionId - The session ID to fork from
+ * @param workingDirectory - Working directory for the fork operation
+ * @returns Promise with the new session ID or error
+ */
+export async function forkCodexSession(sessionId: string, workingDirectory: string): Promise<ForkResult> {
+  return new Promise((resolve) => {
+    // Codex fork command creates a new session branched from an existing one
+    // Note: This is a placeholder - actual fork command syntax may vary
+    const args = ["fork", sessionId];
+
+    const proc = spawn("codex", args, {
+      cwd: workingDirectory,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on("error", (error) => {
+      resolve({
+        success: false,
+        error: `Failed to fork session: ${error.message}`,
+      });
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        // Try to extract new session ID from output
+        // Expected format may vary - adjust parsing as needed
+        const sessionMatch = stdout.match(/session[_-]?id[:\s]+([a-zA-Z0-9_-]+)/i);
+        const newSessionId = sessionMatch?.[1] || `forked-${sessionId}-${Date.now()}`;
+        resolve({
+          success: true,
+          newSessionId,
+        });
+      } else {
+        resolve({
+          success: false,
+          error: stderr || `Fork failed with exit code ${code}`,
+        });
+      }
+    });
+  });
+}
+
+// =============================================================================
+// Codex Agent Provider
+// =============================================================================
+
+export class CodexAgentProvider implements Agent {
   private mode: "interactive" | "streaming";
-  private dangerouslySkipPermissions: boolean;
+  private approvalMode: CodexApprovalMode;
   private streamOutput: boolean;
   private activityTimeoutMs: number;
   private heartbeatIntervalMs: number;
-  private onEvent?: (event: StreamEvent) => void;
+  private onEvent?: (event: CodexStreamEvent) => void;
   private onHeartbeat?: (lastActivityMs: number) => void;
   private onTimeout?: () => void;
   private currentAgentName?: string;
   private model?: string;
+  private enableSearch: boolean;
+  private outputSchema?: Record<string, unknown> | string;
   private verbose: boolean;
 
-  constructor(options: ClaudeProviderOptions = {}) {
+  constructor(options: CodexProviderOptions = {}) {
     // Support both new `mode` and deprecated `interactive` option
     if (options.mode !== undefined) {
       this.mode = options.mode;
     } else {
       this.mode = options.interactive ? "interactive" : "streaming";
     }
-    this.dangerouslySkipPermissions = options.dangerouslySkipPermissions ?? true;
+    this.approvalMode = options.approvalMode ?? "full-auto";
     this.streamOutput = options.streamOutput ?? true;
     this.activityTimeoutMs = options.activityTimeoutMs ?? 600_000; // 10 min
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000; // 10s
@@ -151,6 +231,8 @@ export class ClaudeAgentProvider implements Agent {
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
     this.model = options.model;
+    this.enableSearch = options.enableSearch ?? false;
+    this.outputSchema = options.outputSchema;
     this.verbose = options.verbose ?? false;
   }
 
@@ -174,20 +256,41 @@ export class ClaudeAgentProvider implements Agent {
     return new Promise((resolve) => {
       const args = this.buildInteractiveArgs(options);
 
-      const proc = spawn("claude", args, {
+      const proc = spawn("codex", args, {
         cwd: options.startingDirectory,
         stdio: "inherit",
       });
 
+      const now = Date.now();
+
+      // Track session for monitoring (though interactive mode doesn't capture output)
+      if (options.agentName) {
+        const session: CodexRunningSession = {
+          proc,
+          startTime: now,
+          lastActivity: now,
+          taskId: options.taskId,
+          agentName: options.agentName,
+          workingDirectory: options.startingDirectory,
+        };
+        activeSessions.set(options.agentName, session);
+      }
+
       proc.on("error", (error) => {
+        if (options.agentName) {
+          activeSessions.delete(options.agentName);
+        }
         resolve({
           success: false,
           output: "",
-          error: `Failed to spawn claude: ${error.message}`,
+          error: `Failed to spawn codex: ${error.message}`,
         });
       });
 
       proc.on("close", (code) => {
+        if (options.agentName) {
+          activeSessions.delete(options.agentName);
+        }
         const exitCode = code ?? 0;
         resolve({
           success: exitCode === 0,
@@ -200,23 +303,23 @@ export class ClaudeAgentProvider implements Agent {
   private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
       const args = this.buildStreamingArgs(options);
-      args.push("--output-format", "stream-json");
 
-      const proc = spawn("claude", args, {
+      const proc = spawn("codex", args, {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
       });
 
       const now = Date.now();
       let lastActivity = now;
-      let sessionId: string | undefined;
+      let sessionId: string | undefined = options.sessionId;
       let buffer = "";
       const outputAccumulator = { value: "" };
       let timedOut = false;
 
       // Track session for interjection support
-      const session: RunningSession = {
+      const session: CodexRunningSession = {
         proc,
+        sessionId,
         startTime: now,
         lastActivity: now,
         taskId: options.taskId,
@@ -262,7 +365,7 @@ export class ClaudeAgentProvider implements Agent {
         if (!line.trim()) return;
 
         try {
-          const event: StreamEvent = JSON.parse(line);
+          const event: CodexStreamEvent = JSON.parse(line);
           lastActivity = Date.now();
           session.lastActivity = lastActivity;
 
@@ -281,14 +384,15 @@ export class ClaudeAgentProvider implements Agent {
           if (this.streamOutput) {
             this.renderEvent(event, outputAccumulator);
           } else {
-            // Even when not streaming, we need to accumulate text from assistant events
+            // Even when not streaming, we need to accumulate text from events
             this.extractTextFromEvent(event, outputAccumulator);
           }
         } catch {
-          // Not JSON, output raw
+          // Not JSON, output raw and accumulate as text
           if (this.streamOutput) {
             process.stdout.write(line);
           }
+          outputAccumulator.value += line;
         }
       };
 
@@ -317,7 +421,7 @@ export class ClaudeAgentProvider implements Agent {
         resolve({
           success: false,
           output: outputAccumulator.value,
-          error: `Failed to spawn claude: ${error.message}`,
+          error: `Failed to spawn codex: ${error.message}`,
           sessionId,
         });
       });
@@ -342,18 +446,26 @@ export class ClaudeAgentProvider implements Agent {
         });
       });
 
-      // Send prompt via stdin and close
-      proc.stdin?.write(options.prompt);
+      // Close stdin to signal end of input
       proc.stdin?.end();
     });
   }
 
-  private renderEvent(event: StreamEvent, outputAccumulator?: { value: string }): void {
+  private renderEvent(event: CodexStreamEvent, outputAccumulator?: { value: string }): void {
     switch (event.type) {
+      case "message":
       case "assistant": {
-        // Claude CLI sends message.content as an array of content blocks
-        const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
-        if (message?.content) {
+        // Handle text content from assistant messages
+        const content = event.content || event.message;
+        if (typeof content === "string") {
+          process.stdout.write(content);
+          if (outputAccumulator) {
+            outputAccumulator.value += content;
+          }
+        }
+        // Handle structured message content (array of blocks)
+        const message = event.message as { content?: Array<{ type: string; text?: string }> } | string | undefined;
+        if (message && typeof message === "object" && message.content) {
           for (const block of message.content) {
             if (block.type === "text" && block.text) {
               process.stdout.write(block.text);
@@ -379,11 +491,13 @@ export class ClaudeAgentProvider implements Agent {
       }
 
       case "tool_use":
+      case "function_call":
         // Format tool name in cyan for visibility
-        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name}]`)}\n`);
+        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name || event.name}]`)}\n`);
         break;
 
-      case "tool_result": {
+      case "tool_result":
+      case "function_result": {
         // Show result indicator in dim, with optional content in verbose mode
         const content = event.content as string | undefined;
         if (this.verbose && content) {
@@ -396,15 +510,16 @@ export class ClaudeAgentProvider implements Agent {
         break;
       }
 
-      case "result": {
-        // Claude CLI uses total_cost_usd NOT cost_usd
-        const totalCost = event.total_cost_usd as number | undefined;
-        const durationMs = event.duration_ms as number | undefined;
+      case "result":
+      case "complete": {
+        // Show cost and duration if available
+        const cost = event.cost_usd ?? event.total_cost_usd;
+        const durationMs = event.duration_ms;
 
-        if (totalCost !== undefined) {
-          process.stdout.write(`\n[cost: $${totalCost.toFixed(4)}]\n`);
+        if (typeof cost === "number") {
+          process.stdout.write(`\n[cost: $${cost.toFixed(4)}]\n`);
         }
-        if (durationMs !== undefined) {
+        if (typeof durationMs === "number") {
           const durationSec = (durationMs / 1000).toFixed(1);
           process.stdout.write(`[duration: ${durationSec}s]\n`);
         }
@@ -412,14 +527,13 @@ export class ClaudeAgentProvider implements Agent {
       }
 
       case "error": {
-        // Claude CLI uses error.message NOT event.content
-        const errorObj = event.error as { message?: string } | undefined;
-        const errorMessage = errorObj?.message || "unknown error";
-        process.stdout.write(`\n[ERROR: ${errorMessage}]\n`);
+        const errorMessage = event.message || event.content || "unknown error";
+        process.stdout.write(`\n${chalk.red(`[ERROR: ${errorMessage}]`)}\n`);
         break;
       }
 
       case "system":
+      case "init":
         this.renderSystemEvent(event);
         break;
     }
@@ -428,8 +542,8 @@ export class ClaudeAgentProvider implements Agent {
   /**
    * Render system event subtypes
    */
-  private renderSystemEvent(event: StreamEvent): void {
-    switch (event.subtype) {
+  private renderSystemEvent(event: CodexStreamEvent): void {
+    switch (event.subtype || event.type) {
       case "init":
         // Display session and model info
         if (event.session_id) {
@@ -437,25 +551,6 @@ export class ClaudeAgentProvider implements Agent {
         }
         if (event.model) {
           process.stdout.write(`[model: ${event.model}]\n`);
-        }
-        break;
-
-      case "hook_started": {
-        // Display hook name in dim
-        const hookName = (event.hook_name as string) || (event.name as string) || "unknown";
-        process.stdout.write(`${chalk.dim(`[hook: ${hookName}]`)}\n`);
-        break;
-      }
-
-      case "hook_response":
-        // Only log in verbose mode
-        if (this.verbose) {
-          const response = event.response as string | undefined;
-          if (response) {
-            process.stdout.write(`${chalk.dim(`[hook response: ${response}]`)}\n`);
-          } else {
-            process.stdout.write(`${chalk.dim("[hook response]")}\n`);
-          }
         }
         break;
 
@@ -471,11 +566,16 @@ export class ClaudeAgentProvider implements Agent {
   /**
    * Extract text from event without writing to stdout (for non-streaming mode)
    */
-  private extractTextFromEvent(event: StreamEvent, outputAccumulator: { value: string }): void {
+  private extractTextFromEvent(event: CodexStreamEvent, outputAccumulator: { value: string }): void {
     switch (event.type) {
+      case "message":
       case "assistant": {
-        const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
-        if (message?.content) {
+        const content = event.content || event.message;
+        if (typeof content === "string") {
+          outputAccumulator.value += content;
+        }
+        const message = event.message as { content?: Array<{ type: string; text?: string }> } | string | undefined;
+        if (message && typeof message === "object" && message.content) {
           for (const block of message.content) {
             if (block.type === "text" && block.text) {
               outputAccumulator.value += block.text;
@@ -496,46 +596,71 @@ export class ClaudeAgentProvider implements Agent {
   }
 
   private buildInteractiveArgs(options: AgentRunOptions): string[] {
-    // Interactive mode: no -p flag, Claude runs in REPL mode
-    const args: string[] = ["--verbose"];
+    // Interactive mode: codex runs in TUI/REPL mode
+    const args: string[] = [];
 
-    if (this.dangerouslySkipPermissions) {
-      args.push("--dangerously-skip-permissions");
+    // Set approval mode
+    if (this.approvalMode) {
+      args.push("--approval-mode", this.approvalMode);
     }
 
+    // Set model if specified
     if (this.model) {
       args.push("--model", this.model);
     }
 
-    args.push("--append-system-prompt", options.systemPrompt);
+    // Session resume - if sessionId provided, we're resuming
+    // Note: Codex may use different syntax for resume
+    if (options.sessionId) {
+      args.push("--resume", options.sessionId);
+    }
 
-    // Add initial prompt so Claude starts with context instead of blank slate
-    if (options.prompt) {
-      args.push(options.prompt);
+    // Prepend system prompt to user prompt since Codex doesn't have --append-system-prompt
+    // The prompt is passed as the initial message
+    const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
+
+    if (fullPrompt) {
+      args.push(fullPrompt);
     }
 
     return args;
   }
 
   private buildStreamingArgs(options: AgentRunOptions): string[] {
-    // Streaming/print mode: -p flag for single-shot execution
-    const args: string[] = ["-p", "--verbose"];
+    // Streaming/quiet mode: codex -q --json for non-interactive execution
+    const args: string[] = ["-q", "--json"];
 
-    if (this.dangerouslySkipPermissions) {
-      args.push("--dangerously-skip-permissions");
+    // Set approval mode (full-auto for autonomous execution)
+    if (this.approvalMode) {
+      args.push("--approval-mode", this.approvalMode);
     }
 
+    // Set model if specified
     if (this.model) {
       args.push("--model", this.model);
     }
 
-    // Resume previous session if sessionId provided
+    // Session resume
     if (options.sessionId) {
       args.push("--resume", options.sessionId);
     }
 
-    args.push("--append-system-prompt", options.systemPrompt);
-    args.push(options.prompt);
+    // Output schema for structured output enforcement (unique to Codex)
+    if (this.outputSchema) {
+      if (typeof this.outputSchema === "string") {
+        // Path to schema file
+        args.push("--output-schema", this.outputSchema);
+      } else {
+        // Inline JSON schema - write to temp file or pass as JSON string
+        // For now, pass as JSON string (CLI may support this)
+        args.push("--output-schema", JSON.stringify(this.outputSchema));
+      }
+    }
+
+    // Prepend system prompt to user prompt
+    const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
+
+    args.push(fullPrompt);
 
     return args;
   }

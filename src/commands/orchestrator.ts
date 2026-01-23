@@ -4,10 +4,10 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createAgent } from "../agents";
+import { createAgent, getAgentCapabilities } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
-import { loadAgentPrompt } from "../prompts";
+import { PromptCompiler } from "../prompts/compiler";
 import {
   addWorktree,
   cleanupMergedBranches,
@@ -294,7 +294,18 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         }
       }
 
-      const systemPrompt = await loadAgentPrompt(agentName, taskResult.taskId!, taskResult.taskCli!);
+      // Compile the agent system prompt using the PromptCompiler
+      // This allows capability-based conditional sections and variable substitution
+      const compiler = new PromptCompiler();
+      const agentCapabilities = getAgentCapabilities("claude") || {};
+      const systemPrompt = await compiler.loadAndCompile("agent-system", {
+        capabilities: agentCapabilities,
+        variables: {
+          AGENT_NAME: agentName,
+          TASK_ID: taskResult.taskId!,
+          TASK_CLI: taskResult.taskCli!,
+        },
+      });
 
       agentLog.info(`Starting Claude session in: ${workingDir}`);
 
@@ -437,6 +448,12 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
           // Auto merge into target branch if configured
           // IMPORTANT: We do this from the TARGET worktree, not the source worktree
           if (taskResult.gitInfo.mergeInto && taskResult.repo) {
+            // Set status to done_pending_merge before attempting merge
+            // This ensures we can recover if the orchestrator is killed mid-merge
+            agentLog.info(`Setting task ${taskResult.taskId} to done_pending_merge...`);
+            const pendingTasksFile = await loadTasks(getTasksFile());
+            updateTaskStatus(pendingTasksFile.tasks, taskResult.taskId!, "done_pending_merge");
+            await saveTasks(getTasksFile(), pendingTasksFile);
             const targetWorktreePath = getWorktreePath(BLOOM_DIR, taskResult.repo, taskResult.gitInfo.mergeInto);
             const targetBranch = taskResult.gitInfo.mergeInto;
             const sourceBranch = taskResult.gitInfo.branch;
@@ -501,6 +518,12 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
                           agentLog.warn(`Failed to push ${targetBranch}: ${targetPush.error}`);
                         }
                       }
+
+                      // Merge successful - update status from done_pending_merge to done
+                      agentLog.info(`Setting task ${taskResult.taskId} to done (merge complete)...`);
+                      const doneTasksFile = await loadTasks(getTasksFile());
+                      updateTaskStatus(doneTasksFile.tasks, taskResult.taskId!, "done");
+                      await saveTasks(getTasksFile(), doneTasksFile);
                     } else {
                       // Merge failed - likely conflicts. Have the agent resolve them.
                       // NOTE: We still hold the merge lock during conflict resolution,
@@ -566,8 +589,17 @@ ${taskResult.gitConfig?.push_to_remote ? `6. Push the result: \`git push origin 
                             }
                           }
                         }
+
+                        // Merge successful after conflict resolution - update status to done
+                        agentLog.info(
+                          `Setting task ${taskResult.taskId} to done (merge complete after conflict resolution)...`
+                        );
+                        const conflictDoneTasksFile = await loadTasks(getTasksFile());
+                        updateTaskStatus(conflictDoneTasksFile.tasks, taskResult.taskId!, "done");
+                        await saveTasks(getTasksFile(), conflictDoneTasksFile);
                       } else {
                         agentLog.warn("Agent could not resolve merge conflicts. Manual intervention needed.");
+                        // Task remains in done_pending_merge status for manual intervention
                       }
                     }
                   } else {

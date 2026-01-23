@@ -3,47 +3,59 @@ import chalk from "chalk";
 import { createLogger } from "../logger";
 import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 
-const logger = createLogger("claude-provider");
+const logger = createLogger("cline-provider");
 
 // =============================================================================
-// Stream JSON Event Types (from claude --output-format stream-json)
+// Cline Provider Options
+// =============================================================================
+//
+// Cline-specific options extending AgentConfig:
+// - mode: Plan mode (default) creates plan before acting, Act mode executes directly
+// - yolo: Skip all approval prompts in Act mode
+// - clineMode: Override the Cline mode ("plan" or "act")
+//
+// Cline has task-based session management instead of session IDs.
 // =============================================================================
 
-export interface StreamEvent {
+/**
+ * Cline-specific execution mode.
+ * - "plan": Creates a detailed plan before acting (default)
+ * - "act": Executes directly without planning phase
+ */
+export type ClineMode = "plan" | "act";
+
+/**
+ * Stream event from Cline's JSON output (-F json).
+ */
+export interface ClineStreamEvent {
   type: string;
   subtype?: string;
   content?: string;
   tool_name?: string;
   tool_input?: unknown;
-  session_id?: string;
-  result?: unknown;
-  cost_usd?: number;
-  duration_ms?: number;
+  task_id?: string;
+  message?: { content?: Array<{ type: string; text?: string }> };
+  error?: { message?: string };
+  status?: string;
   [key: string]: unknown;
 }
 
-// =============================================================================
-// Provider Options (Claude-specific)
-// =============================================================================
-//
-// These options extend the generic AgentConfig with Claude-specific features:
-// - dangerouslySkipPermissions: Claude's --dangerously-skip-permissions flag
-// - activityTimeoutMs/heartbeatIntervalMs: Streaming mode monitoring
-// - onEvent/onHeartbeat/onTimeout: Event callbacks for stream processing
-//
-// Note: Claude doesn't support model selection via CLI flags (uses configured model)
-// =============================================================================
-
-export interface ClaudeProviderOptions extends AgentConfig {
+export interface ClineProviderOptions extends AgentConfig {
   /**
    * @deprecated Use `mode` instead. Will be removed in future version.
    */
   interactive?: boolean;
   /**
-   * PROVIDER-SPECIFIC: Skip Claude's permission prompts.
-   * Maps to --dangerously-skip-permissions flag.
+   * PROVIDER-SPECIFIC: Cline's plan/act mode.
+   * - "plan": Creates plan and waits for approval (default)
+   * - "act": Executes directly without planning
    */
-  dangerouslySkipPermissions?: boolean;
+  clineMode?: ClineMode;
+  /**
+   * PROVIDER-SPECIFIC: Skip all approval prompts (--yolo flag).
+   * Only applies in Act mode. Default: true for non-interactive.
+   */
+  yolo?: boolean;
   /**
    * PROVIDER-SPECIFIC: Timeout in ms before considering agent dead.
    * Default: 600000 (10 min). Only applies in streaming mode.
@@ -58,7 +70,7 @@ export interface ClaudeProviderOptions extends AgentConfig {
    * PROVIDER-SPECIFIC: Callback for stream events.
    * Only applies in streaming mode.
    */
-  onEvent?: (event: StreamEvent) => void;
+  onEvent?: (event: ClineStreamEvent) => void;
   /**
    * PROVIDER-SPECIFIC: Callback for heartbeat.
    * Only applies in streaming mode.
@@ -69,11 +81,8 @@ export interface ClaudeProviderOptions extends AgentConfig {
    * Only applies in streaming mode.
    */
   onTimeout?: () => void;
-  /** Model to use (e.g., 'claude-sonnet-4-20250514'). If not specified, uses Claude CLI default. */
-  model?: string;
   /**
    * Enable verbose mode for additional event detail.
-   * When true, shows hook_response events and detailed tool output.
    */
   verbose?: boolean;
 }
@@ -81,36 +90,33 @@ export interface ClaudeProviderOptions extends AgentConfig {
 // =============================================================================
 // Running Session (for interjection support)
 // =============================================================================
-//
-// RunningSession extends AgentSession with Claude-specific process tracking.
-// The `proc` field is needed for interjection (killing the Claude process).
-// =============================================================================
 
-export interface RunningSession extends AgentSession {
-  /** Claude child process - needed for interjection */
+export interface ClineRunningSession extends AgentSession {
+  /** Cline child process - needed for interjection */
   proc: ChildProcess;
+  /** Cline task ID for resume support */
+  taskId?: string;
 }
 
 // Track active sessions for interjection by agent name
-const activeSessions = new Map<string, RunningSession>();
+const activeSessions = new Map<string, ClineRunningSession>();
 
 /**
  * Get an active session by agent name.
  * This is a module-level function for cross-instance access.
  */
-export function getActiveSession(agentName: string): RunningSession | undefined {
+export function getActiveClineSession(agentName: string): ClineRunningSession | undefined {
   return activeSessions.get(agentName);
 }
 
 /**
  * Interject (kill) an active session by agent name.
  * Returns the session that was interjected, or undefined if not found.
- * This is a module-level function since it needs to access internal process state.
  */
-export function interjectSession(agentName: string): RunningSession | undefined {
+export function interjectClineSession(agentName: string): ClineRunningSession | undefined {
   const session = activeSessions.get(agentName);
   if (session) {
-    logger.info(`Interjecting session for ${agentName}`);
+    logger.info(`Interjecting Cline session for ${agentName}`);
     try {
       session.proc.kill("SIGTERM");
     } catch {}
@@ -120,30 +126,32 @@ export function interjectSession(agentName: string): RunningSession | undefined 
 }
 
 // =============================================================================
-// Claude Agent Provider
+// Cline Agent Provider
 // =============================================================================
 
-export class ClaudeAgentProvider implements Agent {
+export class ClineAgentProvider implements Agent {
   private mode: "interactive" | "streaming";
-  private dangerouslySkipPermissions: boolean;
+  private clineMode: ClineMode;
+  private yolo: boolean;
   private streamOutput: boolean;
   private activityTimeoutMs: number;
   private heartbeatIntervalMs: number;
-  private onEvent?: (event: StreamEvent) => void;
+  private onEvent?: (event: ClineStreamEvent) => void;
   private onHeartbeat?: (lastActivityMs: number) => void;
   private onTimeout?: () => void;
   private currentAgentName?: string;
   private model?: string;
   private verbose: boolean;
 
-  constructor(options: ClaudeProviderOptions = {}) {
+  constructor(options: ClineProviderOptions = {}) {
     // Support both new `mode` and deprecated `interactive` option
     if (options.mode !== undefined) {
       this.mode = options.mode;
     } else {
       this.mode = options.interactive ? "interactive" : "streaming";
     }
-    this.dangerouslySkipPermissions = options.dangerouslySkipPermissions ?? true;
+    this.clineMode = options.clineMode ?? "act"; // Default to act for autonomous execution
+    this.yolo = options.yolo ?? true;
     this.streamOutput = options.streamOutput ?? true;
     this.activityTimeoutMs = options.activityTimeoutMs ?? 600_000; // 10 min
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000; // 10s
@@ -156,7 +164,6 @@ export class ClaudeAgentProvider implements Agent {
 
   /**
    * Get the currently active session for this agent instance.
-   * Returns the session from the global tracking map if we have one.
    */
   getActiveSession(): AgentSession | undefined {
     if (this.currentAgentName) {
@@ -167,14 +174,77 @@ export class ClaudeAgentProvider implements Agent {
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
     this.currentAgentName = options.agentName;
+
+    // Check if Cline CLI is available
+    const clineCheck = await this.checkClineAvailable();
+    if (!clineCheck.available) {
+      return {
+        success: false,
+        output: "",
+        error: clineCheck.error,
+      };
+    }
+
     return this.mode === "interactive" ? this.runInteractive(options) : this.runStreaming(options);
+  }
+
+  /**
+   * Check if Cline CLI is available and the gRPC service is running.
+   */
+  private async checkClineAvailable(): Promise<{ available: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      // First check if cline CLI exists
+      const proc = spawn("cline", ["--version"], {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      let stderr = "";
+
+      proc.stderr?.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on("error", (error) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          resolve({
+            available: false,
+            error: "Cline CLI not found. Install with: npm install -g cline",
+          });
+        } else {
+          resolve({
+            available: false,
+            error: `Failed to check Cline CLI: ${error.message}`,
+          });
+        }
+      });
+
+      proc.on("close", (code) => {
+        if (code !== 0) {
+          // Check if the error is about gRPC service not running
+          if (stderr.includes("gRPC") || stderr.includes("ECONNREFUSED") || stderr.includes("service")) {
+            resolve({
+              available: false,
+              error:
+                "Cline Core gRPC service is not running. Start it with: cline-core start (or ensure the Cline VS Code extension is running)",
+            });
+          } else {
+            resolve({
+              available: false,
+              error: stderr || `Cline CLI exited with code ${code}`,
+            });
+          }
+        } else {
+          resolve({ available: true });
+        }
+      });
+    });
   }
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
       const args = this.buildInteractiveArgs(options);
 
-      const proc = spawn("claude", args, {
+      const proc = spawn("cline", args, {
         cwd: options.startingDirectory,
         stdio: "inherit",
       });
@@ -183,7 +253,7 @@ export class ClaudeAgentProvider implements Agent {
         resolve({
           success: false,
           output: "",
-          error: `Failed to spawn claude: ${error.message}`,
+          error: this.formatSpawnError(error),
         });
       });
 
@@ -200,22 +270,23 @@ export class ClaudeAgentProvider implements Agent {
   private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
       const args = this.buildStreamingArgs(options);
-      args.push("--output-format", "stream-json");
 
-      const proc = spawn("claude", args, {
+      const proc = spawn("cline", args, {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
       });
 
       const now = Date.now();
       let lastActivity = now;
-      let sessionId: string | undefined;
+      let taskId: string | undefined;
       let buffer = "";
       const outputAccumulator = { value: "" };
       let timedOut = false;
+      let serviceError = false;
+      let errorMessage = "";
 
       // Track session for interjection support
-      const session: RunningSession = {
+      const session: ClineRunningSession = {
         proc,
         startTime: now,
         lastActivity: now,
@@ -233,7 +304,6 @@ export class ClaudeAgentProvider implements Agent {
         const elapsed = Date.now() - lastActivity;
 
         if (elapsed >= this.activityTimeoutMs) {
-          // Agent presumed dead
           timedOut = true;
           if (this.onTimeout) {
             this.onTimeout();
@@ -246,7 +316,6 @@ export class ClaudeAgentProvider implements Agent {
             proc.kill("SIGTERM");
           } catch {}
         } else if (elapsed >= this.heartbeatIntervalMs) {
-          // Heartbeat
           if (this.onHeartbeat) {
             this.onHeartbeat(elapsed);
           }
@@ -262,14 +331,27 @@ export class ClaudeAgentProvider implements Agent {
         if (!line.trim()) return;
 
         try {
-          const event: StreamEvent = JSON.parse(line);
+          const event: ClineStreamEvent = JSON.parse(line);
           lastActivity = Date.now();
           session.lastActivity = lastActivity;
 
-          // Capture session ID for resume support
-          if (event.session_id) {
-            sessionId = event.session_id;
-            session.sessionId = sessionId;
+          // Capture task ID for resume support
+          if (event.task_id) {
+            taskId = event.task_id;
+            session.taskId = taskId;
+          }
+
+          // Check for service errors
+          if (event.type === "error") {
+            const errorObj = event.error as { message?: string } | undefined;
+            const msg = errorObj?.message || (event.content as string) || "unknown error";
+            if (msg.includes("gRPC") || msg.includes("ECONNREFUSED") || msg.includes("service")) {
+              serviceError = true;
+              errorMessage =
+                "Cline Core gRPC service is not running. Start it with: cline-core start (or ensure the Cline VS Code extension is running)";
+            } else {
+              errorMessage = msg;
+            }
           }
 
           // Notify listener
@@ -277,11 +359,10 @@ export class ClaudeAgentProvider implements Agent {
             this.onEvent(event);
           }
 
-          // Stream human-readable output and accumulate text output
+          // Stream human-readable output and accumulate text
           if (this.streamOutput) {
             this.renderEvent(event, outputAccumulator);
           } else {
-            // Even when not streaming, we need to accumulate text from assistant events
             this.extractTextFromEvent(event, outputAccumulator);
           }
         } catch {
@@ -304,6 +385,15 @@ export class ClaudeAgentProvider implements Agent {
 
       proc.stderr?.on("data", (data) => {
         lastActivity = Date.now();
+        const chunk = data.toString();
+
+        // Check for service connection errors
+        if (chunk.includes("gRPC") || chunk.includes("ECONNREFUSED") || chunk.includes("connect")) {
+          serviceError = true;
+          errorMessage =
+            "Cline Core gRPC service is not running. Start it with: cline-core start (or ensure the Cline VS Code extension is running)";
+        }
+
         if (this.streamOutput) {
           process.stderr.write(data);
         }
@@ -317,8 +407,8 @@ export class ClaudeAgentProvider implements Agent {
         resolve({
           success: false,
           output: outputAccumulator.value,
-          error: `Failed to spawn claude: ${error.message}`,
-          sessionId,
+          error: this.formatSpawnError(error),
+          sessionId: taskId,
         });
       });
 
@@ -334,24 +424,41 @@ export class ClaudeAgentProvider implements Agent {
         }
 
         const exitCode = code ?? 0;
+        const success = !timedOut && !serviceError && exitCode === 0;
+
         resolve({
-          success: !timedOut && exitCode === 0,
+          success,
           output: outputAccumulator.value,
-          error: timedOut ? "Agent timed out due to inactivity" : undefined,
-          sessionId,
+          error: timedOut
+            ? "Agent timed out due to inactivity"
+            : serviceError
+              ? errorMessage
+              : errorMessage || undefined,
+          sessionId: taskId,
         });
       });
 
-      // Send prompt via stdin and close
-      proc.stdin?.write(options.prompt);
+      // Build full prompt with system context
+      const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
+      proc.stdin?.write(fullPrompt);
       proc.stdin?.end();
     });
   }
 
-  private renderEvent(event: StreamEvent, outputAccumulator?: { value: string }): void {
+  /**
+   * Format spawn error with helpful installation message.
+   */
+  private formatSpawnError(error: Error): string {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return "Cline CLI not found. Install with: npm install -g cline";
+    }
+    return `Failed to spawn cline: ${error.message}`;
+  }
+
+  private renderEvent(event: ClineStreamEvent, outputAccumulator?: { value: string }): void {
     switch (event.type) {
       case "assistant": {
-        // Claude CLI sends message.content as an array of content blocks
+        // Handle assistant messages with content array
         const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
         if (message?.content) {
           for (const block of message.content) {
@@ -362,12 +469,17 @@ export class ClaudeAgentProvider implements Agent {
               }
             }
           }
+        } else if (event.content) {
+          // Fallback to direct content
+          process.stdout.write(event.content);
+          if (outputAccumulator) {
+            outputAccumulator.value += event.content;
+          }
         }
         break;
       }
 
       case "content_block_delta": {
-        // Handle streaming text deltas
         const delta = event.delta as { type?: string; text?: string } | undefined;
         if (delta?.type === "text_delta" && delta.text) {
           process.stdout.write(delta.text);
@@ -379,15 +491,12 @@ export class ClaudeAgentProvider implements Agent {
       }
 
       case "tool_use":
-        // Format tool name in cyan for visibility
         process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name}]`)}\n`);
         break;
 
       case "tool_result": {
-        // Show result indicator in dim, with optional content in verbose mode
         const content = event.content as string | undefined;
         if (this.verbose && content) {
-          // In verbose mode, show truncated content
           const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
           process.stdout.write(`${chalk.dim("[result]")} ${truncated}\n`);
         } else {
@@ -396,8 +505,26 @@ export class ClaudeAgentProvider implements Agent {
         break;
       }
 
+      case "plan": {
+        // Cline-specific: Plan output
+        process.stdout.write(`\n${chalk.blue("[PLAN]")}\n`);
+        if (event.content) {
+          process.stdout.write(event.content);
+          process.stdout.write("\n");
+          if (outputAccumulator) {
+            outputAccumulator.value += event.content;
+          }
+        }
+        break;
+      }
+
+      case "plan_approval": {
+        // Cline-specific: Waiting for plan approval
+        process.stdout.write(`${chalk.yellow("[WAITING FOR APPROVAL]")} Plan requires approval to proceed\n`);
+        break;
+      }
+
       case "result": {
-        // Claude CLI uses total_cost_usd NOT cost_usd
         const totalCost = event.total_cost_usd as number | undefined;
         const durationMs = event.duration_ms as number | undefined;
 
@@ -412,28 +539,39 @@ export class ClaudeAgentProvider implements Agent {
       }
 
       case "error": {
-        // Claude CLI uses error.message NOT event.content
         const errorObj = event.error as { message?: string } | undefined;
-        const errorMessage = errorObj?.message || "unknown error";
-        process.stdout.write(`\n[ERROR: ${errorMessage}]\n`);
+        const errorMessage = errorObj?.message || (event.content as string) || "unknown error";
+        process.stdout.write(`\n${chalk.red(`[ERROR: ${errorMessage}]`)}\n`);
         break;
       }
 
       case "system":
         this.renderSystemEvent(event);
         break;
+
+      case "task_created": {
+        // Cline-specific: New task created
+        if (event.task_id) {
+          process.stdout.write(`${chalk.green(`[task: ${event.task_id}]`)}\n`);
+        }
+        break;
+      }
+
+      case "task_resumed": {
+        // Cline-specific: Task resumed
+        if (event.task_id) {
+          process.stdout.write(`${chalk.green(`[resumed: ${event.task_id}]`)}\n`);
+        }
+        break;
+      }
     }
   }
 
-  /**
-   * Render system event subtypes
-   */
-  private renderSystemEvent(event: StreamEvent): void {
+  private renderSystemEvent(event: ClineStreamEvent): void {
     switch (event.subtype) {
       case "init":
-        // Display session and model info
-        if (event.session_id) {
-          process.stdout.write(`[session: ${event.session_id}]\n`);
+        if (event.task_id) {
+          process.stdout.write(`[task: ${event.task_id}]\n`);
         }
         if (event.model) {
           process.stdout.write(`[model: ${event.model}]\n`);
@@ -441,14 +579,12 @@ export class ClaudeAgentProvider implements Agent {
         break;
 
       case "hook_started": {
-        // Display hook name in dim
         const hookName = (event.hook_name as string) || (event.name as string) || "unknown";
         process.stdout.write(`${chalk.dim(`[hook: ${hookName}]`)}\n`);
         break;
       }
 
       case "hook_response":
-        // Only log in verbose mode
         if (this.verbose) {
           const response = event.response as string | undefined;
           if (response) {
@@ -460,7 +596,6 @@ export class ClaudeAgentProvider implements Agent {
         break;
 
       default:
-        // Log other system subtypes in verbose mode
         if (this.verbose && event.subtype) {
           logger.debug(`Unhandled system subtype: ${event.subtype}`, event);
         }
@@ -471,7 +606,7 @@ export class ClaudeAgentProvider implements Agent {
   /**
    * Extract text from event without writing to stdout (for non-streaming mode)
    */
-  private extractTextFromEvent(event: StreamEvent, outputAccumulator: { value: string }): void {
+  private extractTextFromEvent(event: ClineStreamEvent, outputAccumulator: { value: string }): void {
     switch (event.type) {
       case "assistant": {
         const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
@@ -481,6 +616,8 @@ export class ClaudeAgentProvider implements Agent {
               outputAccumulator.value += block.text;
             }
           }
+        } else if (event.content) {
+          outputAccumulator.value += event.content;
         }
         break;
       }
@@ -492,50 +629,74 @@ export class ClaudeAgentProvider implements Agent {
         }
         break;
       }
+
+      case "plan":
+        if (event.content) {
+          outputAccumulator.value += event.content;
+        }
+        break;
     }
   }
 
   private buildInteractiveArgs(options: AgentRunOptions): string[] {
-    // Interactive mode: no -p flag, Claude runs in REPL mode
-    const args: string[] = ["--verbose"];
+    // Interactive mode: Plan mode for human review
+    const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
+    const args: string[] = [fullPrompt];
 
-    if (this.dangerouslySkipPermissions) {
-      args.push("--dangerously-skip-permissions");
-    }
+    args.push("--mode", "plan"); // Interactive uses plan mode for human approval
 
     if (this.model) {
       args.push("--model", this.model);
-    }
-
-    args.push("--append-system-prompt", options.systemPrompt);
-
-    // Add initial prompt so Claude starts with context instead of blank slate
-    if (options.prompt) {
-      args.push(options.prompt);
     }
 
     return args;
   }
 
   private buildStreamingArgs(options: AgentRunOptions): string[] {
-    // Streaming/print mode: -p flag for single-shot execution
-    const args: string[] = ["-p", "--verbose"];
+    // Streaming mode: Use task new for autonomous execution
+    const args: string[] = ["task", "new"];
 
-    if (this.dangerouslySkipPermissions) {
-      args.push("--dangerously-skip-permissions");
+    // For resume, use task resume instead
+    if (options.sessionId) {
+      return this.buildResumeArgs(options);
     }
+
+    // Add the prompt placeholder - will be sent via stdin
+    args.push("--stdin");
+
+    // Mode selection
+    args.push("--mode", this.clineMode);
+
+    // Skip approvals in act mode
+    if (this.clineMode === "act" && this.yolo) {
+      args.push("--yolo");
+    }
+
+    // JSON output for parsing
+    args.push("-F", "json");
 
     if (this.model) {
       args.push("--model", this.model);
     }
 
-    // Resume previous session if sessionId provided
-    if (options.sessionId) {
-      args.push("--resume", options.sessionId);
+    return args;
+  }
+
+  private buildResumeArgs(options: AgentRunOptions): string[] {
+    // Resume a previous task
+    const args: string[] = ["task", "resume", options.sessionId!];
+
+    args.push("--mode", this.clineMode);
+
+    if (this.clineMode === "act" && this.yolo) {
+      args.push("--yolo");
     }
 
-    args.push("--append-system-prompt", options.systemPrompt);
-    args.push(options.prompt);
+    args.push("-F", "json");
+
+    if (this.model) {
+      args.push("--model", this.model);
+    }
 
     return args;
   }
