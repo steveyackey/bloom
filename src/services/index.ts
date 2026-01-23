@@ -13,7 +13,9 @@ export {
 } from "./planning-service";
 export {
   createProject,
+  createProjectInPlace,
   formatProjectName,
+  runCreateInPlaceSession,
   runCreateSession,
 } from "./project-service";
 export {

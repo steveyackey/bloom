@@ -95,6 +95,11 @@ bloom repo clone https://github.com/org/frontend
 bloom create my-feature
 cd my-feature
 
+# Or, if you've already gathered research in a folder:
+# mkdir my-feature && cd my-feature
+# (add research notes, context files, etc.)
+# bloom create .
+
 # 4. Refine your PRD until you're happy with requirements
 bloom refine      # Interactively refine PRD.md, CLAUDE.md, etc.
 
@@ -164,6 +169,7 @@ You can organize everything outside `repos/` however you like—create folders f
 1. INIT      bloom init                # Initialize workspace (once)
 2. CLONE     bloom repo clone <url>    # Add repos to workspace
 3. CREATE    bloom create <name>       # Create project against repos
+             bloom create .            # Or initialize existing folder as project
 4. REFINE    bloom refine              # Refine PRD, ask questions, iterate
 5. PLAN      bloom plan                # Create implementation plan (plan.md)
 6. REFINE    bloom refine              # Refine plan if needed
@@ -171,6 +177,17 @@ You can organize everything outside `repos/` however you like—create folders f
 8. RUN       bloom run                 # Start agents (resumes if interrupted)
 9. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
 10. REVIEW   checkpoint tasks           # Human reviews at phase boundaries
+```
+
+### Research-First Workflow
+
+For complex projects, gather research before creating the PRD:
+
+```bash
+mkdir my-feature && cd my-feature
+# Add research notes, API docs, design specs, etc.
+bloom create .   # Reads existing files, then creates PRD with context
+bloom plan       # Continue with planning...
 ```
 
 ### Team Collaboration Points
@@ -212,8 +229,11 @@ bloom repo create my-new-project             # Create new local repo
 
 ```bash
 bloom create <name>          # Create a new project against workspace repos
+bloom create .               # Initialize project in current directory (uses existing files as context)
 bloom refine                 # Refine PRD, plan, or other project docs
 ```
+
+**Using `bloom create .`**: When you've already gathered research, notes, or context in a folder, use `bloom create .` to initialize it as a project. Bloom will read existing files first, then help you create a PRD based on that context. This is useful for the workflow: gather research -> create PRD -> plan -> generate -> run.
 
 ### Worktree Management
 
