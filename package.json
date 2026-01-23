@@ -19,7 +19,7 @@
     "fix": "biome check --write ./src ./tests",
     "typecheck": "tsc --noEmit",
     "validate": "bun run fix && bun run typecheck && bun run test",
-    "prepare": "simple-git-hooks",
+    "prepare": "bun scripts/install-hooks.ts",
     "package": "bun build --compile ./src/cli.ts --outfile dist/bloom",
     "install:local": "bun run package && rm -f ~/.local/bin/bloom && mkdir -p ~/.local/bin && cp dist/bloom ~/.local/bin/bloom",
     "package:linux-x64": "bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile dist/bloom-linux-x64",
@@ -29,14 +29,10 @@
     "package:windows-x64": "bun build --compile --target=bun-windows-x64 --feature WINDOWS ./src/cli.ts --outfile dist/bloom-windows-x64.exe",
     "package:all": "bun run package:linux-x64 && bun run package:linux-arm64 && bun run package:darwin-x64 && bun run package:darwin-arm64 && bun run package:windows-x64"
   },
-  "simple-git-hooks": {
-    "pre-commit": "bun run fix && git add -u"
-  },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "@types/bun": "latest",
-    "bun-pty": "^0.4.0",
-    "simple-git-hooks": "^2.13.1"
+    "bun-pty": "^0.4.0"
   },
   "peerDependencies": {
     "typescript": "^5"
