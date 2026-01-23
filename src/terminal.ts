@@ -188,6 +188,9 @@ export interface ProcessStats {
   memory: number;
 }
 
+// Windows CPU delta tracking - stores previous CPU time and timestamp per PID
+const windowsCpuHistory = new Map<number, { cpuTime: number; timestamp: number }>();
+
 /**
  * Get CPU and memory stats for a process.
  * Returns null if stats cannot be retrieved (process exited, etc.)
@@ -198,113 +201,142 @@ export interface ProcessStats {
  * - Windows: uses PowerShell Get-Process
  */
 export async function getProcessStats(pid: number): Promise<ProcessStats | null> {
+  const results = await getProcessStatsBatch([pid]);
+  return results.get(pid) || null;
+}
+
+/**
+ * Get CPU and memory stats for multiple processes in a single call.
+ * More efficient than calling getProcessStats() for each PID individually.
+ *
+ * @param pids - Array of process IDs to get stats for
+ * @returns Map of PID to ProcessStats (missing PIDs indicate process not found)
+ */
+export async function getProcessStatsBatch(pids: number[]): Promise<Map<number, ProcessStats>> {
+  if (pids.length === 0) return new Map();
+
   if (feature("WINDOWS")) {
-    return getWindowsProcessStats(pid);
+    return getWindowsProcessStatsBatch(pids);
   }
 
   // Try Linux /proc first (faster and more accurate)
-  const linuxStats = await getLinuxProcessStats(pid);
-  if (linuxStats) return linuxStats;
+  const linuxStats = await getLinuxProcessStatsBatch(pids);
+  if (linuxStats.size > 0) return linuxStats;
 
   // Fall back to ps for macOS (and Linux if /proc fails)
-  return getPsProcessStats(pid);
+  return getPsProcessStatsBatch(pids);
 }
 
-async function getLinuxProcessStats(pid: number): Promise<ProcessStats | null> {
+async function getLinuxProcessStatsBatch(pids: number[]): Promise<Map<number, ProcessStats>> {
+  const results = new Map<number, ProcessStats>();
+
   try {
-    const statFile = Bun.file(`/proc/${pid}/stat`);
-    const statmFile = Bun.file(`/proc/${pid}/statm`);
-    const uptimeFile = Bun.file("/proc/uptime");
+    // Read uptime once for all processes
+    const uptimeContent = await Bun.file("/proc/uptime")
+      .text()
+      .catch(() => null);
+    if (!uptimeContent) return results;
 
-    const [statContent, statmContent, uptimeContent] = await Promise.all([
-      statFile.text().catch(() => null),
-      statmFile.text().catch(() => null),
-      uptimeFile.text().catch(() => null),
-    ]);
-
-    if (!statContent || !statmContent || !uptimeContent) {
-      return null;
-    }
-
-    // Parse stat - fields: pid (comm) state ppid pgrp session tty_nr tpgid flags
-    //               minflt cminflt majflt cmajflt utime stime cutime cstime ...
-    // Note: comm field (in parentheses) can contain spaces, so we find the last ')' and parse from there
-    const lastParenIndex = statContent.lastIndexOf(")");
-    if (lastParenIndex === -1) {
-      return null;
-    }
-    // Fields after comm: state(3) ppid(4) ... utime(14) stime(15) ... starttime(22) (1-indexed)
-    // After slicing past ")", we have " state ppid ..." so split gives state at index 0
-    // utime at 14-3=11, stime at 15-3=12, starttime at 22-3=19
-    const fieldsAfterComm = statContent.slice(lastParenIndex + 2).split(" ");
-    const utime = Number.parseInt(fieldsAfterComm[11] || "0", 10);
-    const stime = Number.parseInt(fieldsAfterComm[12] || "0", 10);
-    const starttime = Number.parseInt(fieldsAfterComm[19] || "0", 10);
-    const totalTime = utime + stime;
-
-    // Parse uptime
     const uptime = Number.parseFloat(uptimeContent.split(" ")[0] || "0");
+    const hertz = 100; // Standard Linux clock ticks per second
+    const pageSize = 4096; // Standard page size
 
-    // Get clock ticks per second (usually 100)
-    const hertz = 100; // Assuming standard Linux value
+    // Read stats for all PIDs in parallel
+    await Promise.all(
+      pids.map(async (pid) => {
+        try {
+          const [statContent, statmContent] = await Promise.all([
+            Bun.file(`/proc/${pid}/stat`)
+              .text()
+              .catch(() => null),
+            Bun.file(`/proc/${pid}/statm`)
+              .text()
+              .catch(() => null),
+          ]);
 
-    // Calculate CPU usage
-    const seconds = uptime - starttime / hertz;
-    const cpu = seconds > 0 ? (100 * (totalTime / hertz)) / seconds : 0;
+          if (!statContent || !statmContent) return;
 
-    // Parse statm - fields: size resident shared text lib data dt
-    const statmParts = statmContent.split(" ");
-    const rss = Number.parseInt(statmParts[1] || "0", 10); // resident pages
-    const pageSize = 4096; // Assuming standard page size
-    const memory = (rss * pageSize) / (1024 * 1024); // Convert to MB
+          // Parse stat - comm field (in parentheses) can contain spaces
+          const lastParenIndex = statContent.lastIndexOf(")");
+          if (lastParenIndex === -1) return;
 
-    return {
-      cpu: Math.min(100, Math.round(cpu * 10) / 10),
-      memory: Math.round(memory * 10) / 10,
-    };
+          // Fields after comm: state(3) ppid(4) ... utime(14) stime(15) ... starttime(22)
+          const fieldsAfterComm = statContent.slice(lastParenIndex + 2).split(" ");
+          const utime = Number.parseInt(fieldsAfterComm[11] || "0", 10);
+          const stime = Number.parseInt(fieldsAfterComm[12] || "0", 10);
+          const starttime = Number.parseInt(fieldsAfterComm[19] || "0", 10);
+          const totalTime = utime + stime;
+
+          // Calculate CPU usage
+          const seconds = uptime - starttime / hertz;
+          const cpu = seconds > 0 ? (100 * (totalTime / hertz)) / seconds : 0;
+
+          // Parse statm - fields: size resident shared text lib data dt
+          const statmParts = statmContent.split(" ");
+          const rss = Number.parseInt(statmParts[1] || "0", 10);
+          const memory = (rss * pageSize) / (1024 * 1024);
+
+          results.set(pid, {
+            cpu: Math.min(100, Math.round(cpu * 10) / 10),
+            memory: Math.round(memory * 10) / 10,
+          });
+        } catch {
+          // Skip this PID
+        }
+      })
+    );
   } catch {
-    return null;
+    // Return whatever we collected
   }
+
+  return results;
 }
 
-async function getPsProcessStats(pid: number): Promise<ProcessStats | null> {
+async function getPsProcessStatsBatch(pids: number[]): Promise<Map<number, ProcessStats>> {
+  const results = new Map<number, ProcessStats>();
+
   try {
-    // Use ps to get CPU% and RSS (resident set size in KB)
-    // Works on macOS and Linux
-    const proc = Bun.spawn(["ps", "-p", String(pid), "-o", "%cpu=,rss="], {
+    // Use ps with multiple PIDs in one call: ps -p pid1,pid2,pid3 -o pid=,%cpu=,rss=
+    const pidList = pids.join(",");
+    const proc = Bun.spawn(["ps", "-p", pidList, "-o", "pid=,%cpu=,rss="], {
       stdout: "pipe",
       stderr: "pipe",
     });
 
     const output = await new Response(proc.stdout).text();
-    const exitCode = await proc.exited;
+    await proc.exited;
 
-    if (exitCode !== 0 || !output.trim()) {
-      return null;
+    // Parse output - each line: "  123  5.2 12345" (pid, cpu%, rss in KB)
+    for (const line of output.trim().split("\n")) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 3) continue;
+
+      const pid = Number.parseInt(parts[0] || "0", 10);
+      const cpu = Number.parseFloat(parts[1] || "0");
+      const rssKb = Number.parseInt(parts[2] || "0", 10);
+      const memory = rssKb / 1024;
+
+      if (pid > 0) {
+        results.set(pid, {
+          cpu: Math.min(100, Math.round(cpu * 10) / 10),
+          memory: Math.round(memory * 10) / 10,
+        });
+      }
     }
-
-    // Parse output: "  5.2 12345" (cpu% and rss in KB)
-    const parts = output.trim().split(/\s+/);
-    if (parts.length < 2) return null;
-
-    const cpu = Number.parseFloat(parts[0] || "0");
-    const rssKb = Number.parseInt(parts[1] || "0", 10);
-    const memory = rssKb / 1024; // Convert KB to MB
-
-    return {
-      cpu: Math.min(100, Math.round(cpu * 10) / 10),
-      memory: Math.round(memory * 10) / 10,
-    };
   } catch {
-    return null;
+    // Return whatever we collected
   }
+
+  return results;
 }
 
-async function getWindowsProcessStats(pid: number): Promise<ProcessStats | null> {
+async function getWindowsProcessStatsBatch(pids: number[]): Promise<Map<number, ProcessStats>> {
+  const results = new Map<number, ProcessStats>();
+
   try {
-    // Use PowerShell to get process stats
-    // Get-Process returns CPU time in seconds and WorkingSet64 in bytes
-    const psCommand = `Get-Process -Id ${pid} -ErrorAction SilentlyContinue | Select-Object CPU,WorkingSet64 | ConvertTo-Json`;
+    // Use PowerShell to get process stats for all PIDs in one call
+    const pidList = pids.join(",");
+    const psCommand = `Get-Process -Id ${pidList} -ErrorAction SilentlyContinue | Select-Object Id,CPU,WorkingSet64 | ConvertTo-Json -AsArray`;
 
     const proc = Bun.spawn(["powershell", "-NoProfile", "-Command", psCommand], {
       stdout: "pipe",
@@ -315,25 +347,50 @@ async function getWindowsProcessStats(pid: number): Promise<ProcessStats | null>
     const exitCode = await proc.exited;
 
     if (exitCode !== 0 || !output.trim()) {
-      return null;
+      return results;
     }
 
+    const now = Date.now();
     const data = JSON.parse(output.trim());
-    if (!data) return null;
+    if (!Array.isArray(data)) return results;
 
-    // CPU is total CPU time in seconds - convert to approximate percentage
-    // This is cumulative, not instantaneous, so it's less accurate than Linux/macOS
-    // WorkingSet64 is memory in bytes
-    const cpuSeconds = data.CPU || 0;
-    const memoryBytes = data.WorkingSet64 || 0;
+    for (const item of data) {
+      const pid = item.Id;
+      const cpuTime = item.CPU || 0;
+      const memoryBytes = item.WorkingSet64 || 0;
 
-    // For CPU%, we'll show the cumulative CPU time as a rough indicator
-    // A more accurate approach would track delta over time, but this gives a ballpark
-    const cpu = Math.min(100, Math.round(cpuSeconds * 10) / 10);
-    const memory = Math.round((memoryBytes / (1024 * 1024)) * 10) / 10; // Convert to MB
+      // Calculate instantaneous CPU% using delta from previous measurement
+      let cpuPercent = 0;
+      const prev = windowsCpuHistory.get(pid);
+      if (prev) {
+        const timeDeltaSec = (now - prev.timestamp) / 1000;
+        if (timeDeltaSec > 0) {
+          const cpuDelta = cpuTime - prev.cpuTime;
+          // CPU time delta / wall time delta * 100 = CPU percentage
+          cpuPercent = (cpuDelta / timeDeltaSec) * 100;
+        }
+      }
 
-    return { cpu, memory };
+      // Store current values for next calculation
+      windowsCpuHistory.set(pid, { cpuTime, timestamp: now });
+
+      const memory = memoryBytes / (1024 * 1024);
+
+      results.set(pid, {
+        cpu: Math.min(100, Math.round(cpuPercent * 10) / 10),
+        memory: Math.round(memory * 10) / 10,
+      });
+    }
+
+    // Clean up history for PIDs no longer being tracked
+    for (const historyPid of windowsCpuHistory.keys()) {
+      if (!pids.includes(historyPid)) {
+        windowsCpuHistory.delete(historyPid);
+      }
+    }
   } catch {
-    return null;
+    // Return whatever we collected
   }
+
+  return results;
 }

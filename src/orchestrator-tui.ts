@@ -6,7 +6,7 @@ import { interjectSession } from "./agents";
 import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
 import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
-import { getProcessStats, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
+import { getProcessStatsBatch, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
 
 // =============================================================================
 // Types
@@ -158,10 +158,25 @@ export class OrchestratorTUI {
   }
 
   private async updateAllStats() {
+    // Collect all PIDs that need stats
+    const pidsToQuery: number[] = [];
+    const panesByPid = new Map<number, Pane>();
+
+    for (const pane of this.panes) {
+      if (pane.proc?.pid && pane.status === "running") {
+        pidsToQuery.push(pane.proc.pid);
+        panesByPid.set(pane.proc.pid, pane);
+      }
+    }
+
+    // Batch fetch all stats in one call
+    const statsMap = await getProcessStatsBatch(pidsToQuery);
+
+    // Update panes with fetched stats
     let changed = false;
     for (const pane of this.panes) {
       if (pane.proc?.pid && pane.status === "running") {
-        const stats = await getProcessStats(pane.proc.pid);
+        const stats = statsMap.get(pane.proc.pid);
         if (stats) {
           pane.stats = stats;
           changed = true;
@@ -171,6 +186,7 @@ export class OrchestratorTUI {
         changed = true;
       }
     }
+
     if (changed) {
       this.scheduleRender();
     }
