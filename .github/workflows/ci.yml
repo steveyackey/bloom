@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+env:
+  CI: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -25,8 +28,36 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
-      - name: Test
-        run: bun test
+      - name: Unit Tests
+        run: bun test tests/ --ignore 'tests/integration/*'
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Integration Tests
+        run: bun test tests/integration/
+        env:
+          BLOOM_HOME: ${{ runner.temp }}/bloom
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            ${{ runner.temp }}/bloom
+          retention-days: 7
 
   docs:
     runs-on: ubuntu-latest

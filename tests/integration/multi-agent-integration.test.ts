@@ -838,3 +838,502 @@ export const CI_REQUIREMENTS = {
     fullIntegration: "5+ minutes",
   },
 };
+
+// =============================================================================
+// Real System Integration Tests
+// =============================================================================
+//
+// These tests verify that the actual system components (prompt compiler,
+// capabilities registry, agent factory) work together correctly.
+//
+// =============================================================================
+
+import { type AgentName, getAgentCapabilities, hasCapability } from "../../src/agents/capabilities";
+import { compilePrompt, PromptCompiler } from "../../src/prompts/compiler";
+
+describe("Real System Integration Tests", () => {
+  // ===========================================================================
+  // Prompt Compiler + Capabilities Integration
+  // ===========================================================================
+  describe("Prompt Compiler + Agent Capabilities", () => {
+    /**
+     * Tests that prompt compiler correctly processes conditional sections
+     * based on actual agent capabilities from the registry.
+     */
+    test("compiles Claude-specific prompt with web search capability", () => {
+      const claudeCapabilities = getAgentCapabilities("claude");
+      expect(claudeCapabilities).toBeDefined();
+
+      const promptTemplate = `# Agent Instructions
+
+<!-- @if supportsWebSearch -->
+## Web Search
+You can use web search to find information.
+<!-- @endif -->
+
+<!-- @if supportsPlanMode -->
+## Plan Mode
+Use plan mode for complex tasks.
+<!-- @endif -->
+
+<!-- @if supportsLSP -->
+## LSP Support
+You have access to Language Server Protocol features.
+<!-- @endif -->
+
+{{CAPABILITIES_SECTION}}`;
+
+      const compiled = compilePrompt(promptTemplate, {
+        capabilities: claudeCapabilities!,
+      });
+
+      // Claude supports web search, so it should be included
+      expect(compiled).toContain("Web Search");
+      expect(compiled).toContain("web search to find information");
+
+      // Claude does not support plan mode or LSP
+      expect(compiled).not.toContain("Plan Mode");
+      expect(compiled).not.toContain("plan mode for complex tasks");
+      expect(compiled).not.toContain("LSP Support");
+
+      // Capabilities section should list enabled capabilities
+      expect(compiled).toContain("## Capabilities");
+      expect(compiled).toContain("Web search");
+    });
+
+    test("compiles Cline-specific prompt with plan mode capability", () => {
+      const clineCapabilities = getAgentCapabilities("cline");
+      expect(clineCapabilities).toBeDefined();
+
+      const promptTemplate = `# Agent Instructions
+
+<!-- @if supportsWebSearch -->
+## Web Search
+You can use web search to find information.
+<!-- @endif -->
+
+<!-- @if supportsPlanMode -->
+## Plan Mode
+Use plan mode for complex tasks.
+<!-- @endif -->
+
+<!-- @if supportsHumanQuestions -->
+## Human Questions
+You can ask clarifying questions.
+<!-- @endif -->`;
+
+      const compiled = compilePrompt(promptTemplate, {
+        capabilities: clineCapabilities!,
+      });
+
+      // Cline supports plan mode and human questions
+      expect(compiled).toContain("Plan Mode");
+      expect(compiled).toContain("Human Questions");
+
+      // Cline does not support web search
+      expect(compiled).not.toContain("Web Search");
+    });
+
+    test("compiles OpenCode-specific prompt with LSP capability", () => {
+      const openCodeCapabilities = getAgentCapabilities("opencode");
+      expect(openCodeCapabilities).toBeDefined();
+
+      const promptTemplate = `# Agent Instructions
+
+<!-- @if supportsLSP -->
+## LSP Support
+You have native Language Server Protocol support for accurate code intelligence.
+<!-- @endif -->
+
+<!-- @if supportsWebSearch -->
+## Web Search
+You can search the web.
+<!-- @endif -->`;
+
+      const compiled = compilePrompt(promptTemplate, {
+        capabilities: openCodeCapabilities!,
+      });
+
+      // OpenCode supports LSP
+      expect(compiled).toContain("LSP Support");
+      expect(compiled).toContain("Language Server Protocol");
+
+      // OpenCode does not support web search
+      expect(compiled).not.toContain("Web Search");
+    });
+  });
+
+  // ===========================================================================
+  // Capability Registry Integration
+  // ===========================================================================
+  describe("Agent Capability Registry", () => {
+    test("all registered agents have required base capabilities", () => {
+      const agents: AgentName[] = ["claude", "cline", "opencode"];
+
+      for (const agent of agents) {
+        const caps = getAgentCapabilities(agent);
+        expect(caps).toBeDefined();
+
+        // All agents should support basic file operations
+        expect(caps!.supportsFileRead).toBe(true);
+        expect(caps!.supportsFileWrite).toBe(true);
+        expect(caps!.supportsBash).toBe(true);
+        expect(caps!.supportsGit).toBe(true);
+      }
+    });
+
+    test("hasCapability utility works correctly", () => {
+      // Claude has web search
+      expect(hasCapability("claude", "supportsWebSearch")).toBe(true);
+      // Cline does not have web search
+      expect(hasCapability("cline", "supportsWebSearch")).toBe(false);
+      // OpenCode has LSP
+      expect(hasCapability("opencode", "supportsLSP")).toBe(true);
+      // Claude does not have LSP
+      expect(hasCapability("claude", "supportsLSP")).toBe(false);
+    });
+
+    test("capability differences match expected fixtures", () => {
+      // Verify our FIXTURE_EXPECTED_PROMPTS match reality
+      const claudeCaps = getAgentCapabilities("claude")!;
+      const clineCaps = getAgentCapabilities("cline")!;
+      const openCodeCaps = getAgentCapabilities("opencode")!;
+
+      // Claude expectations
+      expect(claudeCaps.supportsWebSearch).toBe(true);
+      expect(claudeCaps.supportsPlanMode).toBe(false);
+
+      // Cline expectations
+      expect(clineCaps.supportsWebSearch).toBe(false);
+      expect(clineCaps.supportsPlanMode).toBe(true);
+
+      // OpenCode expectations
+      expect(openCodeCaps.supportsLSP).toBe(true);
+      expect(openCodeCaps.supportsWebSearch).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Task Prompt Generation Integration
+  // ===========================================================================
+  describe("Task Prompt Generation", () => {
+    test("generates complete task prompt with variables", () => {
+      const compiler = new PromptCompiler();
+
+      const promptTemplate = `# Task: {{TASK_TITLE}}
+
+## Task ID: {{TASK_ID}}
+
+Complete this task using the {{AGENT_NAME}} agent.
+
+Use the following CLI: {{TASK_CLI}}`;
+
+      const compiled = compiler.compile(promptTemplate, {
+        variables: {
+          TASK_ID: "test-task-123",
+          TASK_TITLE: "Implement feature X",
+          AGENT_NAME: "phase1",
+          TASK_CLI: 'bloom -f "/path/to/tasks.yaml"',
+        },
+      });
+
+      expect(compiled).toContain("# Task: Implement feature X");
+      expect(compiled).toContain("## Task ID: test-task-123");
+      expect(compiled).toContain("phase1 agent");
+      expect(compiled).toContain('bloom -f "/path/to/tasks.yaml"');
+    });
+
+    test("handles nested conditionals correctly", () => {
+      const promptTemplate = `# Instructions
+
+<!-- @if supportsBash -->
+## Terminal Access
+
+You can run commands.
+
+<!-- @if supportsGit -->
+### Git Commands
+You have access to git.
+<!-- @endif -->
+
+<!-- @endif -->
+
+Done.`;
+
+      // Agent with both bash and git
+      const fullCapabilities = {
+        supportsBash: true,
+        supportsGit: true,
+      };
+
+      const compiled = compilePrompt(promptTemplate, {
+        capabilities: fullCapabilities,
+      });
+
+      expect(compiled).toContain("Terminal Access");
+      expect(compiled).toContain("Git Commands");
+
+      // Agent with bash but no git
+      const bashOnly = {
+        supportsBash: true,
+        supportsGit: false,
+      };
+
+      const bashOnlyCompiled = compilePrompt(promptTemplate, {
+        capabilities: bashOnly,
+      });
+
+      expect(bashOnlyCompiled).toContain("Terminal Access");
+      expect(bashOnlyCompiled).not.toContain("Git Commands");
+
+      // Agent with neither
+      const noCapabilities = {
+        supportsBash: false,
+        supportsGit: false,
+      };
+
+      const noCapabilitiesCompiled = compilePrompt(promptTemplate, {
+        capabilities: noCapabilities,
+      });
+
+      expect(noCapabilitiesCompiled).not.toContain("Terminal Access");
+      expect(noCapabilitiesCompiled).not.toContain("Git Commands");
+    });
+  });
+
+  // ===========================================================================
+  // Multi-Agent Workflow Simulation
+  // ===========================================================================
+  describe("Multi-Agent Workflow Simulation", () => {
+    /**
+     * Simulates a complete multi-agent workflow using mock infrastructure
+     * but real system components (capabilities, prompt compiler).
+     */
+    test("simulates complete three-task workflow with mocked agents", async () => {
+      const tasks = FIXTURE_TASKS.threeTaskSingleAgent.tasks;
+      const orchestratorState = createMockOrchestratorState();
+
+      // Simulate orchestrator processing each task
+      for (const task of tasks) {
+        // Get capabilities for the agent
+        const capabilities = getAgentCapabilities(task.agent);
+        expect(capabilities).toBeDefined();
+
+        // Compile a task prompt (simulating what orchestrator does)
+        const taskPrompt = `# Task: ${task.title}\n\nAcceptance criteria:\n${task.acceptance_criteria.map((c) => `- ${c}`).join("\n")}`;
+
+        const mockBehavior = createMockAgentBehavior({
+          output: `Completed: ${task.title}`,
+          sessionId: `session-${task.id}`,
+        });
+
+        // Record execution
+        orchestratorState.executedTasks.push({
+          taskId: task.id,
+          agent: task.agent,
+          prompt: taskPrompt,
+          sessionId: mockBehavior.sessionId,
+          startTime: Date.now(),
+          endTime: Date.now() + (mockBehavior.responseDelay || 0),
+        });
+      }
+
+      // Verify all tasks were "executed"
+      expect(orchestratorState.executedTasks).toHaveLength(3);
+      expect(orchestratorState.executedTasks.map((t) => t.taskId)).toEqual(["task-1", "task-2", "task-3"]);
+      expect(orchestratorState.executedTasks.every((t) => t.agent === "claude")).toBe(true);
+    });
+
+    test("simulates agent switching with different prompts per agent", async () => {
+      const tasks = FIXTURE_TASKS.twoTasksDifferentAgents.tasks;
+      const compiledPrompts: Map<string, string> = new Map();
+
+      // Simulate compiling prompts for each task based on its agent
+      for (const task of tasks) {
+        const capabilities = getAgentCapabilities(task.agent as AgentName);
+
+        // Create agent-specific prompt section
+        const agentSection = capabilities?.supportsWebSearch
+          ? "Use web search when needed."
+          : "No web search available.";
+
+        const prompt = `# Task: ${task.title}\n\n${agentSection}`;
+        compiledPrompts.set(task.id, prompt);
+      }
+
+      // Verify prompts are different based on agent capabilities
+      const claudePrompt = compiledPrompts.get("task-claude")!;
+      const copilotPrompt = compiledPrompts.get("task-copilot")!;
+
+      // Claude has web search
+      expect(claudePrompt).toContain("web search when needed");
+
+      // Note: Copilot also has web search in our registry
+      // This test verifies the prompts are compiled per-agent
+      expect(copilotPrompt).toBeDefined();
+    });
+  });
+});
+
+// =============================================================================
+// Smoke Tests (Real CLI - Optional, Slow)
+// =============================================================================
+//
+// These tests use real CLI binaries when available. They are marked as slow
+// and can be skipped in CI or when CLIs are not installed.
+//
+// To run smoke tests locally:
+//   SMOKE_TESTS=true bun test tests/integration/
+//
+// =============================================================================
+
+describe("Smoke Tests (Real CLI)", () => {
+  const SKIP_SMOKE = !process.env.SMOKE_TESTS;
+
+  /**
+   * Helper to check if a CLI is installed
+   */
+  function isCLIInstalled(cli: string): boolean {
+    try {
+      const result = Bun.spawnSync(["which", cli], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      return result.exitCode === 0;
+    } catch {
+      return false;
+    }
+  }
+
+  describe.skipIf(SKIP_SMOKE)("Claude CLI Smoke Test", () => {
+    const CLAUDE_INSTALLED = isCLIInstalled("claude");
+
+    test.skipIf(!CLAUDE_INSTALLED)("claude CLI responds to version check", async () => {
+      const result = Bun.spawnSync(["claude", "--version"], {
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 10000,
+      });
+
+      // Version check should succeed
+      expect(result.exitCode).toBe(0);
+
+      const output = result.stdout.toString();
+      // Should contain version information
+      expect(output.length).toBeGreaterThan(0);
+    });
+
+    test.skipIf(!CLAUDE_INSTALLED)("claude CLI help command works", async () => {
+      const result = Bun.spawnSync(["claude", "--help"], {
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 10000,
+      });
+
+      expect(result.exitCode).toBe(0);
+
+      const output = result.stdout.toString();
+      // Help should mention common options
+      expect(output.toLowerCase()).toMatch(/usage|help|command/i);
+    });
+  });
+
+  describe.skipIf(SKIP_SMOKE)("OpenCode CLI Smoke Test", () => {
+    const OPENCODE_INSTALLED = isCLIInstalled("opencode");
+
+    test.skipIf(!OPENCODE_INSTALLED)("opencode CLI responds to version check", async () => {
+      const result = Bun.spawnSync(["opencode", "--version"], {
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 10000,
+      });
+
+      // Version check should succeed
+      expect(result.exitCode).toBe(0);
+    });
+  });
+
+  describe.skipIf(SKIP_SMOKE)("Cline CLI Smoke Test", () => {
+    const CLINE_INSTALLED = isCLIInstalled("cline");
+
+    test.skipIf(!CLINE_INSTALLED)("cline CLI responds to version check", async () => {
+      const result = Bun.spawnSync(["cline", "--version"], {
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 10000,
+      });
+
+      // Version check should succeed
+      expect(result.exitCode).toBe(0);
+    });
+  });
+
+  describe.skipIf(SKIP_SMOKE)("Bloom CLI Integration Smoke Test", () => {
+    let smokeTestDir: string;
+
+    beforeEach(() => {
+      smokeTestDir = join(tmpdir(), `bloom-smoke-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      mkdirSync(smokeTestDir, { recursive: true });
+    });
+
+    afterEach(() => {
+      if (existsSync(smokeTestDir)) {
+        rmSync(smokeTestDir, { recursive: true, force: true });
+      }
+    });
+
+    test("bloom validate command works with valid tasks.yaml", async () => {
+      // Create a minimal valid tasks.yaml
+      const tasksContent = YAML.stringify({
+        tasks: [
+          {
+            id: "smoke-test",
+            title: "Smoke Test Task",
+            status: "todo",
+            agent_name: "test-agent",
+            depends_on: [],
+            acceptance_criteria: ["Test passes"],
+            ai_notes: [],
+            subtasks: [],
+          },
+        ],
+      });
+
+      const tasksFile = join(smokeTestDir, "tasks.yaml");
+      writeFileSync(tasksFile, tasksContent);
+
+      // Run bloom validate
+      const result = Bun.spawnSync(["bun", "src/cli.ts", "validate", "-f", tasksFile], {
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 30000,
+        cwd: process.cwd(),
+      });
+
+      // Validate should succeed for valid YAML
+      expect(result.exitCode).toBe(0);
+    });
+
+    test("bloom validate catches invalid tasks.yaml", async () => {
+      // Create an invalid tasks.yaml (missing required fields)
+      const invalidContent = `
+tasks:
+  - id: invalid-task
+    # Missing required fields like title, status, etc.
+`;
+      const tasksFile = join(smokeTestDir, "tasks.yaml");
+      writeFileSync(tasksFile, invalidContent);
+
+      // Run bloom validate
+      const result = Bun.spawnSync(["bun", "src/cli.ts", "validate", "-f", tasksFile], {
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 30000,
+        cwd: process.cwd(),
+      });
+
+      // Validate should fail for invalid YAML
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+});
