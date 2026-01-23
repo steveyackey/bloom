@@ -68,6 +68,8 @@ export interface ClaudeProviderOptions extends AgentConfig {
    * Only applies in streaming mode.
    */
   onTimeout?: () => void;
+  /** Model to use (e.g., 'claude-sonnet-4-20250514'). If not specified, uses Claude CLI default. */
+  model?: string;
 }
 
 // =============================================================================
@@ -125,6 +127,7 @@ export class ClaudeAgentProvider implements Agent {
   private onHeartbeat?: (lastActivityMs: number) => void;
   private onTimeout?: () => void;
   private currentAgentName?: string;
+  private model?: string;
 
   constructor(options: ClaudeProviderOptions = {}) {
     // Support both new `mode` and deprecated `interactive` option
@@ -140,6 +143,7 @@ export class ClaudeAgentProvider implements Agent {
     this.onEvent = options.onEvent;
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
+    this.model = options.model;
   }
 
   /**
@@ -381,6 +385,10 @@ export class ClaudeAgentProvider implements Agent {
       args.push("--dangerously-skip-permissions");
     }
 
+    if (this.model) {
+      args.push("--model", this.model);
+    }
+
     args.push("--append-system-prompt", options.systemPrompt);
 
     // Add initial prompt so Claude starts with context instead of blank slate
@@ -397,6 +405,10 @@ export class ClaudeAgentProvider implements Agent {
 
     if (this.dangerouslySkipPermissions) {
       args.push("--dangerously-skip-permissions");
+    }
+
+    if (this.model) {
+      args.push("--model", this.model);
     }
 
     // Resume previous session if sessionId provided
