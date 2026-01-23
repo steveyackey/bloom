@@ -4,10 +4,10 @@
  */
 
 import chalk from "chalk";
-import { type PullAllResult, pullAllDefaultBranches } from "../repos";
+import { type PullAllResult, pullAllDefaultBranches } from "../core/repos";
 
-// Re-export types and functions from repos.ts
-export type { CloneResult, PullAllResult, PullResult, RepoInfo, SyncResult } from "../repos";
+// Re-export types and functions from core/repos
+export type { CloneResult, PullAllResult, PullResult, RepoInfo, SyncResult } from "../core/repos";
 export {
   acquireMergeLock,
   addWorktree,
@@ -31,7 +31,7 @@ export {
   removeWorktree,
   syncRepos,
   waitForMergeLock,
-} from "../repos";
+} from "../core/repos";
 
 /**
  * Formats pull results for display.

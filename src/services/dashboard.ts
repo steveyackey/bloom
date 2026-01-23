@@ -6,9 +6,9 @@
 
 import { type FSWatcher, watch } from "node:fs";
 import chalk from "chalk";
+import type { Task, TaskStatus, TasksFile } from "../core/tasks";
+import { getStatusIcon, loadTasks } from "../core/tasks";
 import type { InProcessService } from "../orchestrator-tui";
-import type { Task, TaskStatus, TasksFile } from "../task-schema";
-import { getStatusIcon, loadTasks } from "../tasks";
 
 function colorStatusIcon(status: TaskStatus): string {
   const icon = getStatusIcon(status);

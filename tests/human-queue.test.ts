@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getActionResult, isNoAnswer, isYesAnswer, type Question } from "../src/human-queue";
+import { getActionResult, isNoAnswer, isYesAnswer, type Question } from "../src/core/questions";
 
 describe("Human-Agent Communication", () => {
   describe("Yes/No Answer Detection", () => {

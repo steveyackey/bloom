@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { loadPrompt } from "../src/prompts";
+import { loadPrompt } from "../src/core/prompts";
 
 describe("prompts", () => {
   describe("create prompt", () => {

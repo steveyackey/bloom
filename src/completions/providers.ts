@@ -5,9 +5,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import YAML from "yaml";
-import { loadReposFile } from "../repos";
-import { type Task, TaskStatusSchema, validateTasksFile } from "../task-schema";
-import { getAllAgents, loadTasks } from "../tasks";
+import { loadReposFile } from "../core/repos";
+import { getAllAgents, loadTasks, type Task, TaskStatusSchema, validateTasksFile } from "../core/tasks";
 
 // =============================================================================
 // Types

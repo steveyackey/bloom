@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { initWorkspace } from "../src/commands/init";
+import { initWorkspace } from "../src/features/init";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-init-workspace");
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { Task, TasksFile } from "../src/task-schema";
+import type { Task, TasksFile } from "../src/core/tasks";
 import {
   findTask,
   getAllAgents,
@@ -12,7 +12,7 @@ import {
   resetStuckTasks,
   saveTasks,
   updateTaskStatus,
-} from "../src/tasks";
+} from "../src/core/tasks";
 
 const TEST_DIR = join(import.meta.dirname, ".test-data");
 const TEST_TASKS_FILE = join(TEST_DIR, "tasks.yaml");

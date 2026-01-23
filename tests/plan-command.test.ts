@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { buildReposContext } from "../src/commands/plan-command";
+import { buildReposContext } from "../src/services/planning-service";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-plan-workspace");
 

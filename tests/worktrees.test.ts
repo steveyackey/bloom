@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { addWorktree, createRepo, getWorktreePath, listWorktrees, removeWorktree } from "../src/repos";
+import { addWorktree, createRepo, getWorktreePath, listWorktrees, removeWorktree } from "../src/core/repos";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-worktrees-workspace");
 

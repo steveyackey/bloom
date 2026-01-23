@@ -2,11 +2,11 @@
 import { dirname, resolve } from "node:path";
 import { Terminal } from "@xterm/headless";
 import YAML from "yaml";
-import { interjectSession } from "./agents";
-import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
-import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
-import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
-import { getProcessStats, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
+import { interjectSession } from "./core/agents";
+import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./core/colors";
+import { consumeTrigger, createInterjection, watchTriggers } from "./core/questions";
+import { type Task, type TasksFile, validateTasksFile } from "./core/tasks";
+import { getProcessStats, type ProcessStats, spawnTerminal, type TerminalProcess } from "./core/terminal";
 
 // =============================================================================
 // Types

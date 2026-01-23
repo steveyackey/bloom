@@ -8,7 +8,7 @@ import {
   getWorktreePath,
   getWorktreeStatus,
   listWorktrees,
-} from "../src/repos";
+} from "../src/core/repos";
 import {
   createTask,
   createTasksFile,
@@ -16,7 +16,7 @@ import {
   getTaskMergeTarget,
   sanitizeBranchName,
   validateTasksFile,
-} from "../src/task-schema";
+} from "../src/core/tasks";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-git-workflow");
 

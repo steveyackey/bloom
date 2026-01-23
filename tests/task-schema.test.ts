@@ -9,7 +9,7 @@ import {
   sanitizeBranchName,
   type TaskStatus,
   validateTasksFile,
-} from "../src/task-schema";
+} from "../src/core/tasks";
 
 describe("task-schema", () => {
   describe("createTask", () => {

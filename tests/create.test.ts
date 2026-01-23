@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createProject } from "../src/commands/create";
+import { createProject } from "../src/features/create";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-create-workspace");
 const PACKAGE_TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "template");

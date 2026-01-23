@@ -29,5 +29,5 @@ Thumbs.db
 bin/
 out/
 
-# Project specific
-repos/
+# Project specific - workspace repos directory (not src/core/repos)
+/repos/

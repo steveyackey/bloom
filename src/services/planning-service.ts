@@ -6,10 +6,10 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../agents";
-import { findGitRoot } from "../commands/context";
-import { loadPrompt } from "../prompts";
-import { listRepos } from "../repos";
+import { ClaudeAgentProvider } from "../core/agents";
+import { findGitRoot } from "../core/context";
+import { loadPrompt } from "../core/prompts";
+import { listRepos } from "../core/repos";
 
 // =============================================================================
 // RefineFile Interface

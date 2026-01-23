@@ -1,14 +1,14 @@
-/**
- * Project Service
- * Handles project creation and formatting operations.
- */
+// =============================================================================
+// Create Feature - Create a new project with PRD template
+// =============================================================================
 
 import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../core/agents";
-import { BLOOM_DIR } from "../core/context";
-import { loadPrompt } from "../core/prompts";
+import type { Clerc } from "clerc";
+import { ClaudeAgentProvider } from "../../core/agents";
+import { BLOOM_DIR } from "../../core/context";
+import { loadPrompt } from "../../core/prompts";
 
 // =============================================================================
 // Types
@@ -27,23 +27,9 @@ export interface FormattedProjectName {
 }
 
 // =============================================================================
-// Format Project Name
+// Implementation
 // =============================================================================
 
-/**
- * Formats a project name for display and file system use.
- *
- * @param input - Either a string or array of strings (from variadic CLI args)
- * @returns Object with slug (filesystem-safe) and displayName (human-readable)
- * @throws Error if input is empty
- *
- * @example
- * formatProjectName(['My', 'Big', 'Idea'])
- * // => { slug: 'my-big-idea', displayName: 'My Big Idea' }
- *
- * formatProjectName('my-project')
- * // => { slug: 'my-project', displayName: 'my-project' }
- */
 export function formatProjectName(input: string | string[]): FormattedProjectName {
   let displayName: string;
 
@@ -62,7 +48,7 @@ export function formatProjectName(input: string | string[]): FormattedProjectNam
   // Collapse multiple spaces to single space
   displayName = displayName.replace(/\s+/g, " ");
 
-  // Create slug: lowercase, spaces to dashes, remove special chars (keep alphanumeric and dashes)
+  // Create slug: lowercase, spaces to dashes, remove special chars
   const slug = displayName
     .toLowerCase()
     .replace(/\s+/g, "-")
@@ -71,18 +57,6 @@ export function formatProjectName(input: string | string[]): FormattedProjectNam
   return { slug, displayName };
 }
 
-// =============================================================================
-// Create Project
-// =============================================================================
-
-/**
- * Creates a new project in the workspace.
- *
- * @param projectName - Name of the project directory to create
- * @param baseDir - Base directory to create project in (defaults to cwd)
- * @param workspaceDir - Directory containing workspace templates (defaults to BLOOM_DIR)
- * @returns CreateResult with success status and created files
- */
 export async function createProject(
   projectName: string,
   baseDir?: string,
@@ -123,7 +97,6 @@ export async function createProject(
   result.created.push(`${projectName}/`);
 
   // Copy template files from workspace template/ to project
-  // Rename CLAUDE.template.md to CLAUDE.md
   const templateFiles = readdirSync(workspaceTemplateDir);
   for (const file of templateFiles) {
     const srcPath = join(workspaceTemplateDir, file);
@@ -137,15 +110,6 @@ export async function createProject(
   return result;
 }
 
-// =============================================================================
-// Run Create Session (launches Claude to help with PRD)
-// =============================================================================
-
-/**
- * Runs an interactive Claude session to help with project creation.
- *
- * @param projectDir - Directory of the newly created project
- */
 export async function runCreateSession(projectDir: string): Promise<void> {
   const systemPrompt = await loadPrompt("create", {
     PROJECT_DIR: projectDir,
@@ -166,4 +130,55 @@ export async function runCreateSession(projectDir: string): Promise<void> {
     prompt: initialPrompt,
     startingDirectory: projectDir,
   });
+}
+
+export async function cmdCreate(nameArgs: string[]): Promise<void> {
+  if (!nameArgs || nameArgs.length === 0) {
+    console.error(chalk.red("Usage: bloom create <projectName>"));
+    process.exit(1);
+  }
+
+  const { slug, displayName } = formatProjectName(nameArgs);
+  console.log(`${chalk.bold.cyan("Creating project")} '${chalk.yellow(displayName)}'...\n`);
+
+  const result = await createProject(slug);
+  if (!result.success) {
+    console.error(chalk.red(`Error: ${result.error}`));
+    process.exit(1);
+  }
+
+  console.log(chalk.bold("Created:"));
+  for (const item of result.created) {
+    console.log(`  ${chalk.green("+")} ${item}`);
+  }
+
+  await runCreateSession(result.projectDir);
+
+  console.log(chalk.dim(`\n---`));
+  console.log(
+    `${chalk.green("Project")} '${chalk.yellow(displayName)}' ${chalk.green("created at:")} ${chalk.cyan(result.projectDir)}`
+  );
+  console.log(`\n${chalk.bold("Next steps:")}`);
+  console.log(`  ${chalk.cyan(`cd ${slug}`)}`);
+  console.log(chalk.dim(`\nThen run these commands from within the project directory:`));
+  console.log(`  ${chalk.cyan("bloom refine")}        # Refine the PRD and templates`);
+  console.log(`  ${chalk.cyan("bloom plan")}          # Create implementation plan`);
+  console.log(`  ${chalk.cyan("bloom generate")}      # Generate tasks.yaml from plan`);
+  console.log(`  ${chalk.cyan("bloom run")}           # Execute tasks`);
+}
+
+// =============================================================================
+// CLI Registration
+// =============================================================================
+
+export function register(cli: Clerc): Clerc {
+  return cli
+    .command("create", "Create a new project with PRD template", {
+      parameters: ["<name...>"],
+      help: { group: "workflow" },
+    })
+    .on("create", async (ctx) => {
+      const nameArgs = ctx.parameters.name as string[];
+      await cmdCreate(nameArgs);
+    });
 }
