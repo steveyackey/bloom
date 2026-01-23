@@ -228,10 +228,18 @@ async function getLinuxProcessStats(pid: number): Promise<ProcessStats | null> {
 
     // Parse stat - fields: pid (comm) state ppid pgrp session tty_nr tpgid flags
     //               minflt cminflt majflt cmajflt utime stime cutime cstime ...
-    const statParts = statContent.split(" ");
-    const utime = Number.parseInt(statParts[13] || "0", 10);
-    const stime = Number.parseInt(statParts[14] || "0", 10);
-    const starttime = Number.parseInt(statParts[21] || "0", 10);
+    // Note: comm field (in parentheses) can contain spaces, so we find the last ')' and parse from there
+    const lastParenIndex = statContent.lastIndexOf(")");
+    if (lastParenIndex === -1) {
+      return null;
+    }
+    // Fields after comm: state(3) ppid(4) ... utime(14) stime(15) ... starttime(22) (1-indexed)
+    // After slicing past ")", we have " state ppid ..." so split gives state at index 0
+    // utime at 14-3=11, stime at 15-3=12, starttime at 22-3=19
+    const fieldsAfterComm = statContent.slice(lastParenIndex + 2).split(" ");
+    const utime = Number.parseInt(fieldsAfterComm[11] || "0", 10);
+    const stime = Number.parseInt(fieldsAfterComm[12] || "0", 10);
+    const starttime = Number.parseInt(fieldsAfterComm[19] || "0", 10);
     const totalTime = utime + stime;
 
     // Parse uptime
