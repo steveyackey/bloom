@@ -50,17 +50,14 @@ describe("terminal", () => {
       const testMessage = "subprocess-output-test";
 
       // Use bun to run inline code that writes to stdout
-      const proc = await spawnTerminal(
-        ["bun", "-e", `process.stdout.write("${testMessage}\\n")`],
-        {
-          cwd: process.cwd(),
-          cols: 80,
-          rows: 24,
-          onData: (data) => {
-            captured.push(data);
-          },
-        }
-      );
+      const proc = await spawnTerminal(["bun", "-e", `process.stdout.write("${testMessage}\\n")`], {
+        cwd: process.cwd(),
+        cols: 80,
+        rows: 24,
+        onData: (data) => {
+          captured.push(data);
+        },
+      });
 
       await proc.exited;
 
