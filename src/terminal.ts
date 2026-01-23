@@ -41,10 +41,14 @@ export interface TerminalSpawnOptions {
 // =============================================================================
 
 function spawnWithBunTerminal(command: string[], options: TerminalSpawnOptions): TerminalProcess {
+  // NOTE: Do NOT set stdin: "pipe" when using terminal mode.
+  // The terminal mode creates a PTY that handles all I/O (stdin, stdout, stderr).
+  // Setting stdin: "pipe" separately can interfere with the PTY's output capture,
+  // causing writes to process.stdout in the subprocess to not appear in the
+  // terminal.data callback.
   const proc = Bun.spawn(command, {
     cwd: options.cwd,
     env: { ...process.env, ...options.env } as Record<string, string>,
-    stdin: "pipe",
     terminal: {
       cols: options.cols,
       rows: options.rows,
