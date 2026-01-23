@@ -499,7 +499,8 @@ describe("Claude CLI Event Parsing", () => {
 
       // WHEN: renderEvent is called
       const currentOutput = adapter.captureCurrentOutput(event);
-      const expectedOutput = adapter.captureExpectedOutput(event);
+      // Also capture expected output to verify both implementations match
+      adapter.captureExpectedOutput(event);
 
       // THEN: Cost should be displayed using total_cost_usd field
       expect(currentOutput.stdout).toContain("$0.0500");
@@ -746,10 +747,7 @@ describe("Output Accumulator", () => {
 
   test("should accumulate text from multiple assistant events", () => {
     // GIVEN: Multiple assistant events
-    const events = [
-      REAL_ASSISTANT_EVENT,
-      REAL_ASSISTANT_MULTI_BLOCK_EVENT,
-    ] as unknown as StreamEvent[];
+    const events = [REAL_ASSISTANT_EVENT, REAL_ASSISTANT_MULTI_BLOCK_EVENT] as unknown as StreamEvent[];
 
     // WHEN: Events are processed
     for (const event of events) {

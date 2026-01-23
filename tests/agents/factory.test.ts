@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as YAML from "yaml";
 import { ClaudeAgentProvider } from "../../src/agents/claude";
+import { CopilotAgentProvider } from "../../src/agents/copilot";
 import { createAgent, getRegisteredAgents, isAgentRegistered } from "../../src/agents/factory";
 import { OpenCodeAgentProvider } from "../../src/agents/opencode";
 
@@ -174,17 +175,45 @@ describe("agent factory", () => {
     });
   });
 
+  describe("copilot mode selection", () => {
+    test("respects interactiveAgent config for copilot", async () => {
+      await writeConfig({
+        interactiveAgent: { agent: "copilot" },
+      });
+      const agent = await createAgent("interactive");
+      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+    });
+
+    test("respects nonInteractiveAgent config for copilot", async () => {
+      await writeConfig({
+        nonInteractiveAgent: { agent: "copilot" },
+      });
+      const agent = await createAgent("nonInteractive");
+      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+    });
+
+    test("passes model to CopilotAgentProvider", async () => {
+      await writeConfig({
+        nonInteractiveAgent: { agent: "copilot", model: "claude" },
+      });
+      const agent = await createAgent("nonInteractive");
+      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+    });
+  });
+
   describe("utility functions", () => {
     test("getRegisteredAgents returns registered agent names", () => {
       const agents = getRegisteredAgents();
       expect(agents).toContain("claude");
       expect(agents).toContain("opencode");
-      expect(agents.length).toBe(2);
+      expect(agents).toContain("copilot");
+      expect(agents.length).toBe(3);
     });
 
     test("isAgentRegistered returns true for registered agents", () => {
       expect(isAgentRegistered("claude")).toBe(true);
       expect(isAgentRegistered("opencode")).toBe(true);
+      expect(isAgentRegistered("copilot")).toBe(true);
     });
 
     test("isAgentRegistered returns false for unknown agents", () => {

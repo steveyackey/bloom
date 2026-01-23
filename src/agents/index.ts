@@ -14,6 +14,9 @@ export {
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 // Claude provider with session management utilities
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
+export type { CopilotProviderOptions, CopilotRunningSession, CopilotStreamEvent } from "./copilot";
+// Copilot provider with session management utilities
+export { CopilotAgentProvider, getCopilotActiveSession, interjectCopilotSession } from "./copilot";
 // Core interface and types
 export * from "./core";
 // Agent factory

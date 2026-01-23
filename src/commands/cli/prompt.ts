@@ -11,7 +11,7 @@ import {
   getRegisteredAgentNames,
   isValidAgentName,
 } from "../../agents/capabilities";
-import { PromptCompiler, type CompileOptions } from "../../prompts/compiler";
+import { type CompileOptions, PromptCompiler } from "../../prompts/compiler";
 import { findTask, loadTasks } from "../../tasks";
 import { getTasksFile } from "../context";
 
@@ -85,7 +85,12 @@ export function registerPromptCommands(cli: Clerc): Clerc {
     })
     .on("prompt compile", async (ctx) => {
       const agent = ctx.parameters.agent as string;
-      const { task, verbose, diff, prompt: promptFile } = ctx.flags as {
+      const {
+        task,
+        verbose,
+        diff,
+        prompt: promptFile,
+      } = ctx.flags as {
         task?: string;
         verbose?: boolean;
         diff?: string;
@@ -94,18 +99,14 @@ export function registerPromptCommands(cli: Clerc): Clerc {
 
       // Validate agent name
       if (!isValidAgentName(agent)) {
-        console.error(
-          chalk.red("Error:") +
-            ` Invalid agent name "${agent}". Valid agents: ${AGENT_NAMES.join(", ")}`
-        );
+        console.error(`${chalk.red("Error:")} Invalid agent name "${agent}". Valid agents: ${AGENT_NAMES.join(", ")}`);
         process.exit(1);
       }
 
       // Validate diff agent if provided
       if (diff && !isValidAgentName(diff)) {
         console.error(
-          chalk.red("Error:") +
-            ` Invalid diff agent name "${diff}". Valid agents: ${AGENT_NAMES.join(", ")}`
+          `${chalk.red("Error:")} Invalid diff agent name "${diff}". Valid agents: ${AGENT_NAMES.join(", ")}`
         );
         process.exit(1);
       }
@@ -193,10 +194,7 @@ async function showDiff(
 /**
  * Build compile options with optional task context.
  */
-async function buildCompileOptions(
-  capabilities: AgentCapabilities,
-  taskId?: string
-): Promise<CompileOptions> {
+async function buildCompileOptions(capabilities: AgentCapabilities, taskId?: string): Promise<CompileOptions> {
   const options: CompileOptions = {
     capabilities: capabilities as AgentCapabilities,
   };
