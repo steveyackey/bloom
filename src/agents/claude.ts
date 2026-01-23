@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import chalk from "chalk";
 import { createLogger } from "../logger";
 import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 
@@ -70,6 +71,11 @@ export interface ClaudeProviderOptions extends AgentConfig {
   onTimeout?: () => void;
   /** Model to use (e.g., 'claude-sonnet-4-20250514'). If not specified, uses Claude CLI default. */
   model?: string;
+  /**
+   * Enable verbose mode for additional event detail.
+   * When true, shows hook_response events and detailed tool output.
+   */
+  verbose?: boolean;
 }
 
 // =============================================================================
@@ -128,6 +134,7 @@ export class ClaudeAgentProvider implements Agent {
   private onTimeout?: () => void;
   private currentAgentName?: string;
   private model?: string;
+  private verbose: boolean;
 
   constructor(options: ClaudeProviderOptions = {}) {
     // Support both new `mode` and deprecated `interactive` option
@@ -144,6 +151,7 @@ export class ClaudeAgentProvider implements Agent {
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
     this.model = options.model;
+    this.verbose = options.verbose ?? false;
   }
 
   /**
@@ -371,13 +379,22 @@ export class ClaudeAgentProvider implements Agent {
       }
 
       case "tool_use":
-        process.stdout.write(`\n[tool: ${event.tool_name}]\n`);
+        // Format tool name in cyan for visibility
+        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name}]`)}\n`);
         break;
 
-      case "tool_result":
-        // Tool results can be verbose, just show indicator
-        process.stdout.write(`[tool result]\n`);
+      case "tool_result": {
+        // Show result indicator in dim, with optional content in verbose mode
+        const content = event.content as string | undefined;
+        if (this.verbose && content) {
+          // In verbose mode, show truncated content
+          const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+          process.stdout.write(`${chalk.dim("[result]")} ${truncated}\n`);
+        } else {
+          process.stdout.write(`${chalk.dim("[result]")}\n`);
+        }
         break;
+      }
 
       case "result": {
         // Claude CLI uses total_cost_usd NOT cost_usd
@@ -403,13 +420,49 @@ export class ClaudeAgentProvider implements Agent {
       }
 
       case "system":
-        if (event.subtype === "init") {
-          if (event.session_id) {
-            process.stdout.write(`[session: ${event.session_id}]\n`);
+        this.renderSystemEvent(event);
+        break;
+    }
+  }
+
+  /**
+   * Render system event subtypes
+   */
+  private renderSystemEvent(event: StreamEvent): void {
+    switch (event.subtype) {
+      case "init":
+        // Display session and model info
+        if (event.session_id) {
+          process.stdout.write(`[session: ${event.session_id}]\n`);
+        }
+        if (event.model) {
+          process.stdout.write(`[model: ${event.model}]\n`);
+        }
+        break;
+
+      case "hook_started": {
+        // Display hook name in dim
+        const hookName = (event.hook_name as string) || (event.name as string) || "unknown";
+        process.stdout.write(`${chalk.dim(`[hook: ${hookName}]`)}\n`);
+        break;
+      }
+
+      case "hook_response":
+        // Only log in verbose mode
+        if (this.verbose) {
+          const response = event.response as string | undefined;
+          if (response) {
+            process.stdout.write(`${chalk.dim(`[hook response: ${response}]`)}\n`);
+          } else {
+            process.stdout.write(`${chalk.dim("[hook response]")}\n`);
           }
-          if (event.model) {
-            process.stdout.write(`[model: ${event.model}]\n`);
-          }
+        }
+        break;
+
+      default:
+        // Log other system subtypes in verbose mode
+        if (this.verbose && event.subtype) {
+          logger.debug(`Unhandled system subtype: ${event.subtype}`, event);
         }
         break;
     }

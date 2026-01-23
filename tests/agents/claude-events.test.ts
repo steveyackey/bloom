@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import chalk from "chalk";
 import type { StreamEvent } from "../../src/agents/claude";
 
 // =============================================================================
@@ -96,6 +97,40 @@ export const REAL_CONTENT_BLOCK_DELTA_EVENT = {
   },
 };
 
+/**
+ * Real Claude CLI system hook_started event
+ */
+export const REAL_SYSTEM_HOOK_STARTED_EVENT = {
+  type: "system",
+  subtype: "hook_started",
+  hook_name: "pre-commit",
+};
+
+/**
+ * Real Claude CLI system hook_response event
+ */
+export const REAL_SYSTEM_HOOK_RESPONSE_EVENT = {
+  type: "system",
+  subtype: "hook_response",
+  response: "Hook executed successfully",
+};
+
+/**
+ * Real Claude CLI tool_result event with content
+ */
+export const REAL_TOOL_RESULT_EVENT = {
+  type: "tool_result",
+  content: "File contents:\nconst foo = 'bar';",
+};
+
+/**
+ * Real Claude CLI tool_result event with long content
+ */
+export const REAL_TOOL_RESULT_LONG_CONTENT_EVENT = {
+  type: "tool_result",
+  content: "A".repeat(300),
+};
+
 // =============================================================================
 // Test Helpers
 // =============================================================================
@@ -155,9 +190,11 @@ class OutputCapture {
 class ClaudeEventTestAdapter {
   private outputCapture: OutputCapture;
   private accumulatedOutput: string = "";
+  private verbose: boolean;
 
-  constructor() {
+  constructor(options: { verbose?: boolean } = {}) {
     this.outputCapture = new OutputCapture();
+    this.verbose = options.verbose ?? false;
   }
 
   /**
@@ -191,12 +228,22 @@ class ClaudeEventTestAdapter {
       }
 
       case "tool_use":
-        process.stdout.write(`\n[tool: ${event.tool_name}]\n`);
+        // Format tool name in cyan for visibility
+        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name}]`)}\n`);
         break;
 
-      case "tool_result":
-        process.stdout.write("[tool result]\n");
+      case "tool_result": {
+        // Show result indicator in dim, with optional content in verbose mode
+        const content = event.content as string | undefined;
+        if (this.verbose && content) {
+          // In verbose mode, show truncated content
+          const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+          process.stdout.write(`${chalk.dim("[result]")} ${truncated}\n`);
+        } else {
+          process.stdout.write(`${chalk.dim("[result]")}\n`);
+        }
         break;
+      }
 
       case "result": {
         // CORRECT: Use total_cost_usd NOT cost_usd
@@ -222,12 +269,38 @@ class ClaudeEventTestAdapter {
       }
 
       case "system":
-        if (event.subtype === "init") {
-          if (event.session_id) {
-            process.stdout.write(`[session: ${event.session_id}]\n`);
-          }
-          if (event.model) {
-            process.stdout.write(`[model: ${event.model}]\n`);
+        this.renderSystemEventExpected(event);
+        break;
+    }
+  }
+
+  /**
+   * Render system event subtypes (expected behavior)
+   */
+  private renderSystemEventExpected(event: StreamEvent): void {
+    switch (event.subtype) {
+      case "init":
+        if (event.session_id) {
+          process.stdout.write(`[session: ${event.session_id}]\n`);
+        }
+        if (event.model) {
+          process.stdout.write(`[model: ${event.model}]\n`);
+        }
+        break;
+
+      case "hook_started": {
+        const hookName = (event.hook_name as string) || (event.name as string) || "unknown";
+        process.stdout.write(`${chalk.dim(`[hook: ${hookName}]`)}\n`);
+        break;
+      }
+
+      case "hook_response":
+        if (this.verbose) {
+          const response = event.response as string | undefined;
+          if (response) {
+            process.stdout.write(`${chalk.dim(`[hook response: ${response}]`)}\n`);
+          } else {
+            process.stdout.write(`${chalk.dim("[hook response]")}\n`);
           }
         }
         break;
@@ -265,12 +338,22 @@ class ClaudeEventTestAdapter {
       }
 
       case "tool_use":
-        process.stdout.write(`\n[tool: ${event.tool_name}]\n`);
+        // Format tool name in cyan for visibility
+        process.stdout.write(`\n${chalk.cyan(`[tool: ${event.tool_name}]`)}\n`);
         break;
 
-      case "tool_result":
-        process.stdout.write("[tool result]\n");
+      case "tool_result": {
+        // Show result indicator in dim, with optional content in verbose mode
+        const content = event.content as string | undefined;
+        if (this.verbose && content) {
+          // In verbose mode, show truncated content
+          const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+          process.stdout.write(`${chalk.dim("[result]")} ${truncated}\n`);
+        } else {
+          process.stdout.write(`${chalk.dim("[result]")}\n`);
+        }
         break;
+      }
 
       case "result": {
         // FIXED: Use total_cost_usd NOT cost_usd
@@ -296,12 +379,38 @@ class ClaudeEventTestAdapter {
       }
 
       case "system":
-        if (event.subtype === "init") {
-          if (event.session_id) {
-            process.stdout.write(`[session: ${event.session_id}]\n`);
-          }
-          if (event.model) {
-            process.stdout.write(`[model: ${event.model}]\n`);
+        this.renderSystemEventCurrent(event);
+        break;
+    }
+  }
+
+  /**
+   * Render system event subtypes (current implementation)
+   */
+  private renderSystemEventCurrent(event: StreamEvent): void {
+    switch (event.subtype) {
+      case "init":
+        if (event.session_id) {
+          process.stdout.write(`[session: ${event.session_id}]\n`);
+        }
+        if (event.model) {
+          process.stdout.write(`[model: ${event.model}]\n`);
+        }
+        break;
+
+      case "hook_started": {
+        const hookName = (event.hook_name as string) || (event.name as string) || "unknown";
+        process.stdout.write(`${chalk.dim(`[hook: ${hookName}]`)}\n`);
+        break;
+      }
+
+      case "hook_response":
+        if (this.verbose) {
+          const response = event.response as string | undefined;
+          if (response) {
+            process.stdout.write(`${chalk.dim(`[hook response: ${response}]`)}\n`);
+          } else {
+            process.stdout.write(`${chalk.dim("[hook response]")}\n`);
           }
         }
         break;
@@ -659,5 +768,269 @@ describe("Output Accumulator", () => {
 
     // THEN: Only assistant text should be accumulated
     expect(adapter.getAccumulatedOutput()).toBe("Hello");
+  });
+});
+
+// =============================================================================
+// System Event Subtypes Tests
+// =============================================================================
+
+describe("System Event Subtypes", () => {
+  let adapter: ClaudeEventTestAdapter;
+
+  beforeEach(() => {
+    adapter = new ClaudeEventTestAdapter();
+  });
+
+  describe("hook_started events", () => {
+    test("should display hook name in dim format", () => {
+      // GIVEN: Hook started event
+      const event = REAL_SYSTEM_HOOK_STARTED_EVENT as unknown as StreamEvent;
+
+      // WHEN: renderEvent is called
+      const output = adapter.captureCurrentOutput(event);
+
+      // THEN: Hook name should be displayed
+      expect(output.stdout).toContain("[hook: pre-commit]");
+    });
+
+    test("should handle hook_started with name field instead of hook_name", () => {
+      // GIVEN: Hook started event with name field
+      const event = {
+        type: "system",
+        subtype: "hook_started",
+        name: "post-push",
+      } as unknown as StreamEvent;
+
+      // WHEN: renderEvent is called
+      const output = adapter.captureCurrentOutput(event);
+
+      // THEN: Hook name should be displayed from name field
+      expect(output.stdout).toContain("[hook: post-push]");
+    });
+
+    test("should display 'unknown' when hook name is missing", () => {
+      // GIVEN: Hook started event without name
+      const event = {
+        type: "system",
+        subtype: "hook_started",
+      } as unknown as StreamEvent;
+
+      // WHEN: renderEvent is called
+      const output = adapter.captureCurrentOutput(event);
+
+      // THEN: Should display 'unknown'
+      expect(output.stdout).toContain("[hook: unknown]");
+    });
+  });
+
+  describe("hook_response events", () => {
+    test("should not show hook_response in normal mode", () => {
+      // GIVEN: Hook response event and normal mode adapter
+      const event = REAL_SYSTEM_HOOK_RESPONSE_EVENT as unknown as StreamEvent;
+
+      // WHEN: renderEvent is called
+      const output = adapter.captureCurrentOutput(event);
+
+      // THEN: Should not display anything
+      expect(output.stdout).toBe("");
+    });
+
+    test("should show hook_response with response text in verbose mode", () => {
+      // GIVEN: Hook response event and verbose adapter
+      const verboseAdapter = new ClaudeEventTestAdapter({ verbose: true });
+      const event = REAL_SYSTEM_HOOK_RESPONSE_EVENT as unknown as StreamEvent;
+
+      // WHEN: renderEvent is called
+      const output = verboseAdapter.captureCurrentOutput(event);
+
+      // THEN: Hook response should be displayed
+      expect(output.stdout).toContain("[hook response: Hook executed successfully]");
+    });
+
+    test("should show generic hook_response in verbose mode when no response text", () => {
+      // GIVEN: Hook response event without response text
+      const verboseAdapter = new ClaudeEventTestAdapter({ verbose: true });
+      const event = {
+        type: "system",
+        subtype: "hook_response",
+      } as unknown as StreamEvent;
+
+      // WHEN: renderEvent is called
+      const output = verboseAdapter.captureCurrentOutput(event);
+
+      // THEN: Generic hook response should be displayed
+      expect(output.stdout).toContain("[hook response]");
+      expect(output.stdout).not.toContain("[hook response: ");
+    });
+  });
+});
+
+// =============================================================================
+// Tool Result Events Tests
+// =============================================================================
+
+describe("Tool Result Events", () => {
+  let adapter: ClaudeEventTestAdapter;
+
+  beforeEach(() => {
+    adapter = new ClaudeEventTestAdapter();
+  });
+
+  test("should show dim result indicator in normal mode", () => {
+    // GIVEN: Tool result event
+    const event = REAL_TOOL_RESULT_EVENT as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = adapter.captureCurrentOutput(event);
+
+    // THEN: Should show dim result indicator
+    expect(output.stdout).toContain("[result]");
+  });
+
+  test("should not show content in normal mode", () => {
+    // GIVEN: Tool result event with content
+    const event = REAL_TOOL_RESULT_EVENT as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = adapter.captureCurrentOutput(event);
+
+    // THEN: Should not show content
+    expect(output.stdout).not.toContain("const foo");
+    expect(output.stdout).not.toContain("File contents");
+  });
+
+  test("should show content in verbose mode", () => {
+    // GIVEN: Tool result event with content and verbose adapter
+    const verboseAdapter = new ClaudeEventTestAdapter({ verbose: true });
+    const event = REAL_TOOL_RESULT_EVENT as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = verboseAdapter.captureCurrentOutput(event);
+
+    // THEN: Should show content
+    expect(output.stdout).toContain("[result]");
+    expect(output.stdout).toContain("File contents");
+  });
+
+  test("should truncate long content in verbose mode", () => {
+    // GIVEN: Tool result event with long content and verbose adapter
+    const verboseAdapter = new ClaudeEventTestAdapter({ verbose: true });
+    const event = REAL_TOOL_RESULT_LONG_CONTENT_EVENT as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = verboseAdapter.captureCurrentOutput(event);
+
+    // THEN: Content should be truncated with ellipsis
+    expect(output.stdout).toContain("...");
+    // Should contain start of content (200 A's)
+    expect(output.stdout).toContain("A".repeat(200));
+    // Should not contain full content (300 A's)
+    expect(output.stdout).not.toContain("A".repeat(300));
+  });
+
+  test("should handle tool_result without content gracefully", () => {
+    // GIVEN: Tool result event without content
+    const event = {
+      type: "tool_result",
+    } as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = adapter.captureCurrentOutput(event);
+
+    // THEN: Should not throw and show indicator
+    expect(output.stdout).toContain("[result]");
+  });
+});
+
+// =============================================================================
+// Tool Use Events Formatting Tests
+// =============================================================================
+
+describe("Tool Use Events Formatting", () => {
+  let adapter: ClaudeEventTestAdapter;
+
+  beforeEach(() => {
+    adapter = new ClaudeEventTestAdapter();
+  });
+
+  test("should format tool name in cyan", () => {
+    // GIVEN: Tool use event
+    const event = REAL_TOOL_USE_EVENT as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = adapter.captureCurrentOutput(event);
+
+    // THEN: Output should contain cyan-formatted tool name
+    // chalk.cyan adds ANSI escape codes
+    expect(output.stdout).toContain(chalk.cyan("[tool: Read]"));
+  });
+
+  test("should add newline before and after tool indicator", () => {
+    // GIVEN: Tool use event
+    const event = REAL_TOOL_USE_EVENT as unknown as StreamEvent;
+
+    // WHEN: renderEvent is called
+    const output = adapter.captureCurrentOutput(event);
+
+    // THEN: Should have proper line breaks
+    expect(output.stdout).toBe(`\n${chalk.cyan("[tool: Read]")}\n`);
+  });
+});
+
+// =============================================================================
+// Verbose Mode Integration Tests
+// =============================================================================
+
+describe("Verbose Mode Integration", () => {
+  test("should show additional detail in verbose mode for full event sequence", () => {
+    // GIVEN: Verbose adapter and event sequence including hook events
+    const verboseAdapter = new ClaudeEventTestAdapter({ verbose: true });
+    const events: StreamEvent[] = [
+      REAL_SYSTEM_INIT_EVENT as unknown as StreamEvent,
+      REAL_SYSTEM_HOOK_STARTED_EVENT as unknown as StreamEvent,
+      REAL_SYSTEM_HOOK_RESPONSE_EVENT as unknown as StreamEvent,
+      REAL_TOOL_USE_EVENT as unknown as StreamEvent,
+      REAL_TOOL_RESULT_EVENT as unknown as StreamEvent,
+      REAL_ASSISTANT_EVENT as unknown as StreamEvent,
+      REAL_RESULT_EVENT as unknown as StreamEvent,
+    ];
+
+    // WHEN: All events are processed
+    let fullOutput = "";
+    for (const event of events) {
+      const output = verboseAdapter.captureExpectedOutput(event);
+      fullOutput += output.stdout;
+    }
+
+    // THEN: Should contain verbose output including hook response
+    expect(fullOutput).toContain("[hook: pre-commit]"); // Hook started
+    expect(fullOutput).toContain("[hook response: Hook executed successfully]"); // Hook response in verbose
+    expect(fullOutput).toContain("File contents"); // Tool result content in verbose
+    expect(fullOutput).toContain("Hello"); // Assistant message
+  });
+
+  test("should not show hook_response in normal mode for full event sequence", () => {
+    // GIVEN: Normal adapter and event sequence including hook events
+    const normalAdapter = new ClaudeEventTestAdapter();
+    const events: StreamEvent[] = [
+      REAL_SYSTEM_INIT_EVENT as unknown as StreamEvent,
+      REAL_SYSTEM_HOOK_STARTED_EVENT as unknown as StreamEvent,
+      REAL_SYSTEM_HOOK_RESPONSE_EVENT as unknown as StreamEvent,
+      REAL_TOOL_USE_EVENT as unknown as StreamEvent,
+      REAL_TOOL_RESULT_EVENT as unknown as StreamEvent,
+    ];
+
+    // WHEN: All events are processed
+    let fullOutput = "";
+    for (const event of events) {
+      const output = normalAdapter.captureExpectedOutput(event);
+      fullOutput += output.stdout;
+    }
+
+    // THEN: Should contain hook_started but not hook_response
+    expect(fullOutput).toContain("[hook: pre-commit]"); // Hook started shown
+    expect(fullOutput).not.toContain("[hook response"); // Hook response not shown
+    expect(fullOutput).not.toContain("File contents"); // Tool result content not shown
   });
 });
