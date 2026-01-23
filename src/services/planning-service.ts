@@ -83,11 +83,15 @@ export async function runPlanSession(workingDir: string, planFile: string, bloom
   // Build repos context
   const reposContext = await buildReposContext(bloomDir);
 
-  const systemPrompt = await loadPrompt("plan", {
-    WORKING_DIR: workingDir,
-    PLAN_FILE: planFile,
-    REPOS_CONTEXT: reposContext,
-  });
+  const systemPrompt = await loadPrompt(
+    "plan",
+    {
+      WORKING_DIR: workingDir,
+      PLAN_FILE: planFile,
+      REPOS_CONTEXT: reposContext,
+    },
+    bloomDir
+  );
 
   const agent = await createAgent("interactive");
 
@@ -114,11 +118,15 @@ export async function runGenerateSession(workingDir: string, tasksFile: string, 
   // Build repos context
   const reposContext = await buildReposContext(bloomDir);
 
-  const systemPrompt = await loadPrompt("generate", {
-    WORKING_DIR: workingDir,
-    TASKS_FILE: tasksFile,
-    REPOS_CONTEXT: reposContext,
-  });
+  const systemPrompt = await loadPrompt(
+    "generate",
+    {
+      WORKING_DIR: workingDir,
+      TASKS_FILE: tasksFile,
+      REPOS_CONTEXT: reposContext,
+    },
+    bloomDir
+  );
 
   const agent = await createAgent("interactive");
 

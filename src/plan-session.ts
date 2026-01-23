@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 import { createAgent } from "./agents";
+import { BLOOM_DIR } from "./commands/context";
 import { loadPlanningPrompt } from "./prompts";
 
 export async function runPlanningSession(tasksFile: string): Promise<void> {
-  const systemPrompt = await loadPlanningPrompt(tasksFile);
+  const systemPrompt = await loadPlanningPrompt(tasksFile, BLOOM_DIR);
 
   const agent = await createAgent("interactive");
 

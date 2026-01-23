@@ -147,9 +147,13 @@ export async function createProject(
  * @param projectDir - Directory of the newly created project
  */
 export async function runCreateSession(projectDir: string): Promise<void> {
-  const systemPrompt = await loadPrompt("create", {
-    PROJECT_DIR: projectDir,
-  });
+  const systemPrompt = await loadPrompt(
+    "create",
+    {
+      PROJECT_DIR: projectDir,
+    },
+    BLOOM_DIR
+  );
 
   const agent = await createAgent("interactive");
 
@@ -374,11 +378,15 @@ export async function runCreateInPlaceSession(projectDir: string, projectName: s
   console.log(chalk.dim("Reading existing files for context...\n"));
   const existingContext = gatherExistingContext(projectDir);
 
-  const systemPrompt = await loadPrompt("create-in-place", {
-    PROJECT_DIR: projectDir,
-    PROJECT_NAME: projectName,
-    EXISTING_CONTEXT: existingContext,
-  });
+  const systemPrompt = await loadPrompt(
+    "create-in-place",
+    {
+      PROJECT_DIR: projectDir,
+      PROJECT_NAME: projectName,
+      EXISTING_CONTEXT: existingContext,
+    },
+    BLOOM_DIR
+  );
 
   const agent = await createAgent("interactive");
 

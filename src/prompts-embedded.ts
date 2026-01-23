@@ -4,6 +4,81 @@
 // These prompts are embedded directly in the source code to support
 // Bun's --compile mode where external files aren't accessible.
 
+// Default templates - used when workspace templates don't exist
+export const DEFAULT_PRD_TEMPLATE = `# Product Requirements Document: [Project Name]
+
+## Overview
+Brief description of the project and its purpose.
+
+## Problem Statement
+What problem does this solve? Why does it need to exist?
+
+## Target Users
+Who will use this? What are their needs?
+
+## Goals & Success Criteria
+- Primary goal
+- How will we measure success?
+
+## Core Features
+1. **Feature Name**: Description
+2. **Feature Name**: Description
+
+## Technical Requirements
+- Platform/runtime requirements
+- Key technologies or frameworks
+- Constraints or limitations
+
+## Non-Goals (Out of Scope)
+- What this project will NOT do (for this version)
+
+## Open Questions
+- Any unresolved decisions or unknowns
+`;
+
+export const DEFAULT_PLAN_TEMPLATE = `# Implementation Plan
+
+## Summary
+Brief summary of what will be implemented based on the PRD.
+
+## Architecture Overview
+High-level architecture decisions and design patterns to be used.
+
+## Implementation Phases
+
+### Phase 1: [Phase Name]
+**Goal**: What this phase accomplishes
+
+**Tasks**:
+1. Task description
+2. Task description
+
+**Acceptance Criteria**:
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+### Phase 2: [Phase Name]
+**Goal**: What this phase accomplishes
+
+**Tasks**:
+1. Task description
+2. Task description
+
+**Acceptance Criteria**:
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Dependencies
+- List any external dependencies or prerequisites
+
+## Risks & Mitigations
+- **Risk**: Description
+  - **Mitigation**: How to address it
+
+## Open Questions
+- Questions that need resolution before or during implementation
+`;
+
 export const EMBEDDED_PROMPTS: Record<string, string> = {
   "agent-system": `# Agent System Prompt
 
@@ -151,36 +226,7 @@ You are helping the user set up a new project. Your job is to:
 The PRD you create should follow this structure:
 
 \`\`\`markdown
-# Product Requirements Document: [Project Name]
-
-## Overview
-Brief description of the project and its purpose.
-
-## Problem Statement
-What problem does this solve? Why does it need to exist?
-
-## Target Users
-Who will use this? What are their needs?
-
-## Goals & Success Criteria
-- Primary goal
-- How will we measure success?
-
-## Core Features
-1. **Feature Name**: Description
-2. **Feature Name**: Description
-...
-
-## Technical Requirements
-- Platform/runtime requirements
-- Key technologies or frameworks
-- Constraints or limitations
-
-## Non-Goals (Out of Scope)
-- What this project will NOT do (for this version)
-
-## Open Questions
-- Any unresolved decisions or unknowns
+{{PRD_TEMPLATE}}
 \`\`\`
 
 ## When Done
@@ -496,52 +542,23 @@ Before writing the plan, ask the user:
 
 ## Plan Format
 
-Create a plan document (plan.md) with this structure:
+Create a plan document (plan.md) following this template structure:
 
 \`\`\`markdown
-# Implementation Plan: [Project Name]
-
-## Overview
-Brief summary of what will be built.
-
-## Phases
-
-### Phase 1: [Phase Name]
-**Goal**: What this phase accomplishes
-**Checkpoint**: What will be verified before moving to Phase 2
-
-#### Tasks
-1. **Task Name**
-   - Description: What needs to be done
-   - Repo: Which repository/directory
-   - Branch: feature/task-name (created from main)
-   - Dependencies: What must be done first
-   - Acceptance Criteria:
-     - [ ] Criterion 1
-     - [ ] Criterion 2
-
-2. **Task Name**
-   ...
-
-### Phase 2: [Phase Name]
-...
-
-## Git Strategy
-- Branch naming: feature/<task-name>
-- Base branch: main
-- Merge: At checkpoint validation
-
-## Checkpoints
-[When and how verification will happen]
-
-## Risk & Dependencies
-- Known risks
-- External dependencies
-- Potential blockers
-
-## Open Questions
-- Any decisions that need to be made during implementation
+{{PLAN_TEMPLATE}}
 \`\`\`
+
+Expand upon this template as needed. For each phase, include:
+- **Goal**: What this phase accomplishes
+- **Tasks**: Specific work items with descriptions, repos, branches, and acceptance criteria
+- **Checkpoint**: What will be verified before moving to the next phase
+
+For each task, specify:
+- Description: What needs to be done
+- Repo: Which repository/directory
+- Branch: feature/task-name (created from base branch)
+- Dependencies: What must be done first
+- Acceptance Criteria: Testable conditions for completion
 
 ## Guidelines
 
@@ -609,39 +626,7 @@ Be conversational and build on what's already there. Don't ask the user to repea
 The PRD you create should follow this structure:
 
 \`\`\`markdown
-# Product Requirements Document: {{PROJECT_NAME}}
-
-## Overview
-Brief description of the project and its purpose.
-
-## Problem Statement
-What problem does this solve? Why does it need to exist?
-
-## Target Users
-Who will use this? What are their needs?
-
-## Goals & Success Criteria
-- Primary goal
-- How will we measure success?
-
-## Core Features
-1. **Feature Name**: Description
-2. **Feature Name**: Description
-...
-
-## Technical Requirements
-- Platform/runtime requirements
-- Key technologies or frameworks
-- Constraints or limitations
-
-## Non-Goals (Out of Scope)
-- What this project will NOT do (for this version)
-
-## Open Questions
-- Any unresolved decisions or unknowns
-
-## Research & References
-- Links and notes from gathered research (if applicable)
+{{PRD_TEMPLATE}}
 \`\`\`
 
 ## When Done
