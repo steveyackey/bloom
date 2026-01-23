@@ -33,33 +33,40 @@ Before writing the plan, ask the user:
 3. **Parallelization**: "Should tasks be parallelized where possible, or kept sequential for easier review?"
 4. **Any constraints**: "Are there any time constraints, dependencies, or requirements I should know about?"
 
-## CRITICAL: Final Merge Requirement
+## CRITICAL: All Work Must Reach Main
 
-**All work MUST end up merged to the main branch.** This is the most important invariant of any plan:
+**All work MUST end up in main** - typically via PR, or direct merge for internal branches. This is the most important invariant:
 
-1. **Every feature branch** must eventually merge to main (directly or through intermediate branches)
-2. **The final phase** must include a consolidation step that merges all remaining work to main
-3. **Parallel work** must converge - if you have branches A and B in parallel, both must merge to main before the plan is complete
-4. **Never leave orphaned branches** - a branch without `merge_into` that eventually reaches main is a bug
+1. **Every feature branch** must eventually reach main (via PR or merge)
+2. **The final phase** must include tasks that open PRs or merge all remaining work
+3. **Parallel work** must converge - if you have branches A and B in parallel, both must reach main
+4. **Never leave orphaned branches** - a branch with no path to main is a bug
 
-### Merge Flow Examples
+### Reaching Main: Two Options
 
-**Sequential (simple):**
+| Option | When to use | Task field |
+|--------|-------------|------------|
+| **PR (typical)** | Main branch, needs review | `open_pr: true` |
+| **Direct merge** | Internal/phase branches, automation | `merge_into: main` |
+
+### Flow Examples
+
+**Sequential with PRs (most common):**
 ```
-feature/task-1 → merge to main → feature/task-2 (from main) → merge to main
+feature/task-1 → PR to main → feature/task-2 (from main) → PR to main
 ```
 
-**Parallel with convergence:**
+**Parallel with PRs:**
 ```
-feature/frontend ─────────────┬─→ merge to main
+feature/frontend ─────────────┬─→ PR to main
                               │
-feature/backend ──────────────┘
+feature/backend ──────────────┴─→ PR to main
 ```
 
-**Phase branches:**
+**Phase branches (internal merge, final PR):**
 ```
-feature/phase-1-work → merge to phase-1 → merge to main
-feature/phase-2-work → merge to phase-2 → merge to main (after phase-1)
+feature/phase-1-work → merge to phase-1 → PR to main
+feature/phase-2-work → merge to phase-2 → PR to main
 ```
 
 ## Plan Format
@@ -90,13 +97,13 @@ For each task, specify:
 - Include clear acceptance criteria for each task
 - Add checkpoint tasks at phase boundaries
 - Consider which tasks can run in parallel (different repos/directories)
-- **ALWAYS include a final phase** that consolidates all work to main
-- **Verify the merge chain**: trace each branch back to main to ensure nothing is orphaned
+- **ALWAYS include a final phase** that opens PRs or merges all work to main
+- **Verify the path to main**: trace each branch - it must reach main via PR or merge
 
 ## When Done
 
 After writing the plan, let the user know:
 1. The plan has been saved to `plan.md`
 2. They can review and edit it
-3. **Verify the merge chain**: Confirm that all branches eventually merge to main
+3. **Verify the path to main**: Confirm that all branches reach main (via PR or merge)
 4. They should run `bloom generate` to create the tasks.yaml file for execution
