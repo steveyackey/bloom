@@ -234,7 +234,8 @@ export class OpenCodeAgentProvider implements Agent {
       return {
         success: false,
         output: "",
-        error: "Model selection is REQUIRED for OpenCode in streaming mode. Use provider/model format (e.g., opencode/grok-code).",
+        error:
+          "Model selection is REQUIRED for OpenCode in streaming mode. Use provider/model format (e.g., opencode/grok-code).",
       };
     }
 
