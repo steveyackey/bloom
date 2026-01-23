@@ -2,6 +2,14 @@
 // Agent Providers - Re-exports
 // =============================================================================
 
+// Agent availability checking
+export type { AgentAvailability } from "./availability";
+export {
+  checkAgentAvailability,
+  checkAllAgentsAvailability,
+  getAgentDefaultModel,
+  getAgentModels,
+} from "./availability";
 // Agent capability registry
 export type { AgentCapabilities, AgentCapabilityName, AgentName } from "./capabilities";
 export {
