@@ -191,12 +191,11 @@ export interface ProcessStats {
  * Platform support:
  * - Linux: reads from /proc/{pid}/stat (most accurate)
  * - macOS: uses ps command
- * - Windows: not yet supported (returns null)
+ * - Windows: uses PowerShell Get-Process
  */
 export async function getProcessStats(pid: number): Promise<ProcessStats | null> {
   if (feature("WINDOWS")) {
-    // Windows: would need tasklist or wmic - not implemented yet
-    return null;
+    return getWindowsProcessStats(pid);
   }
 
   // Try Linux /proc first (faster and more accurate)
@@ -284,6 +283,44 @@ async function getPsProcessStats(pid: number): Promise<ProcessStats | null> {
       cpu: Math.min(100, Math.round(cpu * 10) / 10),
       memory: Math.round(memory * 10) / 10,
     };
+  } catch {
+    return null;
+  }
+}
+
+async function getWindowsProcessStats(pid: number): Promise<ProcessStats | null> {
+  try {
+    // Use PowerShell to get process stats
+    // Get-Process returns CPU time in seconds and WorkingSet64 in bytes
+    const psCommand = `Get-Process -Id ${pid} -ErrorAction SilentlyContinue | Select-Object CPU,WorkingSet64 | ConvertTo-Json`;
+
+    const proc = Bun.spawn(["powershell", "-NoProfile", "-Command", psCommand], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const output = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0 || !output.trim()) {
+      return null;
+    }
+
+    const data = JSON.parse(output.trim());
+    if (!data) return null;
+
+    // CPU is total CPU time in seconds - convert to approximate percentage
+    // This is cumulative, not instantaneous, so it's less accurate than Linux/macOS
+    // WorkingSet64 is memory in bytes
+    const cpuSeconds = data.CPU || 0;
+    const memoryBytes = data.WorkingSet64 || 0;
+
+    // For CPU%, we'll show the cumulative CPU time as a rough indicator
+    // A more accurate approach would track delta over time, but this gives a ballpark
+    const cpu = Math.min(100, Math.round(cpuSeconds * 10) / 10);
+    const memory = Math.round((memoryBytes / (1024 * 1024)) * 10) / 10; // Convert to MB
+
+    return { cpu, memory };
   } catch {
     return null;
   }

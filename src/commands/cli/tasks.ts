@@ -65,7 +65,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
             },
           },
         ],
-        help: { group: "tasks" },
+        help: { group: "monitor" },
       })
       .on("list", async (ctx) => {
         const status = ctx.parameters.status as TaskStatus | undefined;
@@ -91,7 +91,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
 
       // dashboard - Live dashboard
       .command("dashboard", "Live dashboard showing task progress", {
-        help: { group: "tasks" },
+        help: { group: "monitor" },
       })
       .on("dashboard", async () => {
         await cmdDashboard();
@@ -99,7 +99,7 @@ export function registerTaskCommands(cli: Clerc): Clerc {
 
       // validate - Validate tasks file
       .command("validate", "Validate tasks file for errors", {
-        help: { group: "tasks" },
+        help: { group: "monitor" },
       })
       .on("validate", async () => {
         await cmdValidate();

@@ -20,7 +20,7 @@ import { cmdUpdate } from "../update";
 export function registerUtilityCommands(cli: Clerc): Clerc {
   return cli
     .command("update", "Update bloom to the latest version", {
-      help: { group: "config" },
+      help: { group: "system" },
     })
     .on("update", async () => {
       await cmdUpdate();

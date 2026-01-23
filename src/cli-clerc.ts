@@ -29,15 +29,20 @@ const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 // Command Groups Definition
 // =============================================================================
 
+// Groups are ordered by frequency of human use - common commands first
 const COMMAND_GROUPS = {
   commands: [
-    ["setup", "Project Setup"],
+    // Most common human commands
+    ["workflow", "Workflow"],
+    ["monitor", "Monitor & Interact"],
     ["repo", "Repository Management"],
-    ["planning", "Planning & Generation"],
-    ["tasks", "Task Management"],
-    ["agents", "Agent Operations"],
-    ["collab", "Collaboration"],
-    ["config", "Configuration"],
+    // Less common / mixed human-AI
+    ["tasks", "Task Operations"],
+    // Primarily AI-used commands
+    ["agent-ops", "Agent Operations"],
+    ["collab", "Agent Collaboration"],
+    // System/config
+    ["system", "System"],
   ] as [string, string][],
 };
 
