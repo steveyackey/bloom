@@ -9,6 +9,7 @@ import chalk from "chalk";
 import { createAgent } from "../agents";
 import { BLOOM_DIR } from "../commands/context";
 import { loadPrompt } from "../prompts";
+import { buildReposContext } from "./planning-service";
 
 // =============================================================================
 // Types
@@ -147,10 +148,15 @@ export async function createProject(
  * @param projectDir - Directory of the newly created project
  */
 export async function runCreateSession(projectDir: string): Promise<void> {
+  // Build repos context for the prompt
+  const reposContext = await buildReposContext(BLOOM_DIR);
+
   const systemPrompt = await loadPrompt(
     "create",
     {
       PROJECT_DIR: projectDir,
+      BLOOM_DIR: BLOOM_DIR,
+      REPOS_CONTEXT: reposContext,
     },
     BLOOM_DIR
   );
@@ -378,12 +384,17 @@ export async function runCreateInPlaceSession(projectDir: string, projectName: s
   console.log(chalk.dim("Reading existing files for context...\n"));
   const existingContext = gatherExistingContext(projectDir);
 
+  // Build repos context for the prompt
+  const reposContext = await buildReposContext(BLOOM_DIR);
+
   const systemPrompt = await loadPrompt(
     "create-in-place",
     {
       PROJECT_DIR: projectDir,
       PROJECT_NAME: projectName,
       EXISTING_CONTEXT: existingContext,
+      BLOOM_DIR: BLOOM_DIR,
+      REPOS_CONTEXT: reposContext,
     },
     BLOOM_DIR
   );
