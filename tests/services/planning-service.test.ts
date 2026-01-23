@@ -171,7 +171,7 @@ describe("planning-service", () => {
 
       const context = await buildReposContext(testDir);
 
-      expect(context).toContain("- Worktrees:");
+      expect(context).toContain("- Active worktrees:");
       expect(context).toContain("main");
       expect(context).toContain("feature-branch");
     });

@@ -21,6 +21,8 @@ export interface TerminalProcess {
   kill(signal?: string): void;
   /** Promise that resolves with exit code when process exits */
   readonly exited: Promise<number>;
+  /** Process ID (if available) */
+  readonly pid?: number;
 }
 
 export interface TerminalSpawnOptions {
@@ -75,6 +77,9 @@ function spawnWithBunTerminal(command: string[], options: TerminalSpawnOptions):
     },
     get exited() {
       return exitedPromise;
+    },
+    get pid() {
+      return proc.pid;
     },
   };
 }
@@ -142,6 +147,9 @@ if (feature("WINDOWS")) {
       get exited() {
         return exitedPromise;
       },
+      get pid() {
+        return proc.pid;
+      },
     };
   };
 }
@@ -163,4 +171,74 @@ export async function spawnTerminal(command: string[], options: TerminalSpawnOpt
     return spawnWithBunPty(command, options);
   }
   return spawnWithBunTerminal(command, options);
+}
+
+// =============================================================================
+// Process Stats
+// =============================================================================
+
+export interface ProcessStats {
+  /** CPU usage percentage (0-100) */
+  cpu: number;
+  /** Memory usage in MB */
+  memory: number;
+}
+
+/**
+ * Get CPU and memory stats for a process.
+ * Returns null if stats cannot be retrieved (process exited, etc.)
+ */
+export async function getProcessStats(pid: number): Promise<ProcessStats | null> {
+  if (feature("WINDOWS")) {
+    // Windows: use tasklist - not as accurate but works
+    return null; // TODO: Windows support
+  }
+
+  try {
+    // Linux/macOS: read from /proc/{pid}/stat and /proc/{pid}/statm
+    const statFile = Bun.file(`/proc/${pid}/stat`);
+    const statmFile = Bun.file(`/proc/${pid}/statm`);
+    const uptimeFile = Bun.file("/proc/uptime");
+
+    const [statContent, statmContent, uptimeContent] = await Promise.all([
+      statFile.text().catch(() => null),
+      statmFile.text().catch(() => null),
+      uptimeFile.text().catch(() => null),
+    ]);
+
+    if (!statContent || !statmContent || !uptimeContent) {
+      return null;
+    }
+
+    // Parse stat - fields: pid (comm) state ppid pgrp session tty_nr tpgid flags
+    //               minflt cminflt majflt cmajflt utime stime cutime cstime ...
+    const statParts = statContent.split(" ");
+    const utime = Number.parseInt(statParts[13] || "0", 10);
+    const stime = Number.parseInt(statParts[14] || "0", 10);
+    const starttime = Number.parseInt(statParts[21] || "0", 10);
+    const totalTime = utime + stime;
+
+    // Parse uptime
+    const uptime = Number.parseFloat(uptimeContent.split(" ")[0] || "0");
+
+    // Get clock ticks per second (usually 100)
+    const hertz = 100; // Assuming standard Linux value
+
+    // Calculate CPU usage
+    const seconds = uptime - starttime / hertz;
+    const cpu = seconds > 0 ? (100 * (totalTime / hertz)) / seconds : 0;
+
+    // Parse statm - fields: size resident shared text lib data dt
+    const statmParts = statmContent.split(" ");
+    const rss = Number.parseInt(statmParts[1] || "0", 10); // resident pages
+    const pageSize = 4096; // Assuming standard page size
+    const memory = (rss * pageSize) / (1024 * 1024); // Convert to MB
+
+    return {
+      cpu: Math.min(100, Math.round(cpu * 10) / 10),
+      memory: Math.round(memory * 10) / 10,
+    };
+  } catch {
+    return null;
+  }
 }

@@ -6,7 +6,7 @@ import { interjectSession } from "./agents";
 import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
 import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
-import { spawnTerminal, type TerminalProcess } from "./terminal";
+import { getProcessStats, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
 
 // =============================================================================
 // Types
@@ -57,6 +57,8 @@ interface Pane {
   humanTakeoverSource?: string;
   /** Cleanup function for in-process services */
   cleanup?: () => void;
+  /** Latest process stats (CPU/memory) */
+  stats?: ProcessStats;
 }
 
 type ViewMode = "tiled" | "single";
@@ -77,6 +79,7 @@ export class OrchestratorTUI {
   private paneConfigs: PaneConfig[] = [];
   private stopTriggerWatch?: () => void;
   private lastRenderedOutput = "";
+  private statsUpdateInterval?: ReturnType<typeof setInterval>;
 
   constructor(configs?: AgentConfig[]) {
     this.cols = process.stdout.columns || 80;
@@ -146,10 +149,39 @@ export class OrchestratorTUI {
     // Select first pane (dashboard) after all agents are spawned
     this.selectedIndex = 0;
 
+    // Start periodic stats updates
+    this.statsUpdateInterval = setInterval(() => this.updateAllStats(), 5000);
+    // Initial stats fetch
+    this.updateAllStats();
+
     this.render();
   }
 
+  private async updateAllStats() {
+    let changed = false;
+    for (const pane of this.panes) {
+      if (pane.proc?.pid && pane.status === "running") {
+        const stats = await getProcessStats(pane.proc.pid);
+        if (stats) {
+          pane.stats = stats;
+          changed = true;
+        }
+      } else if (pane.stats) {
+        pane.stats = undefined;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.scheduleRender();
+    }
+  }
+
   private cleanup() {
+    // Stop stats updates
+    if (this.statsUpdateInterval) {
+      clearInterval(this.statsUpdateInterval);
+    }
+
     // Stop watching for triggers
     if (this.stopTriggerWatch) {
       this.stopTriggerWatch();
@@ -261,10 +293,24 @@ export class OrchestratorTUI {
     const count = this.panes.length;
 
     if (this.viewMode === "single") {
-      if (dir === "h" || dir === "k") {
+      // In single view: h/l switch panes, j/k scroll content
+      if (dir === "h") {
         this.selectedIndex = (this.selectedIndex - 1 + count) % count;
-      } else {
+      } else if (dir === "l") {
         this.selectedIndex = (this.selectedIndex + 1) % count;
+      } else if (dir === "j" || dir === "k") {
+        // Scroll the terminal buffer
+        const pane = this.panes[this.selectedIndex];
+        if (pane) {
+          const scrollAmount = 3; // Lines to scroll per keypress
+          if (dir === "j") {
+            // Scroll down
+            pane.term.scrollLines(scrollAmount);
+          } else {
+            // Scroll up
+            pane.term.scrollLines(-scrollAmount);
+          }
+        }
       }
     } else {
       const tilesPerRow = Math.ceil(Math.sqrt(count));
@@ -632,7 +678,10 @@ export class OrchestratorTUI {
     // Header with chalk styling
     const title = chalk.bold.cyan(" Bloom");
     const viewInfo = chalk.gray(` ${this.viewMode}`);
-    const agentCount = chalk.green(`${this.panes.length}`);
+    // Count only actual agents (exclude dashboard and questions panes)
+    const agentPanes = this.panes.filter((p) => p.config.name !== "dashboard" && p.config.name !== "questions");
+    const activeAgents = agentPanes.filter((p) => p.status === "running").length;
+    const agentCount = chalk.green(`${activeAgents}/${agentPanes.length}`);
     const keys = chalk.dim("n:new r:restart x:kill X:delete i:interject v:view hjkl:nav Enter:focus ^B:back q:quit");
     const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Agents:")} ${agentCount} ${chalk.dim("|")} ${keys}`;
     // Pad to full width to overwrite any previous content
@@ -702,8 +751,18 @@ export class OrchestratorTUI {
       pane.status === "running" ? chalk.green("●") : pane.status === "error" ? chalk.red("✗") : chalk.gray("○");
     const focusStatus = isFocused ? chalk.cyan(" (focused)") : isSelected ? chalk.yellow(" (selected)") : "";
     const nameStyled = border.bold(pane.config.name);
-    const titleText = `─ ${statusIcon} ${nameStyled}${focusStatus} `;
-    const titleVisibleLen = 4 + pane.config.name.length + (isFocused ? 10 : isSelected ? 11 : 0);
+
+    // Add CPU/memory stats if available
+    let statsText = "";
+    let statsVisibleLen = 0;
+    if (pane.stats) {
+      statsText = chalk.dim(` [${pane.stats.cpu}% ${pane.stats.memory}MB]`);
+      // Approximate visible length: " [X.X% X.XMB]"
+      statsVisibleLen = 3 + String(pane.stats.cpu).length + 2 + String(pane.stats.memory).length + 3;
+    }
+
+    const titleText = `─ ${statusIcon} ${nameStyled}${focusStatus}${statsText} `;
+    const titleVisibleLen = 4 + pane.config.name.length + (isFocused ? 10 : isSelected ? 11 : 0) + statsVisibleLen;
     const remainingWidth = region.w - titleVisibleLen - 2;
 
     output += ansi.moveTo(region.y, region.x + 1);
