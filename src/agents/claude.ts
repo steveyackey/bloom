@@ -40,6 +40,8 @@ export interface ClaudeProviderOptions {
   onHeartbeat?: (lastActivityMs: number) => void;
   /** Callback for activity timeout (agent presumed dead) */
   onTimeout?: () => void;
+  /** Model to use (e.g., 'claude-sonnet-4-20250514'). If not specified, uses Claude CLI default. */
+  model?: string;
 }
 
 // =============================================================================
@@ -88,6 +90,7 @@ export class ClaudeAgentProvider implements Agent {
   private onEvent?: (event: StreamEvent) => void;
   private onHeartbeat?: (lastActivityMs: number) => void;
   private onTimeout?: () => void;
+  private model?: string;
 
   constructor(options: ClaudeProviderOptions = {}) {
     this.interactive = options.interactive ?? false;
@@ -98,6 +101,7 @@ export class ClaudeAgentProvider implements Agent {
     this.onEvent = options.onEvent;
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
+    this.model = options.model;
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
@@ -327,6 +331,10 @@ export class ClaudeAgentProvider implements Agent {
       args.push("--dangerously-skip-permissions");
     }
 
+    if (this.model) {
+      args.push("--model", this.model);
+    }
+
     args.push("--append-system-prompt", options.systemPrompt);
 
     // Add initial prompt so Claude starts with context instead of blank slate
@@ -343,6 +351,10 @@ export class ClaudeAgentProvider implements Agent {
 
     if (this.dangerouslySkipPermissions) {
       args.push("--dangerously-skip-permissions");
+    }
+
+    if (this.model) {
+      args.push("--model", this.model);
     }
 
     // Resume previous session if sessionId provided
