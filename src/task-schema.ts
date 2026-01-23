@@ -47,7 +47,10 @@ export type Task = {
   merge_into?: string;
   /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default) */
   open_pr?: boolean;
+  /** Agent group name for this task (used for parallel execution grouping) */
   agent_name?: string;
+  /** Agent provider to use for this task (claude, copilot, cline, codex, opencode). Overrides config default. */
+  agent?: string;
   instructions?: string;
   acceptance_criteria: string[];
   ai_notes: string[];
@@ -73,6 +76,7 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     merge_into: z.string().optional(),
     open_pr: z.boolean().optional(),
     agent_name: z.string().optional(),
+    agent: z.string().optional(),
     instructions: z.string().optional(),
     acceptance_criteria: z.array(z.string()).default([]),
     ai_notes: z.array(z.string()).default([]),

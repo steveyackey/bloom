@@ -4,7 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createAgent, getAgentCapabilities } from "../agents";
+import { type AgentName, createAgent, getAgentCapabilities } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { PromptCompiler } from "../prompts/compiler";
@@ -33,6 +33,7 @@ import {
   saveTasks,
   updateTaskStatus,
 } from "../tasks";
+import { getDefaultAgentName, loadUserConfig } from "../user-config";
 import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
 
 // =============================================================================
@@ -61,6 +62,8 @@ interface TaskGetResult {
   gitConfig?: GitConfig;
   /** Existing session ID if resuming interrupted work */
   sessionId?: string;
+  /** Agent provider override for this task (e.g., "claude", "copilot"). If not set, uses config default. */
+  agent?: string;
 }
 
 interface AgentConfig {
@@ -186,6 +189,7 @@ Begin working on the task now.`;
     taskCli,
     gitConfig,
     sessionId: task.session_id, // Resume existing session if available
+    agent: task.agent, // Per-task agent provider override
   };
 }
 
@@ -215,7 +219,25 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
   const agentLog = logger.agent(agentName);
   agentLog.info(`Starting work loop (polling every ${POLL_INTERVAL_MS / 1000}s)...`);
 
-  const agent = await createAgent("nonInteractive");
+  // Load user config to determine default agent provider
+  const userConfig = await loadUserConfig();
+  const defaultProvider = getDefaultAgentName(userConfig) as AgentName;
+  agentLog.debug(`Default agent provider: ${defaultProvider}`);
+
+  // Cache agents by provider to avoid recreating them
+  const agentCache = new Map<string, Awaited<ReturnType<typeof createAgent>>>();
+
+  async function getOrCreateAgent(provider: string) {
+    if (!agentCache.has(provider)) {
+      agentLog.debug(`Creating agent for provider: ${provider}`);
+      const agent = await createAgent("nonInteractive", { agentName: provider });
+      agentCache.set(provider, agent);
+    }
+    return agentCache.get(provider)!;
+  }
+
+  // Create default agent initially
+  await getOrCreateAgent(defaultProvider);
 
   while (true) {
     try {
@@ -294,10 +316,20 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         }
       }
 
+      // Determine which agent provider to use for this task
+      // Per-task agent overrides config default
+      const taskProvider = (taskResult.agent ?? defaultProvider) as AgentName;
+      if (taskResult.agent) {
+        agentLog.info(`Task specifies agent: ${taskProvider}`);
+      }
+
+      // Get or create the agent for this provider
+      const agent = await getOrCreateAgent(taskProvider);
+
       // Compile the agent system prompt using the PromptCompiler
       // This allows capability-based conditional sections and variable substitution
       const compiler = new PromptCompiler();
-      const agentCapabilities = getAgentCapabilities("claude") || {};
+      const agentCapabilities = getAgentCapabilities(taskProvider) || {};
       const systemPrompt = await compiler.loadAndCompile("agent-system", {
         capabilities: agentCapabilities,
         variables: {
@@ -307,7 +339,7 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         },
       });
 
-      agentLog.info(`Starting Claude session in: ${workingDir}`);
+      agentLog.info(`Starting ${taskProvider} session in: ${workingDir}`);
 
       const startTime = Date.now();
       let result = await agent.run({

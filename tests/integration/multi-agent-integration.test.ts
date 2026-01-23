@@ -25,6 +25,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as YAML from "yaml";
+import type { Task } from "../../src/task-schema";
 
 // =============================================================================
 // Test Fixtures
@@ -373,7 +374,8 @@ describe("Multi-Agent Integration Tests", () => {
       // Mock agent execution to track calls
       const mockExecutions: Array<{
         taskId: string;
-        agent: string;
+        agentName: string;
+        agentProvider: string;
         sessionId?: string;
       }> = [];
 
@@ -383,9 +385,11 @@ describe("Multi-Agent Integration Tests", () => {
           sessionId: currentSessionId ?? `session-${task.id}`,
         });
 
+        // Provider comes from task.agent field (per-task provider selection)
         mockExecutions.push({
           taskId: task.id,
-          agent: task.agent,
+          agentName: task.agent_name,
+          agentProvider: task.agent, // Per-task agent provider
           sessionId: currentSessionId,
         });
 
@@ -395,7 +399,10 @@ describe("Multi-Agent Integration Tests", () => {
 
       // Assertions
       expect(mockExecutions).toHaveLength(3);
-      expect(mockExecutions.every((e) => e.agent === "claude")).toBe(true);
+      // All tasks specify the same agent provider (claude)
+      expect(mockExecutions.every((e) => e.agentProvider === "claude")).toBe(true);
+      // All tasks are in the same agent group
+      expect(mockExecutions.every((e) => e.agentName === "phase-1")).toBe(true);
 
       // Session should persist (later tasks should have session from earlier)
       expect(mockExecutions[1]?.sessionId).toBeDefined();
@@ -436,14 +443,15 @@ describe("Multi-Agent Integration Tests", () => {
      */
     test("switches agents between tasks and compiles prompts per-agent", async () => {
       writeTasks(FIXTURE_TASKS.twoTasksDifferentAgents);
+      writeConfig(FIXTURE_CONFIGS.defaultClaude);
 
       const promptsCompiled: Array<{ taskId: string; agent: string }> = [];
 
-      // Simulate orchestrator processing tasks
+      // Simulate orchestrator processing tasks with per-task agent selection
       for (const task of FIXTURE_TASKS.twoTasksDifferentAgents.tasks) {
         promptsCompiled.push({
           taskId: task.id,
-          agent: task.agent,
+          agent: task.agent, // Per-task agent provider
         });
       }
 
@@ -461,6 +469,16 @@ describe("Multi-Agent Integration Tests", () => {
 
       // Copilot prompt should have GitHub MCP reference
       expect(task2?.agent).toBe("copilot");
+    });
+
+    test("supports multiple agent groups for parallel execution", () => {
+      const task1 = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[0];
+      const task2 = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[1];
+
+      // Different agent groups allow parallel execution
+      expect(task1?.agent_name).toBe("researcher");
+      expect(task2?.agent_name).toBe("implementer");
+      expect(task1?.agent_name).not.toBe(task2?.agent_name);
     });
   });
 
@@ -489,16 +507,40 @@ describe("Multi-Agent Integration Tests", () => {
       writeConfig(FIXTURE_CONFIGS.defaultClaude);
       writeTasks(FIXTURE_TASKS.twoTasksDifferentAgents);
 
-      // Task specifies its own agent, should override config
-      const task = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[1];
+      // Config default is claude
       const configDefault = FIXTURE_CONFIGS.defaultClaude.nonInteractiveAgent.agent;
-
-      expect(task?.agent).toBe("copilot");
       expect(configDefault).toBe("claude");
 
-      // Resolved agent should be task-level
+      // Task specifies its own agent, should override config
+      const task = FIXTURE_TASKS.twoTasksDifferentAgents.tasks[1];
+      expect(task?.agent).toBe("copilot");
+
+      // Resolved agent should be task-level (per-task provider selection)
       const resolvedAgent = task?.agent ?? configDefault;
       expect(resolvedAgent).toBe("copilot");
+    });
+
+    test("tasks without agent field use config default", () => {
+      writeConfig(FIXTURE_CONFIGS.defaultClaude);
+
+      // Create a task without the agent field
+      const taskWithoutAgent: Partial<Task> = {
+        id: "task-no-agent",
+        title: "Task without explicit agent",
+        status: "ready_for_agent" as const,
+        agent_name: "worker",
+        // NO agent field
+        depends_on: [],
+        acceptance_criteria: ["Complete the work"],
+        ai_notes: [],
+        subtasks: [],
+      };
+
+      const configDefault = FIXTURE_CONFIGS.defaultClaude.nonInteractiveAgent.agent;
+
+      // When task.agent is undefined, config default is used
+      const resolvedAgent = taskWithoutAgent.agent ?? configDefault;
+      expect(resolvedAgent).toBe("claude");
     });
   });
 
@@ -557,6 +599,9 @@ describe("Multi-Agent Integration Tests", () => {
     test("gracefully degrades when agent lacks required capability", () => {
       const task = FIXTURE_TASKS.taskWithWebSearch.tasks[0];
 
+      // Task specifies cline as the agent
+      expect(task?.agent).toBe("cline");
+
       // Cline capabilities - does NOT support web search
       const clineCapabilities = {
         supportsWebSearch: false,
@@ -571,10 +616,10 @@ describe("Multi-Agent Integration Tests", () => {
       const expectedExclusions = FIXTURE_EXPECTED_PROMPTS.clinePromptSections.shouldExclude;
       expect(expectedExclusions).toContain("Web search");
 
-      // Agent is still Cline as specified
-      expect(task?.agent).toBe("cline");
+      // Task specifies agent_name (group) and agent (provider)
+      expect(task?.agent_name).toBe("researcher");
 
-      // Capability check
+      // Cline capability check - no web search support
       expect(clineCapabilities.supportsWebSearch).toBe(false);
     });
 
@@ -1115,8 +1160,9 @@ Done.`;
 
       // Simulate orchestrator processing each task
       for (const task of tasks) {
-        // Get capabilities for the agent
-        const capabilities = getAgentCapabilities(task.agent);
+        // Get capabilities for the task's specified agent (per-task provider)
+        const taskAgent = task.agent as AgentName;
+        const capabilities = getAgentCapabilities(taskAgent);
         expect(capabilities).toBeDefined();
 
         // Compile a task prompt (simulating what orchestrator does)
@@ -1127,10 +1173,10 @@ Done.`;
           sessionId: `session-${task.id}`,
         });
 
-        // Record execution
+        // Record execution - provider comes from task.agent
         orchestratorState.executedTasks.push({
           taskId: task.id,
-          agent: task.agent,
+          agent: taskAgent,
           prompt: taskPrompt,
           sessionId: mockBehavior.sessionId,
           startTime: Date.now(),
@@ -1141,6 +1187,7 @@ Done.`;
       // Verify all tasks were "executed"
       expect(orchestratorState.executedTasks).toHaveLength(3);
       expect(orchestratorState.executedTasks.map((t) => t.taskId)).toEqual(["task-1", "task-2", "task-3"]);
+      // All tasks specify claude as their agent
       expect(orchestratorState.executedTasks.every((t) => t.agent === "claude")).toBe(true);
     });
 
@@ -1150,9 +1197,10 @@ Done.`;
 
       // Simulate compiling prompts for each task based on its agent
       for (const task of tasks) {
-        const capabilities = getAgentCapabilities(task.agent as AgentName);
+        const taskAgent = task.agent as AgentName;
+        const capabilities = getAgentCapabilities(taskAgent);
 
-        // Create agent-specific prompt section
+        // Create agent-specific prompt section based on capabilities
         const agentSection = capabilities?.supportsWebSearch
           ? "Use web search when needed."
           : "No web search available.";
@@ -1168,9 +1216,8 @@ Done.`;
       // Claude has web search
       expect(claudePrompt).toContain("web search when needed");
 
-      // Note: Copilot also has web search in our registry
-      // This test verifies the prompts are compiled per-agent
-      expect(copilotPrompt).toBeDefined();
+      // Copilot also has web search in our registry
+      expect(copilotPrompt).toContain("web search when needed");
     });
   });
 });

@@ -7,8 +7,8 @@ import {
   checkAllAgentsAvailability,
   getAgentDefaultModel,
   getAgentModels,
-  getRegisteredAgents,
   interjectSession,
+  listAvailableAgents,
 } from "./agents";
 import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
 import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
@@ -267,13 +267,13 @@ export class OrchestratorTUI {
       }
 
       // Build choices with availability info
-      const agents = getRegisteredAgents();
+      const agents = listAvailableAgents();
       const choices = agents.map((agent) => {
         const availability = this.agentAvailability.get(agent);
         const isAvailable = availability?.available ?? false;
         const isCurrent = agent === this.currentAgent;
 
-        let name = agent;
+        let name: string = agent;
         if (isCurrent) name = `${agent} (current)`;
         if (!isAvailable) {
           name = `${agent} [unavailable: ${availability?.unavailableReason || "unknown"}]`;
@@ -286,7 +286,7 @@ export class OrchestratorTUI {
         };
       });
 
-      const selectedAgent = await select({
+      const selectedAgent = await select<string>({
         message: "Select an agent:",
         choices,
         default: this.currentAgent,
