@@ -164,6 +164,21 @@ You can search the web for current information when needed:
 3. Research best practices and common patterns
 <!-- @endif -->
 
+<!-- @if supportsLSP -->
+## Language Server Protocol (LSP) Support
+
+You have access to native LSP capabilities for accurate code intelligence:
+
+1. **Go to Definition**: Navigate to symbol definitions accurately
+2. **Find References**: Locate all usages of a symbol across the codebase
+3. **Hover Information**: Get type information and documentation on hover
+4. **Diagnostics**: Access real-time error and warning information from the language server
+5. **Code Actions**: Use LSP-provided quick fixes and refactorings
+
+Use LSP features to ensure accurate understanding of the codebase structure and types.
+This provides more reliable code navigation than text-based search alone.
+<!-- @endif -->
+
 ## Variables
 
 - **TASK CLI**: `{{TASK_CLI}}`

@@ -40,6 +40,7 @@ export interface AgentCapabilities {
   supportsLinting?: boolean;
   supportsTypeChecking?: boolean;
   supportsFormatting?: boolean;
+  supportsLSP?: boolean;
   [key: string]: boolean | string[] | number | undefined;
 }
 
@@ -81,6 +82,7 @@ const CAPABILITY_DESCRIPTIONS: Record<string, string> = {
   supportsLinting: "Code linting",
   supportsTypeChecking: "Type checking",
   supportsFormatting: "Code formatting",
+  supportsLSP: "Language Server Protocol (LSP) for code intelligence",
 };
 
 // =============================================================================

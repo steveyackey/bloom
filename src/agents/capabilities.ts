@@ -26,7 +26,8 @@ export type AgentCapabilityName =
   | "supportsStructuredOutput"
   | "supportsStreamingJson"
   | "supportsHumanQuestions"
-  | "supportsPlanMode";
+  | "supportsPlanMode"
+  | "supportsLSP";
 
 /**
  * Defines what capabilities an AI agent provider supports.
@@ -151,6 +152,14 @@ export interface AgentCapabilities {
    */
   supportsPlanMode: boolean;
 
+  /**
+   * Whether the agent has native Language Server Protocol (LSP) support.
+   * LSP provides accurate code intelligence features like go-to-definition,
+   * find references, hover info, and diagnostics.
+   * OpenCode has native LSP support built-in.
+   */
+  supportsLSP: boolean;
+
   // ===========================================================================
   // Agent-Specific Features
   // ===========================================================================
@@ -212,6 +221,9 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     supportsHumanQuestions: true, // Can pause for human input
     supportsPlanMode: false, // No explicit plan mode
 
+    // Code intelligence
+    supportsLSP: false, // Uses AST analysis but no native LSP
+
     // Special instructions
     specialInstructions: [
       "Use TodoWrite tool to track task progress",
@@ -252,6 +264,9 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     // Interaction
     supportsHumanQuestions: false, // Runs to completion
     supportsPlanMode: false,
+
+    // Code intelligence
+    supportsLSP: false, // No native LSP support
 
     // Special instructions
     specialInstructions: [
@@ -294,6 +309,9 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     supportsHumanQuestions: false, // Runs to completion (approval modes are CLI-level)
     supportsPlanMode: false,
 
+    // Code intelligence
+    supportsLSP: false, // No native LSP support
+
     // Special instructions
     specialInstructions: [
       "Supports session forking to explore alternative approaches",
@@ -334,6 +352,9 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     // Interaction
     supportsHumanQuestions: true, // Plan mode waits for approval
     supportsPlanMode: true, // Explicit Plan/Act mode switching
+
+    // Code intelligence
+    supportsLSP: false, // No native LSP support
 
     // Special instructions
     specialInstructions: [
@@ -376,6 +397,9 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     // Interaction
     supportsHumanQuestions: false, // Runs to completion
     supportsPlanMode: false,
+
+    // Code intelligence
+    supportsLSP: true, // Native LSP support for accurate code intelligence
 
     // Special instructions
     specialInstructions: [
