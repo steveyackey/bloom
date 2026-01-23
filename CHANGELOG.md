@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.6](https://github.com/steveyackey/bloom/compare/bloom-v0.2.5...bloom-v0.2.6) (2026-01-23)
+
+
+### Features
+
+* custom git hooks installer for bare repo worktrees ([32115ac](https://github.com/steveyackey/bloom/commit/32115ac64a99d822239573c01ff58b406393b94e))
+
+
+### Bug Fixes
+
+* prevent duplicate repo entries when syncing ([d15d2f2](https://github.com/steveyackey/bloom/commit/d15d2f261b811ca47280f9c1c2e629d333f75568))
+* protect default branch from cleanup deletion ([8b8917b](https://github.com/steveyackey/bloom/commit/8b8917b010ffe7b4698a05454c9345cffc9df38b))
+* strip + prefix from worktree branches in getMergedBranches ([edcdcba](https://github.com/steveyackey/bloom/commit/edcdcba1c2785cc9f63591addea5e3a62ba3f0d1))
+* track repos/ folder with .gitkeep so cloned workspaces work ([d41cf2a](https://github.com/steveyackey/bloom/commit/d41cf2a7159686e167d57ef382c3cf9512bfd8c6))
+
 ## [0.2.5](https://github.com/steveyackey/bloom/compare/bloom-v0.2.4...bloom-v0.2.5) (2026-01-23)
 
 
