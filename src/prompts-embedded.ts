@@ -37,29 +37,26 @@ Tasks may specify git branch settings. Always check the task prompt for:
 
 - **Working branch**: The branch you're working on
 - **Base branch**: Where your branch was created from
-- **Merge into**: Target branch to merge your work into when done
+- **Merge target** or **PR target**: Where your work will go after completion
 
 ### Before Marking Done
 
 1. **Commit everything**: No uncommitted changes should remain
 2. **Push if instructed**: The task prompt will tell you if pushing is required
-3. **Merge if instructed**: If the task specifies a \`merge_into\` branch:
-   - Switch to the target branch
-   - Merge your working branch with a descriptive message
-   - Push the merge if required
 
-### Example Merge Flow
+### Important: Orchestrator Handles Merges and PRs
 
-\`\`\`bash
-# Ensure all changes are committed
-git add -A
-git commit -m "feat: implement feature X"
+**Do NOT manually merge branches or create PRs.** The orchestrator handles this automatically:
+- If the task has \`merge_into\`: Orchestrator auto-merges after task completion
+- If the task has \`open_pr: true\`: Orchestrator creates a GitHub PR automatically
 
-# Merge into target branch (if specified)
-git checkout main
-git merge feature/my-branch --no-ff -m "Merge feature/my-branch: implement feature X"
-git push origin main  # if push_to_remote is enabled
-\`\`\`
+Your job is just to:
+1. Complete the work on your branch
+2. Commit all changes
+3. Push if configured
+4. Mark the task as done
+
+The merge/PR will happen automatically.
 
 ## Progress Tracking
 
@@ -222,14 +219,23 @@ Tasks file: {{TASKS_FILE}}
 ## Clarifying Questions
 
 After reading the plan, ask the user about git configuration if the workflow involves:
-- **Pull requests**: If any task has \`merge_into\` set (especially to main/master), or if the plan mentions creating PRs
+- **Merging to main/master**: Ask about PR vs auto-merge preference
 - **Team collaboration**: If multiple people might be working on related branches
 - **CI/CD**: If the plan mentions automated testing or deployment pipelines
 
-**Question to ask**:
-> "I see this workflow will create pull requests / merge branches. Would you like to enable \`push_to_remote: true\`? This pushes branches to the remote after each task completes, which is recommended for PR workflows and provides backup of work in progress. (Default is false - local only)"
+**Questions to ask**:
 
-If the user confirms, set \`push_to_remote: true\` in the git config. If they decline or the workflow is purely local development, leave it as false.
+1. **For workflows targeting main/master**:
+> "I see tasks will merge into main/master. Would you prefer:
+> - **PR-based (Recommended)**: Creates GitHub PRs for code review before merging
+> - **Auto-merge**: Directly merges without review (faster, but no code review)"
+
+If they choose PR-based, add \`open_pr: true\` to tasks that would merge into main/master.
+
+2. **For any workflow with branches**:
+> "Would you like to enable \`push_to_remote: true\`? This pushes branches to the remote after each task completes, which is required for PR workflows and provides backup of work in progress. (Default is false - local only)"
+
+If the user confirms, set \`push_to_remote: true\` in the git config.
 
 ## Task Schema
 
@@ -252,6 +258,7 @@ tasks:                           # Root array of tasks
     branch: feature/my-work      # OPTIONAL. Working branch for this task
     base_branch: main            # OPTIONAL. Branch to create working branch from (default: repo's default)
     merge_into: main             # OPTIONAL. Branch to merge into when done (same as branch = no merge)
+    open_pr: true                # OPTIONAL. Create GitHub PR instead of auto-merge (requires push_to_remote)
     agent_name: claude-code      # OPTIONAL. Agent name for task grouping (see AGENT NAMING below)
     instructions: |              # OPTIONAL. Detailed multi-line instructions
       Step by step instructions
@@ -364,8 +371,21 @@ Agent works directly on \`develop\` branch without creating new branches.
 \`\`\`
 Multiple tasks work on the same branch, only the last one merges.
 
+### Pattern 4: PR-Based Workflow (Recommended for main/master)
+\`\`\`yaml
+- id: implement-feature
+  repo: my-app
+  branch: feature/new-feature
+  base_branch: main
+  merge_into: main                 # PR targets main
+  open_pr: true                    # Creates PR instead of auto-merge
+\`\`\`
+Agent works on feature branch, then orchestrator creates a GitHub PR for code review.
+Requires \`push_to_remote: true\` in git config.
+
 ### Git Configuration
 Enable \`push_to_remote: true\` in the \`git:\` section to automatically push after each task.
+This is **required** for \`open_pr: true\` tasks.
 
 ## Complete Example
 
@@ -467,9 +487,10 @@ Before writing the plan, ask the user:
 
 1. **Checkpoints**: "How often would you like verification checkpoints? (e.g., after each phase, after major features, etc.)"
 2. **Merge Strategy**: "How should code be merged? Options:
-   - **Feature branches**: Each task gets a branch, merged to main after review
+   - **PR-based (Recommended for main/master)**: Feature branches with PRs for code review before merging
+   - **Auto-merge**: Direct merge without review (for internal/automation workflows)
    - **Phase branches**: Work accumulates in phase branch, merged at checkpoint
-   - **Trunk-based**: Small, frequent merges directly to main"
+   - **Trunk-based**: Small, frequent commits directly to main"
 3. **Parallelization**: "Should tasks be parallelized where possible, or kept sequential for easier review?"
 4. **Any constraints**: "Are there any time constraints, dependencies, or requirements I should know about?"
 
@@ -570,6 +591,7 @@ tasks:                           # Root array of tasks
     branch: feature/my-work      # OPTIONAL. Working branch for this task
     base_branch: main            # OPTIONAL. Branch to create working branch from (default: repo's default)
     merge_into: main             # OPTIONAL. Branch to merge into when done (same as branch = no merge)
+    open_pr: true                # OPTIONAL. Create GitHub PR instead of auto-merge (requires push_to_remote)
     agent_name: claude-code      # OPTIONAL. Agent name for task grouping (see AGENT NAMING below)
     instructions: |              # OPTIONAL. Detailed multi-line instructions
       Step by step instructions

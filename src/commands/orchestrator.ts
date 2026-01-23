@@ -22,7 +22,7 @@ import {
   waitForMergeLock,
 } from "../repos";
 import { createDashboardService } from "../services";
-import { type GitConfig, getTaskBranch, getTaskMergeTarget } from "../task-schema";
+import { type GitConfig, getTaskBranch, getTaskMergeTarget, getTaskPRTarget } from "../task-schema";
 import {
   getAllAgents,
   getAllRepos,
@@ -43,6 +43,10 @@ interface GitTaskInfo {
   branch: string;
   baseBranch?: string;
   mergeInto?: string;
+  /** If true, create a PR instead of auto-merging */
+  openPR?: boolean;
+  /** Target branch for the PR (if openPR is true) */
+  prBase?: string;
   worktreePath: string;
 }
 
@@ -102,11 +106,14 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
       const defaultBranch = repo?.defaultBranch || "main";
       const baseBranch = task.base_branch || defaultBranch;
       const mergeInto = getTaskMergeTarget(task);
+      const prTarget = getTaskPRTarget(task);
 
       gitInfo = {
         branch,
         baseBranch,
         mergeInto,
+        openPR: task.open_pr,
+        prBase: prTarget ?? (task.open_pr ? defaultBranch : undefined),
         worktreePath: getWorktreePath(BLOOM_DIR, repoName, branch),
       };
     }
@@ -136,7 +143,9 @@ async function getTaskForAgent(agentName: string): Promise<TaskGetResult> {
     prompt += `- **Working branch**: \`${gitInfo.branch}\`\n`;
     prompt += `- **Base branch**: \`${gitInfo.baseBranch}\`\n`;
 
-    if (gitInfo.mergeInto) {
+    if (gitInfo.openPR && gitInfo.prBase) {
+      prompt += `- **PR target**: \`${gitInfo.prBase}\` (PR will be created automatically after task completes)\n\n`;
+    } else if (gitInfo.mergeInto) {
       prompt += `- **Merge target**: \`${gitInfo.mergeInto}\` (handled automatically after task completes)\n\n`;
     }
 
@@ -352,7 +361,7 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
             }
           }
 
-          // Push source branch if configured
+          // Push source branch if configured (required for PR creation)
           if (taskResult.gitConfig?.push_to_remote && taskResult.gitInfo.branch) {
             const postStatus = getWorktreeStatus(taskResult.gitInfo.worktreePath);
             if (postStatus.clean) {
@@ -365,6 +374,67 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
               } else {
                 agentLog.warn(`Failed to push: ${pushResult.error}`);
               }
+            }
+          }
+
+          // Create PR if open_pr is configured
+          if (taskResult.gitInfo.openPR && taskResult.gitInfo.prBase && taskResult.repo) {
+            const sourceBranch = taskResult.gitInfo.branch;
+            const targetBranch = taskResult.gitInfo.prBase;
+
+            // Build PR body from task details
+            let prBody = "";
+            if (taskResult.prompt) {
+              // Extract instructions from prompt
+              const instructionsMatch = taskResult.prompt.match(/## Instructions\n([\s\S]*?)(?=\n## |$)/);
+              if (instructionsMatch) {
+                prBody += `## Summary\n${instructionsMatch[1].trim()}\n\n`;
+              }
+              // Extract acceptance criteria
+              const acMatch = taskResult.prompt.match(/## Acceptance Criteria\n([\s\S]*?)(?=\n## |$)/);
+              if (acMatch) {
+                prBody += `## Acceptance Criteria\n${acMatch[1].trim()}\n`;
+              }
+            }
+
+            agentLog.info(`Creating PR: ${sourceBranch} -> ${targetBranch}...`);
+
+            try {
+              const ghResult = Bun.spawnSync(
+                [
+                  "gh",
+                  "pr",
+                  "create",
+                  "--title",
+                  taskResult.title || `Task: ${taskResult.taskId}`,
+                  "--body",
+                  prBody || `Automated PR for task ${taskResult.taskId}`,
+                  "--base",
+                  targetBranch,
+                  "--head",
+                  sourceBranch,
+                ],
+                {
+                  cwd: taskResult.gitInfo.worktreePath,
+                  stdout: "pipe",
+                  stderr: "pipe",
+                }
+              );
+
+              if (ghResult.exitCode === 0) {
+                const prUrl = ghResult.stdout.toString().trim();
+                agentLog.info(`PR created: ${prUrl}`);
+              } else {
+                const stderr = ghResult.stderr.toString().trim();
+                // Check if PR already exists
+                if (stderr.includes("already exists")) {
+                  agentLog.info(`PR already exists for ${sourceBranch}`);
+                } else {
+                  agentLog.warn(`Failed to create PR: ${stderr}`);
+                }
+              }
+            } catch (err) {
+              agentLog.warn(`Error creating PR: ${err}`);
             }
           }
 

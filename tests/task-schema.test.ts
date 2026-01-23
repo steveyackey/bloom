@@ -5,6 +5,7 @@ import {
   type GitConfig,
   getTaskBranch,
   getTaskMergeTarget,
+  getTaskPRTarget,
   safeValidateTasksFile,
   sanitizeBranchName,
   type TaskStatus,
@@ -135,6 +136,59 @@ describe("task-schema", () => {
       const task = createTask({ id: "t1", title: "Test", branch: "feature/test", merge_into: "main" });
       expect(getTaskMergeTarget(task)).toBe("main");
     });
+
+    test("returns undefined when open_pr is true (PR workflow, not auto-merge)", () => {
+      const task = createTask({
+        id: "t1",
+        title: "Test",
+        repo: "my-repo",
+        branch: "feature/test",
+        merge_into: "main",
+        open_pr: true,
+      });
+      expect(getTaskMergeTarget(task)).toBeUndefined();
+    });
+  });
+
+  describe("getTaskPRTarget", () => {
+    test("returns undefined when open_pr is false", () => {
+      const task = createTask({
+        id: "t1",
+        title: "Test",
+        repo: "my-repo",
+        branch: "feature/test",
+        merge_into: "main",
+      });
+      expect(getTaskPRTarget(task)).toBeUndefined();
+    });
+
+    test("returns undefined when open_pr is true but no branch", () => {
+      const task = createTask({ id: "t1", title: "Test", repo: "my-repo", open_pr: true });
+      expect(getTaskPRTarget(task)).toBeUndefined();
+    });
+
+    test("returns merge_into when open_pr is true and merge_into is set", () => {
+      const task = createTask({
+        id: "t1",
+        title: "Test",
+        repo: "my-repo",
+        branch: "feature/test",
+        merge_into: "main",
+        open_pr: true,
+      });
+      expect(getTaskPRTarget(task)).toBe("main");
+    });
+
+    test("returns undefined when open_pr is true but merge_into not set (uses repo default)", () => {
+      const task = createTask({
+        id: "t1",
+        title: "Test",
+        repo: "my-repo",
+        branch: "feature/test",
+        open_pr: true,
+      });
+      expect(getTaskPRTarget(task)).toBeUndefined();
+    });
   });
 
   describe("sanitizeBranchName", () => {
@@ -201,6 +255,21 @@ describe("task-schema", () => {
         tasks: [{ id: "t1", title: "Task 1", merge_into: "main" }],
       };
       expect(() => validateTasksFile(data)).toThrow(/no repo specified/);
+    });
+
+    test("throws on task with open_pr but no repo", () => {
+      const data = {
+        tasks: [{ id: "t1", title: "Task 1", open_pr: true }],
+      };
+      expect(() => validateTasksFile(data)).toThrow(/no repo specified/);
+    });
+
+    test("validates task with open_pr and repo", () => {
+      const data = {
+        tasks: [{ id: "t1", title: "Task 1", repo: "my-repo", branch: "feature/test", open_pr: true }],
+      };
+      const result = validateTasksFile(data);
+      expect(result.tasks[0]!.open_pr).toBe(true);
     });
 
     test("validates nested subtasks with git config", () => {

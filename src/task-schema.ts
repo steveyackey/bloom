@@ -37,6 +37,8 @@ export type Task = {
   base_branch?: string;
   /** Branch to merge working branch into when task completes. Same as `branch` means no merge needed */
   merge_into?: string;
+  /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default) */
+  open_pr?: boolean;
   agent_name?: string;
   instructions?: string;
   acceptance_criteria: string[];
@@ -61,6 +63,7 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     branch: z.string().optional(),
     base_branch: z.string().optional(),
     merge_into: z.string().optional(),
+    open_pr: z.boolean().optional(),
     agent_name: z.string().optional(),
     instructions: z.string().optional(),
     acceptance_criteria: z.array(z.string()).default([]),
@@ -106,12 +109,27 @@ export function getTaskBranch(task: Task): string | undefined {
 /**
  * Determine if a task requires a merge step after completion.
  * Returns the target branch if merge is needed, undefined otherwise.
+ * Note: Returns undefined if open_pr is true (PR workflow, not auto-merge).
  */
 export function getTaskMergeTarget(task: Task): string | undefined {
+  // open_pr means create a PR, not auto-merge
+  if (task.open_pr) return undefined;
   const branch = getTaskBranch(task);
   if (!branch || !task.merge_into) return undefined;
   // Same branch = no merge needed
   if (task.merge_into === branch) return undefined;
+  return task.merge_into;
+}
+
+/**
+ * Determine if a task should create a PR after completion.
+ * Returns the target branch for the PR if open_pr is true, undefined otherwise.
+ */
+export function getTaskPRTarget(task: Task): string | undefined {
+  if (!task.open_pr) return undefined;
+  const branch = getTaskBranch(task);
+  if (!branch) return undefined;
+  // Return merge_into if set, otherwise undefined (orchestrator will use repo default)
   return task.merge_into;
 }
 
@@ -153,9 +171,9 @@ export function safeValidateTasksFile(
  */
 function validateTaskGitConfig(tasks: Task[]): void {
   for (const task of tasks) {
-    if ((task.branch || task.base_branch || task.merge_into) && !task.repo) {
+    if ((task.branch || task.base_branch || task.merge_into || task.open_pr) && !task.repo) {
       throw new Error(
-        `Task "${task.id}" has git branch settings (branch/base_branch/merge_into) but no repo specified. ` +
+        `Task "${task.id}" has git branch settings (branch/base_branch/merge_into/open_pr) but no repo specified. ` +
           `Add a 'repo' field pointing to the repository name.`
       );
     }

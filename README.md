@@ -345,6 +345,7 @@ tasks:
     branch: feature/my-work         # Working branch for this task
     base_branch: main               # Branch to create from (default: repo's default)
     merge_into: main                # Branch to merge into when done
+    open_pr: true                   # Create GitHub PR instead of auto-merge
     agent_name: claude-code         # Assign to specific agent
     checkpoint: true                # Requires human approval before downstream tasks
     instructions: |                 # Detailed instructions
@@ -402,6 +403,26 @@ Agent creates branch from `main`, does work, merges back to `main`.
   # No base_branch - branch exists
   # No merge_into - no merge needed
 ```
+
+**Pattern 4: PR-Based Workflow (Recommended for main/master)**
+```yaml
+- id: implement-feature
+  repo: my-app
+  branch: feature/new-feature
+  base_branch: main
+  merge_into: main      # PR targets main
+  open_pr: true         # Creates PR instead of auto-merge
+```
+Agent works on feature branch, orchestrator creates GitHub PR for code review.
+
+### When to Use Which
+
+| Pattern | Use When |
+|---------|----------|
+| Pattern 1 (Auto-merge) | Internal tools, automation, solo projects |
+| Pattern 4 (PR-based) | Production code, team projects, code review required |
+| Pattern 2 (Sequential) | Large features requiring multiple tasks on same branch |
+| Pattern 3 (Existing) | Hotfixes or work on existing branches |
 
 ### Git Configuration
 
