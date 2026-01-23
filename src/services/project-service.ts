@@ -6,7 +6,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
-import { ClaudeAgentProvider } from "../agents";
+import { createAgent } from "../agents";
 import { BLOOM_DIR } from "../commands/context";
 import { loadPrompt } from "../prompts";
 
@@ -151,10 +151,7 @@ export async function runCreateSession(projectDir: string): Promise<void> {
     PROJECT_DIR: projectDir,
   });
 
-  const agent = new ClaudeAgentProvider({
-    interactive: true,
-    dangerouslySkipPermissions: true,
-  });
+  const agent = await createAgent("interactive");
 
   console.log(`\n${chalk.bold.cyan("Starting project creation session...")}\n`);
   console.log(chalk.dim("Claude will help you define your project and fill out the PRD.\n"));
