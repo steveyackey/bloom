@@ -144,7 +144,8 @@ conflicts. Tasks working in different directories can use different agents.
 5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
 6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
 7. **SMALL TASKS**: Each task should be 1-4 hours of focused work
-8. **YAML QUOTING**: Quote strings containing special characters:
+8. **FINAL MERGE REQUIRED**: ALL branches must eventually merge to main. The task list must end with all work in main.
+9. **YAML QUOTING**: Quote strings containing special characters:
    - Backticks: \`command\` -> "\`command\`"
    - Curly braces: { key: value } -> "{ key: value }"
    - Colons with space: foo: bar -> "foo: bar"
@@ -198,19 +199,38 @@ Agent works directly in the main worktree without creating new branches.
 ```
 Multiple tasks share the same worktree. **Important**: Use the same `agent_name` for tasks sharing a branch to prevent conflicts.
 
-### Pattern 4: Parallel Feature Branches
+### Pattern 4: Parallel Feature Branches (with convergence)
 ```yaml
 - id: frontend-feature
   repo: my-app
   branch: feature/frontend         # Worktree: repos/my-app/feature-frontend
+  base_branch: main
   agent_name: frontend-agent       # Different agent
+  # No merge_into yet - will merge after both are done
 
 - id: backend-feature
   repo: my-app
   branch: feature/backend          # Worktree: repos/my-app/feature-backend
+  base_branch: main
   agent_name: backend-agent        # Different agent
+  # No merge_into yet - will merge after both are done
+
+# IMPORTANT: Final merge task to consolidate parallel work
+- id: merge-all-features
+  depends_on: [frontend-feature, backend-feature]
+  repo: my-app
+  branch: feature/frontend         # Merge frontend first
+  merge_into: main
+  agent_name: frontend-agent       # Reuse frontend agent
+  instructions: |
+    All parallel work is complete. Merge both feature branches to main.
+    1. This task merges feature/frontend to main automatically
+    2. Then merge feature/backend to main manually:
+       cd repos/my-app/main && git merge feature/backend
+    3. Resolve any conflicts between the two features
+    4. Run full test suite to verify integration
 ```
-Different branches = different worktrees = can run in parallel with different agents.
+**CRITICAL**: Parallel branches must converge! Without the final merge task, work stays orphaned.
 
 ### Worktree Path Reference
 When validating or debugging, tasks are located at:
@@ -220,7 +240,27 @@ When validating or debugging, tasks are located at:
 ### Git Configuration
 Enable `push_to_remote: true` in the `git:` section to automatically push after each task.
 
+## CRITICAL: Final Merge Requirement
+
+**Every task list MUST end with all work merged to main.** This is the #1 source of bugs.
+
+### What to check:
+1. **Trace every branch**: Follow each `branch` → `merge_into` chain. It must reach `main`.
+2. **Last task merges to main**: The final task(s) of the last phase should have `merge_into: main`
+3. **No orphaned branches**: A task with `branch: X` but no `merge_into` anywhere is a bug (unless another task merges X)
+
+### Common mistakes:
+- ❌ Parallel tasks without a final merge task to consolidate
+- ❌ `merge_into: some-feature-branch` without that branch ever merging to main
+- ❌ Checkpoint that validates but doesn't merge
+- ❌ Forgetting `merge_into` on the last task of a phase
+
+### Self-check before saving:
+Ask yourself: "If I run all these tasks, will main contain all the work at the end?" If no, add merge tasks.
+
 ## Complete Example
+
+This example shows a two-phase project with parallel work that converges to main:
 
 ```yaml
 git:
@@ -229,7 +269,7 @@ git:
 
 tasks:
   # ===========================================================================
-  # Phase 1: Setup
+  # Phase 1: Setup (sequential work → merge to main)
   # ===========================================================================
   - id: setup-project-structure
     title: Initialize project structure
@@ -238,7 +278,8 @@ tasks:
     depends_on: []
     repo: core-package
     branch: feature/phase-1-setup
-    base_branch: main
+    base_branch: main                # Branch from main
+    agent_name: setup-agent
     instructions: Create base directory layout and config files
     acceptance_criteria:
       - src/ directory exists with index.ts
@@ -248,45 +289,104 @@ tasks:
     title: Install core dependencies
     status: todo
     phase: 1
-    depends_on:
-      - setup-project-structure
+    depends_on: [setup-project-structure]
     repo: core-package
-    branch: feature/phase-1-setup
+    branch: feature/phase-1-setup    # Same branch as above (sequential)
+    agent_name: setup-agent          # Same agent (sequential)
     instructions: Add zod and yaml packages
     acceptance_criteria:
       - zod installed for schema validation
       - yaml installed for file parsing
-    validation_task_id: validate-phase-1
 
-  # CHECKPOINT - Human validates before next phase
+  # CHECKPOINT - Validates and MERGES phase 1 to main
   - id: validate-phase-1
-    title: "[CHECKPOINT] Validate phase 1 setup"
+    title: "[CHECKPOINT] Validate and merge phase 1"
     status: todo
     phase: 1
     checkpoint: true
-    depends_on:
-      - setup-project-structure
-      - setup-dependencies
+    depends_on: [setup-dependencies]
     repo: core-package
     branch: feature/phase-1-setup
-    merge_into: main
+    merge_into: main                 # ← MERGE TO MAIN
+    agent_name: setup-agent
     instructions: |
       VALIDATION CHECKPOINT - Human review required.
-
-      Run these checks:
-      - bun install succeeds
-      - tsc --noEmit passes
-
-      After validation, merge to main and mark done.
+      Run: bun install && tsc --noEmit
+      After validation, this branch merges to main automatically.
     acceptance_criteria:
       - "`bun install` succeeds"
       - "`tsc --noEmit` passes"
       - Human has reviewed and approved
+
+  # ===========================================================================
+  # Phase 2: Features (parallel work → both merge to main)
+  # ===========================================================================
+  - id: add-frontend-feature
+    title: Add frontend components
+    status: todo
+    phase: 2
+    depends_on: [validate-phase-1]   # Depends on phase 1 merge
+    repo: core-package
+    branch: feature/frontend         # Separate branch
+    base_branch: main                # Branch from updated main
+    agent_name: frontend-agent       # Different agent (parallel)
+    instructions: Create React components for the UI
+    acceptance_criteria:
+      - Components render without errors
+      - Unit tests pass
+
+  - id: add-backend-feature
+    title: Add backend API
+    status: todo
+    phase: 2
+    depends_on: [validate-phase-1]   # Same dep - runs in PARALLEL with frontend
+    repo: core-package
+    branch: feature/backend          # Separate branch
+    base_branch: main                # Branch from updated main
+    agent_name: backend-agent        # Different agent (parallel)
+    instructions: Create Express API endpoints
+    acceptance_criteria:
+      - API endpoints respond correctly
+      - Integration tests pass
+
+  # FINAL CHECKPOINT - Merges ALL parallel work to main
+  - id: validate-phase-2
+    title: "[CHECKPOINT] Final validation and merge"
+    status: todo
+    phase: 2
+    checkpoint: true
+    depends_on: [add-frontend-feature, add-backend-feature]  # Wait for BOTH
+    repo: core-package
+    branch: feature/frontend
+    merge_into: main                 # ← Merges frontend to main
+    agent_name: frontend-agent
+    instructions: |
+      FINAL CHECKPOINT - All work must merge to main.
+
+      1. This task auto-merges feature/frontend to main
+      2. Manually merge feature/backend:
+         cd repos/core-package/main && git merge feature/backend
+      3. Resolve any conflicts between frontend and backend
+      4. Run full test suite: bun test
+      5. Verify the app works end-to-end
+
+      After this task, main contains ALL work from the project.
+    acceptance_criteria:
+      - feature/frontend merged to main
+      - feature/backend merged to main
+      - All tests pass on main
+      - "App runs correctly: `bun run dev`"
 ```
+
+**Merge chain verification:**
+- Phase 1: `feature/phase-1-setup` → `main` ✓
+- Phase 2: `feature/frontend` → `main` ✓, `feature/backend` → `main` ✓
+- **Result**: All work ends up in main ✓
 
 ## When Done
 
 After writing the tasks.yaml, let the user know:
 1. The tasks have been generated to `tasks.yaml`
-2. They can review and edit it if needed
-3. They should run `bloom run` to start the orchestrator and begin execution
+2. **Verify merge chain**: List all branches and confirm each merges to main (directly or indirectly)
+3. They can review and edit it if needed
+4. They should run `bloom run` to start the orchestrator and begin execution
