@@ -99,14 +99,14 @@ export function registerPromptCommands(cli: Clerc): Clerc {
 
       // Validate agent name
       if (!isValidAgentName(agent)) {
-        console.error(chalk.red("Error:") + ` Invalid agent name "${agent}". Valid agents: ${AGENT_NAMES.join(", ")}`);
+        console.error(`${chalk.red("Error:")} Invalid agent name "${agent}". Valid agents: ${AGENT_NAMES.join(", ")}`);
         process.exit(1);
       }
 
       // Validate diff agent if provided
       if (diff && !isValidAgentName(diff)) {
         console.error(
-          chalk.red("Error:") + ` Invalid diff agent name "${diff}". Valid agents: ${AGENT_NAMES.join(", ")}`
+          `${chalk.red("Error:")} Invalid diff agent name "${diff}". Valid agents: ${AGENT_NAMES.join(", ")}`
         );
         process.exit(1);
       }

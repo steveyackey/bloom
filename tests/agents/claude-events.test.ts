@@ -499,7 +499,8 @@ describe("Claude CLI Event Parsing", () => {
 
       // WHEN: renderEvent is called
       const currentOutput = adapter.captureCurrentOutput(event);
-      const expectedOutput = adapter.captureExpectedOutput(event);
+      // Also capture expected output to verify both implementations match
+      adapter.captureExpectedOutput(event);
 
       // THEN: Cost should be displayed using total_cost_usd field
       expect(currentOutput.stdout).toContain("$0.0500");

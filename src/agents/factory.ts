@@ -6,6 +6,7 @@ import type { AgentConfig } from "../user-config";
 import { loadUserConfig } from "../user-config";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
 import { ClineAgentProvider, type ClineProviderOptions } from "./cline";
+import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
 import type { Agent } from "./core";
 import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
 
@@ -16,6 +17,7 @@ import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode"
 const agentRegistry = {
   claude: ClaudeAgentProvider,
   cline: ClineAgentProvider,
+  copilot: CopilotAgentProvider,
   opencode: OpenCodeAgentProvider,
 } as const;
 
@@ -56,6 +58,8 @@ export async function createAgent(mode: AgentMode): Promise<Agent> {
       return createClaudeAgent(isInteractive, model);
     case "cline":
       return createClineAgent(isInteractive, model);
+    case "copilot":
+      return createCopilotAgent(isInteractive, model);
     case "opencode":
       return createOpenCodeAgent(isInteractive, model);
     default:
@@ -99,6 +103,20 @@ function createClineAgent(interactive: boolean, model?: string): ClineAgentProvi
   };
 
   return new ClineAgentProvider(options);
+}
+
+/**
+ * Creates a Copilot agent with the specified mode and optional model.
+ */
+function createCopilotAgent(interactive: boolean, model?: string): CopilotAgentProvider {
+  const options: CopilotProviderOptions = {
+    interactive,
+    allowAllTools: true,
+    streamOutput: true,
+    model: model,
+  };
+
+  return new CopilotAgentProvider(options);
 }
 
 /**

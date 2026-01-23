@@ -197,10 +197,10 @@ export class PromptCompiler {
     const conditionalRegex = /<!-- @if\s+(\w+)\s*-->([\s\S]*?)<!-- @endif\s*-->/;
 
     let result = content;
-    let match: RegExpExecArray | null;
 
     // Process one conditional at a time to handle them correctly
-    while ((match = conditionalRegex.exec(result)) !== null) {
+    let match: RegExpExecArray | null = conditionalRegex.exec(result);
+    while (match !== null) {
       const fullMatch = match[0];
       const capabilityName = match[1] ?? "";
       const innerContent = match[2] ?? "";
@@ -212,7 +212,7 @@ export class PromptCompiler {
         const afterMatch = result.slice(match.index + 1);
         const innerMatch = conditionalRegex.exec(afterMatch);
 
-        if (innerMatch && innerMatch[2] && !innerMatch[2].includes("<!-- @if ")) {
+        if (innerMatch?.[2] && !innerMatch[2].includes("<!-- @if ")) {
           // Found an innermost one, process it
           const actualIndex = match.index + 1 + innerMatch.index;
           const before = result.slice(0, actualIndex);
@@ -222,6 +222,7 @@ export class PromptCompiler {
           const isEnabled = Boolean(capabilities[innerCapability]);
           const replacement = isEnabled ? (innerMatch[2] ?? "") : "";
           result = before + replacement + after;
+          match = conditionalRegex.exec(result);
           continue;
         }
         // No innermost found after, just process this one
@@ -233,6 +234,7 @@ export class PromptCompiler {
       // Replace the conditional block
       const replacement = isEnabled ? innerContent : "";
       result = result.slice(0, match.index) + replacement + result.slice(match.index + fullMatch.length);
+      match = conditionalRegex.exec(result);
     }
 
     return result;
@@ -251,7 +253,7 @@ export class PromptCompiler {
 
       // Check for @if markers
       const ifMatch = line.match(/<!-- @if\s+(\w+)\s*-->/);
-      if (ifMatch && ifMatch[1]) {
+      if (ifMatch?.[1]) {
         stack.push({ capability: ifMatch[1], line: lineNumber });
       }
 
