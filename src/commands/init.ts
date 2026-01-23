@@ -2,7 +2,7 @@
 // Init Command - Initialize a new Bloom workspace
 // =============================================================================
 
-import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
 import * as YAML from "yaml";
@@ -42,28 +42,41 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
     result.created.push("bloom.config.yaml");
   }
 
-  // Create repos directory
+  // Create repos directory with .gitkeep
+  const gitkeepPath = join(reposDir, ".gitkeep");
   if (existsSync(reposDir)) {
     result.skipped.push("repos/");
-  } else {
-    mkdirSync(reposDir, { recursive: true });
-    result.created.push("repos/");
-  }
-
-  // Add repos/ to .gitignore (create or append)
-  const gitignorePath = join(dir, ".gitignore");
-  const reposIgnoreEntry = "repos/";
-  if (existsSync(gitignorePath)) {
-    const gitignoreContent = readFileSync(gitignorePath, "utf-8");
-    if (!gitignoreContent.includes(reposIgnoreEntry)) {
-      const newline = gitignoreContent.endsWith("\n") ? "" : "\n";
-      appendFileSync(gitignorePath, `${newline}${reposIgnoreEntry}\n`);
-      result.created.push(".gitignore (added repos/)");
-    } else {
-      result.skipped.push(".gitignore (repos/ already present)");
+    // Ensure .gitkeep exists even if repos/ already exists
+    if (!existsSync(gitkeepPath)) {
+      await Bun.write(gitkeepPath, "");
+      result.created.push("repos/.gitkeep");
     }
   } else {
-    await Bun.write(gitignorePath, `${reposIgnoreEntry}\n`);
+    mkdirSync(reposDir, { recursive: true });
+    await Bun.write(gitkeepPath, "");
+    result.created.push("repos/");
+    result.created.push("repos/.gitkeep");
+  }
+
+  // Add repos/* and !repos/.gitkeep to .gitignore (create or append)
+  const gitignorePath = join(dir, ".gitignore");
+  const reposIgnorePattern = "repos/*";
+  const gitkeepException = "!repos/.gitkeep";
+  if (existsSync(gitignorePath)) {
+    let gitignoreContent = readFileSync(gitignorePath, "utf-8");
+    // Check if already has the new pattern
+    if (gitignoreContent.includes(reposIgnorePattern)) {
+      result.skipped.push(".gitignore (repos/* already present)");
+    } else {
+      // Remove old "repos/" entry if present (handles with or without trailing newline)
+      gitignoreContent = gitignoreContent.replace(/^repos\/\n?/m, "");
+      const newline = gitignoreContent.endsWith("\n") ? "" : "\n";
+      gitignoreContent += `${newline}${reposIgnorePattern}\n${gitkeepException}\n`;
+      await Bun.write(gitignorePath, gitignoreContent);
+      result.created.push(".gitignore (added repos/*, !repos/.gitkeep)");
+    }
+  } else {
+    await Bun.write(gitignorePath, `${reposIgnorePattern}\n${gitkeepException}\n`);
     result.created.push(".gitignore");
   }
 

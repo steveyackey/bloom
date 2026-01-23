@@ -30,4 +30,5 @@ bin/
 out/
 
 # Project specific
-repos/
+repos/*
+!repos/.gitkeep
