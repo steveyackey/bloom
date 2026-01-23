@@ -6,6 +6,7 @@ import type { AgentConfig } from "../user-config";
 import { loadUserConfig } from "../user-config";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
 import { ClineAgentProvider, type ClineProviderOptions } from "./cline";
+import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
 import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
 import type { Agent } from "./core";
 import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
@@ -17,6 +18,7 @@ import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode"
 const agentRegistry = {
   claude: ClaudeAgentProvider,
   cline: ClineAgentProvider,
+  codex: CodexAgentProvider,
   copilot: CopilotAgentProvider,
   opencode: OpenCodeAgentProvider,
 } as const;
@@ -58,6 +60,8 @@ export async function createAgent(mode: AgentMode): Promise<Agent> {
       return createClaudeAgent(isInteractive, model);
     case "cline":
       return createClineAgent(isInteractive, model);
+    case "codex":
+      return createCodexAgent(isInteractive, model);
     case "copilot":
       return createCopilotAgent(isInteractive, model);
     case "opencode":
@@ -103,6 +107,20 @@ function createClineAgent(interactive: boolean, model?: string): ClineAgentProvi
   };
 
   return new ClineAgentProvider(options);
+}
+
+/**
+ * Creates a Codex agent with the specified mode and optional model.
+ */
+function createCodexAgent(interactive: boolean, model?: string): CodexAgentProvider {
+  const options: CodexProviderOptions = {
+    interactive,
+    approvalMode: "full-auto",
+    streamOutput: true,
+    model: model,
+  };
+
+  return new CodexAgentProvider(options);
 }
 
 /**

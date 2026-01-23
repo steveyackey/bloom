@@ -17,6 +17,15 @@ export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claud
 export type { ClineMode, ClineProviderOptions, ClineRunningSession, ClineStreamEvent } from "./cline";
 // Cline provider with session management utilities
 export { ClineAgentProvider, getActiveClineSession, interjectClineSession } from "./cline";
+// Codex provider with session management and fork utilities
+export type {
+  CodexApprovalMode,
+  CodexProviderOptions,
+  CodexRunningSession,
+  CodexStreamEvent,
+  ForkResult,
+} from "./codex";
+export { CodexAgentProvider, forkCodexSession, getActiveCodexSession, interjectCodexSession } from "./codex";
 export type { CopilotProviderOptions, CopilotRunningSession, CopilotStreamEvent } from "./copilot";
 // Copilot provider with session management utilities
 export { CopilotAgentProvider, getCopilotActiveSession, interjectCopilotSession } from "./copilot";
