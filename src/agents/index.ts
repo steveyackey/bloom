@@ -2,16 +2,13 @@
 // Agent Providers - Re-exports
 // =============================================================================
 
-// Core interface and types
-export * from "./core";
-
-// Agent factory
-export { createAgent, getRegisteredAgents, isAgentRegistered, type AgentMode } from "./factory";
-
+export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 // Claude provider with session management utilities
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
-export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
-
+// Core interface and types
+export * from "./core";
+// Agent factory
+export { type AgentMode, createAgent, getRegisteredAgents, isAgentRegistered } from "./factory";
+export type { OpenCodeProviderOptions } from "./opencode";
 // OpenCode provider
 export { OpenCodeAgentProvider } from "./opencode";
-export type { OpenCodeProviderOptions } from "./opencode";
