@@ -12,11 +12,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { type AgentCapabilities, type AgentName, hasCapability } from "../../src/agents/capabilities";
 import type { Agent, AgentRunOptions, AgentRunResult, AgentSession } from "../../src/agents/core";
-import { hasCapability, type AgentCapabilities, type AgentName } from "../../src/agents/capabilities";
 
 // =============================================================================
 // Mock Infrastructure
