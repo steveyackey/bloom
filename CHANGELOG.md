@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.2.5](https://github.com/steveyackey/bloom/compare/bloom-v0.2.4...bloom-v0.2.5) (2026-01-23)
+
+
+### Features
+
+* add 'bloom create .' command for in-place project creation ([#67](https://github.com/steveyackey/bloom/issues/67)) ([0ce817c](https://github.com/steveyackey/bloom/commit/0ce817c55dcbf62e99003c003ef68444ea821189))
+* add agent abstraction layer with factory pattern ([#66](https://github.com/steveyackey/bloom/issues/66)) ([00a01ec](https://github.com/steveyackey/bloom/commit/00a01ecd01ba4ec07c9dec41e53a463cafa7ae3c))
+* add open_pr support for GitHub PR creation ([dec4a23](https://github.com/steveyackey/bloom/commit/dec4a23b74884c5ddc6a52dfe02c1dee5299e552))
+* add workspace and repos context to create prompts ([f785a96](https://github.com/steveyackey/bloom/commit/f785a966121e927740e18fdde7e80c5b01165d19))
+* improve validation, dashboard, and agent management ([be0c43d](https://github.com/steveyackey/bloom/commit/be0c43da0be7af0300e62c3fd42e1b4dfb0a45e8))
+* load PRD and plan templates from workspace ([08a69d9](https://github.com/steveyackey/bloom/commit/08a69d9096e54aa683367416a72cb5670cd1b574))
+* reorganize CLI help menu and add Windows process stats ([ff74b9a](https://github.com/steveyackey/bloom/commit/ff74b9adeac6675383c0b6870ee9b3cc9533d5f0))
+* validate branch naming conflicts in tasks.yaml ([b89316c](https://github.com/steveyackey/bloom/commit/b89316c841e3a5f70e900634dc976c53398e7992))
+
+
+### Bug Fixes
+
+* add create-in-place prompt to embedded prompts ([80fa164](https://github.com/steveyackey/bloom/commit/80fa16409d37d518a6dfcdd9927495a672b3df13))
+* add null checks for regex match array access ([7740055](https://github.com/steveyackey/bloom/commit/77400557dbc2c8e0be607346d40507bf31e7374d))
+* auto-create merge target worktree when it doesn't exist ([148c37b](https://github.com/steveyackey/bloom/commit/148c37b72383c69263e6f15cc1f3f0d5da2ba82a))
+* batch process stats collection and fix Windows CPU calculation ([f324950](https://github.com/steveyackey/bloom/commit/f324950fd1bf0e0ef56f3e6617cf6dcdea336029))
+* condense repos context to single line per repo ([34f19c0](https://github.com/steveyackey/bloom/commit/34f19c017698c37b09f323bf2f131aa77883d761))
+* create merge target branch from default when it doesn't exist ([9bc17b3](https://github.com/steveyackey/bloom/commit/9bc17b3057f120cc0e6880a01c3feb70316a6c2c))
+* fall back to default branch when base branch doesn't exist ([8989231](https://github.com/steveyackey/bloom/commit/898923133303678731b4f8ef006b78f0ec252cb0))
+* handle existing branch when creating worktree ([f942d42](https://github.com/steveyackey/bloom/commit/f942d4274a308780a66da303944cee21b4031122))
+* improve checkpoint prompts, auto mode, and cross-platform stats ([3b95a5c](https://github.com/steveyackey/bloom/commit/3b95a5c4c701f8dbd42e2bd90e59d1e4a921eb31))
+* parse /proc/stat correctly when process name contains spaces ([cfeea74](https://github.com/steveyackey/bloom/commit/cfeea747f99935da07d0a4439d214dcabdeb33be))
+* remove dead code and add missing error handling ([3dca275](https://github.com/steveyackey/bloom/commit/3dca2751b8a839648ad1fa20033f32638a76af14))
+* remove stdin: pipe from PTY spawn to fix agent output display ([2ef222c](https://github.com/steveyackey/bloom/commit/2ef222c7bc7b17503a454bc954ee7cf403c71f04))
+* sync external prompt files with embedded prompts ([402b690](https://github.com/steveyackey/bloom/commit/402b6903d94ab1316436f1aa8c1c1f1cec91f4d0))
+
 ## [0.2.4](https://github.com/steveyackey/bloom/compare/bloom-v0.2.3...bloom-v0.2.4) (2026-01-22)
 
 
