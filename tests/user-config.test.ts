@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expandRepoUrl, extractRepoInfo, extractRepoName, isShorthandUrl, normalizeGitUrl } from "../src/user-config";
+import {
+  AgentConfigSchema,
+  expandRepoUrl,
+  extractRepoInfo,
+  extractRepoName,
+  isShorthandUrl,
+  loadUserConfig,
+  normalizeGitUrl,
+  saveUserConfig,
+} from "../src/user-config";
 
 describe("user-config Git URL functions", () => {
   describe("isShorthandUrl", () => {
@@ -214,7 +223,142 @@ describe("user-config file operations", () => {
     }
   });
 
-  // Note: Testing loadUserConfig, saveUserConfig, setGitProtocol requires
-  // mocking or integration with the file system, which the tests above handle
-  // through BLOOM_HOME environment variable
+  describe("loadUserConfig with agent config", () => {
+    test("returns defaults when no config file exists", async () => {
+      const config = await loadUserConfig();
+      expect(config.gitProtocol).toBe("ssh");
+      expect(config.interactiveAgent).toBeUndefined();
+      expect(config.nonInteractiveAgent).toBeUndefined();
+    });
+
+    test("loads valid full config with both agents", async () => {
+      await saveUserConfig({
+        gitProtocol: "https",
+        interactiveAgent: { agent: "claude", model: "opus" },
+        nonInteractiveAgent: { agent: "openai", model: "gpt-4" },
+      });
+
+      const config = await loadUserConfig();
+      expect(config.gitProtocol).toBe("https");
+      expect(config.interactiveAgent).toEqual({ agent: "claude", model: "opus" });
+      expect(config.nonInteractiveAgent).toEqual({ agent: "openai", model: "gpt-4" });
+    });
+
+    test("loads config with only interactiveAgent specified", async () => {
+      await saveUserConfig({
+        gitProtocol: "ssh",
+        interactiveAgent: { agent: "custom-agent" },
+      });
+
+      const config = await loadUserConfig();
+      expect(config.gitProtocol).toBe("ssh");
+      expect(config.interactiveAgent).toEqual({ agent: "custom-agent" });
+      expect(config.nonInteractiveAgent).toBeUndefined();
+    });
+
+    test("loads config with only nonInteractiveAgent specified", async () => {
+      await saveUserConfig({
+        gitProtocol: "ssh",
+        nonInteractiveAgent: { agent: "batch-agent", model: "fast" },
+      });
+
+      const config = await loadUserConfig();
+      expect(config.gitProtocol).toBe("ssh");
+      expect(config.interactiveAgent).toBeUndefined();
+      expect(config.nonInteractiveAgent).toEqual({ agent: "batch-agent", model: "fast" });
+    });
+
+    test("loads config without model specified (uses agent only)", async () => {
+      await saveUserConfig({
+        gitProtocol: "ssh",
+        interactiveAgent: { agent: "my-agent" },
+        nonInteractiveAgent: { agent: "other-agent" },
+      });
+
+      const config = await loadUserConfig();
+      expect(config.interactiveAgent?.agent).toBe("my-agent");
+      expect(config.interactiveAgent?.model).toBeUndefined();
+      expect(config.nonInteractiveAgent?.agent).toBe("other-agent");
+      expect(config.nonInteractiveAgent?.model).toBeUndefined();
+    });
+
+    test("returns defaults when config file has invalid YAML", async () => {
+      // Write invalid YAML directly
+      await Bun.write(join(testHomeDir, "config.yaml"), "invalid: yaml: content: [");
+
+      const config = await loadUserConfig();
+      expect(config.gitProtocol).toBe("ssh");
+      expect(config.interactiveAgent).toBeUndefined();
+      expect(config.nonInteractiveAgent).toBeUndefined();
+    });
+
+    test("handles config with extra unknown fields gracefully", async () => {
+      // Write config with extra fields that should be stripped
+      const yaml = `gitProtocol: https
+interactiveAgent:
+  agent: claude
+  model: sonnet
+unknownField: should-be-ignored
+`;
+      await Bun.write(join(testHomeDir, "config.yaml"), yaml);
+
+      const config = await loadUserConfig();
+      expect(config.gitProtocol).toBe("https");
+      expect(config.interactiveAgent?.agent).toBe("claude");
+      // Unknown fields should be stripped by Zod
+      expect((config as Record<string, unknown>).unknownField).toBeUndefined();
+    });
+  });
+
+  describe("AgentConfigSchema validation", () => {
+    test("parses valid agent config with agent and model", () => {
+      const result = AgentConfigSchema.safeParse({ agent: "claude", model: "opus" });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.agent).toBe("claude");
+        expect(result.data.model).toBe("opus");
+      }
+    });
+
+    test("applies default agent value when agent is missing", () => {
+      const result = AgentConfigSchema.safeParse({});
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.agent).toBe("claude");
+        expect(result.data.model).toBeUndefined();
+      }
+    });
+
+    test("accepts any string as agent name", () => {
+      const validNames = ["claude", "openai", "custom-agent", "my_agent_123", ""];
+      for (const name of validNames) {
+        const result = AgentConfigSchema.safeParse({ agent: name });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.agent).toBe(name);
+        }
+      }
+    });
+
+    test("rejects non-string agent values", () => {
+      const invalidValues = [123, true, null, [], {}];
+      for (const value of invalidValues) {
+        const result = AgentConfigSchema.safeParse({ agent: value });
+        expect(result.success).toBe(false);
+      }
+    });
+
+    test("accepts optional model as string", () => {
+      const result = AgentConfigSchema.safeParse({ agent: "claude", model: "sonnet-3.5" });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.model).toBe("sonnet-3.5");
+      }
+    });
+
+    test("rejects non-string model values", () => {
+      const result = AgentConfigSchema.safeParse({ agent: "claude", model: 123 });
+      expect(result.success).toBe(false);
+    });
+  });
 });
