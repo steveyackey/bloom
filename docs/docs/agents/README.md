@@ -168,4 +168,4 @@ Each provider implements the `Agent` interface:
 - `run(options)`: Execute a prompt and return results
 - `getActiveSession()`: Get current session for monitoring
 
-See [Contributing Guide](/docs/contributing) for details on adding new agent providers.
+See the source code in `src/agents/` for details on adding new agent providers.

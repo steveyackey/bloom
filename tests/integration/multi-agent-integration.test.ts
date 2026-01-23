@@ -338,14 +338,14 @@ describe("Multi-Agent Integration Tests", () => {
   /**
    * Helper to write tasks file.
    */
-  function writeTasks(tasks: typeof FIXTURE_TASKS.threeTaskSingleAgent): void {
+  function writeTasks(tasks: { tasks: ReadonlyArray<Record<string, unknown>> }): void {
     writeFileSync(tasksFile, YAML.stringify(tasks));
   }
 
   /**
    * Helper to write config file.
    */
-  function writeConfig(config: typeof FIXTURE_CONFIGS.defaultClaude): void {
+  function writeConfig(config: Record<string, unknown>): void {
     writeFileSync(configFile, YAML.stringify(config));
   }
 
@@ -532,7 +532,7 @@ describe("Multi-Agent Integration Tests", () => {
     });
 
     test("creates new session if no previous session exists", () => {
-      const task = FIXTURE_TASKS.threeTaskSingleAgent.tasks[0];
+      const task = FIXTURE_TASKS.threeTaskSingleAgent.tasks[0] as Record<string, unknown>;
 
       // Task without session_id should get new session
       expect(task?.session_id).toBeUndefined();
