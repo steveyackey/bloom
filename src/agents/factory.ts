@@ -4,6 +4,12 @@
 
 import type { AgentConfig, PerAgentConfig } from "../user-config";
 import { getAgentConfig, getDefaultAgentName, loadUserConfig } from "../user-config";
+import {
+  type AgentCapabilities,
+  type AgentName,
+  getAgentCapabilities as getCapabilities,
+  isValidAgentName,
+} from "./capabilities";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
 import { ClineAgentProvider, type ClineMode, type ClineProviderOptions } from "./cline";
 import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
@@ -15,6 +21,10 @@ import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode"
 // Agent Registry
 // =============================================================================
 
+/**
+ * Registry of all available agent providers.
+ * Each agent has a provider class that implements the Agent interface.
+ */
 const agentRegistry = {
   claude: ClaudeAgentProvider,
   cline: ClineAgentProvider,
@@ -24,7 +34,7 @@ const agentRegistry = {
 } as const;
 
 // =============================================================================
-// Factory Function
+// Type Definitions
 // =============================================================================
 
 export type AgentMode = "interactive" | "nonInteractive";
@@ -37,6 +47,50 @@ export interface CreateAgentOptions {
   agentName?: string;
   /** Override the model (ignores per-agent config) */
   model?: string;
+}
+
+// =============================================================================
+// Core Factory Functions
+// =============================================================================
+
+/**
+ * Creates an agent by name with the specified mode settings.
+ *
+ * @param agentName - The name of the agent to create (claude, copilot, codex, cline, opencode)
+ * @param isInteractive - Whether to create the agent in interactive mode
+ * @param model - Optional model override
+ * @returns A configured Agent instance
+ * @throws Error if agent name is invalid
+ *
+ * @example
+ * ```ts
+ * const agent = createAgentByName("claude", true);
+ * const agent = createAgentByName("opencode", false, "anthropic/claude-sonnet-4");
+ * ```
+ */
+export function createAgentByName(agentName: string, isInteractive: boolean, model?: string): Agent {
+  // Validate agent name
+  if (!isValidAgentName(agentName)) {
+    const available = listAvailableAgents().join(", ");
+    throw new Error(`Unknown agent '${agentName}'. Available: ${available}`);
+  }
+
+  // Create the appropriate agent
+  switch (agentName) {
+    case "claude":
+      return createClaudeAgent(isInteractive, model);
+    case "cline":
+      return createClineAgent(isInteractive, model);
+    case "codex":
+      return createCodexAgent(isInteractive, model);
+    case "copilot":
+      return createCopilotAgent(isInteractive, model);
+    case "opencode":
+      return createOpenCodeAgent(isInteractive, model);
+    default:
+      // This should never happen due to isValidAgentName check above
+      throw new Error(`Unknown agent '${agentName}'. Available: ${listAvailableAgents().join(", ")}`);
+  }
 }
 
 /**
@@ -118,6 +172,66 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
   }
 }
 
+// =============================================================================
+// Agent Query Functions
+// =============================================================================
+
+/**
+ * Get the list of all available agent names.
+ * This returns all agents that can be instantiated by the factory.
+ *
+ * @returns Array of agent names
+ *
+ * @example
+ * ```ts
+ * const agents = listAvailableAgents();
+ * // Returns: ["claude", "copilot", "codex", "cline", "opencode"]
+ * ```
+ */
+export function listAvailableAgents(): AgentName[] {
+  return Object.keys(agentRegistry) as AgentName[];
+}
+
+/**
+ * Get capabilities for a specific agent without instantiating it.
+ * This is useful for determining what features an agent supports
+ * before creating an instance.
+ *
+ * @param agentName - The name of the agent
+ * @returns The agent's capabilities, or undefined if agent not found
+ *
+ * @example
+ * ```ts
+ * const caps = getAgentCapabilities("claude");
+ * if (caps?.supportsSessionResume) {
+ *   // Agent supports resuming sessions
+ * }
+ * ```
+ */
+export function getAgentCapabilities(agentName: string): AgentCapabilities | undefined {
+  return getCapabilities(agentName);
+}
+
+/**
+ * Get the list of registered agent names.
+ * @deprecated Use listAvailableAgents() instead for clearer semantics.
+ */
+export function getRegisteredAgents(): string[] {
+  return Object.keys(agentRegistry);
+}
+
+/**
+ * Check if an agent is registered.
+ * @deprecated Use isValidAgentName() from capabilities module instead.
+ */
+export function isAgentRegistered(name: string): boolean {
+  return name in agentRegistry;
+}
+
+// =============================================================================
+// Agent Factory Helpers
+// =============================================================================
+
 /**
  * Creates a Claude agent with the specified mode and optional model.
  * Applies per-agent configuration if provided.
@@ -161,6 +275,7 @@ function createClineAgent(interactive: boolean, model?: string, perAgentConfig?:
 
 /**
  * Creates a Codex agent with the specified mode and optional model.
+ * Codex supports session forking and structured output via JSON schemas.
  */
 function createCodexAgent(interactive: boolean, model?: string): CodexAgentProvider {
   const options: CodexProviderOptions = {
@@ -175,6 +290,8 @@ function createCodexAgent(interactive: boolean, model?: string): CodexAgentProvi
 
 /**
  * Creates a Copilot agent with the specified mode and optional model.
+ * Copilot supports multiple models (Claude, GPT, Gemini) and has
+ * native GitHub MCP integration.
  */
 function createCopilotAgent(interactive: boolean, model?: string): CopilotAgentProvider {
   const options: CopilotProviderOptions = {
@@ -204,18 +321,4 @@ function createOpenCodeAgent(
   };
 
   return new OpenCodeAgentProvider(options);
-}
-
-/**
- * Get the list of registered agent names.
- */
-export function getRegisteredAgents(): string[] {
-  return Object.keys(agentRegistry);
-}
-
-/**
- * Check if an agent is registered.
- */
-export function isAgentRegistered(name: string): boolean {
-  return name in agentRegistry;
 }

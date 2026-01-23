@@ -11,12 +11,15 @@ export {
   hasCapability,
   isValidAgentName,
 } from "./capabilities";
-export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
+
 // Claude provider with session management utilities
+export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
-export type { ClineMode, ClineProviderOptions, ClineRunningSession, ClineStreamEvent } from "./cline";
+
 // Cline provider with session management utilities
+export type { ClineMode, ClineProviderOptions, ClineRunningSession, ClineStreamEvent } from "./cline";
 export { ClineAgentProvider, getActiveClineSession, interjectClineSession } from "./cline";
+
 // Codex provider with session management and fork utilities
 export type {
   CodexApprovalMode,
@@ -26,13 +29,22 @@ export type {
   ForkResult,
 } from "./codex";
 export { CodexAgentProvider, forkCodexSession, getActiveCodexSession, interjectCodexSession } from "./codex";
-export type { CopilotProviderOptions, CopilotRunningSession, CopilotStreamEvent } from "./copilot";
+
 // Copilot provider with session management utilities
+export type { CopilotProviderOptions, CopilotRunningSession, CopilotStreamEvent } from "./copilot";
 export { CopilotAgentProvider, getCopilotActiveSession, interjectCopilotSession } from "./copilot";
 // Core interface and types
 export * from "./core";
 // Agent factory
-export { type AgentMode, createAgent, getRegisteredAgents, isAgentRegistered } from "./factory";
-export type { OpenCodeProviderOptions } from "./opencode";
+export {
+  type AgentMode,
+  createAgent,
+  createAgentByName,
+  getAgentCapabilities as getAgentCapabilitiesFromFactory,
+  getRegisteredAgents,
+  isAgentRegistered,
+  listAvailableAgents,
+} from "./factory";
 // OpenCode provider
+export type { OpenCodeProviderOptions } from "./opencode";
 export { OpenCodeAgentProvider } from "./opencode";
