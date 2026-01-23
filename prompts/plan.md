@@ -26,57 +26,32 @@ Before writing the plan, ask the user:
 
 1. **Checkpoints**: "How often would you like verification checkpoints? (e.g., after each phase, after major features, etc.)"
 2. **Merge Strategy**: "How should code be merged? Options:
-   - **Feature branches**: Each task gets a branch, merged to main after review
+   - **PR-based (Recommended for main/master)**: Feature branches with PRs for code review before merging
+   - **Auto-merge**: Direct merge without review (for internal/automation workflows)
    - **Phase branches**: Work accumulates in phase branch, merged at checkpoint
-   - **Trunk-based**: Small, frequent merges directly to main"
+   - **Trunk-based**: Small, frequent commits directly to main"
 3. **Parallelization**: "Should tasks be parallelized where possible, or kept sequential for easier review?"
 4. **Any constraints**: "Are there any time constraints, dependencies, or requirements I should know about?"
 
 ## Plan Format
 
-Create a plan document (plan.md) with this structure:
+Create a plan document (plan.md) following this template structure:
 
 ```markdown
-# Implementation Plan: [Project Name]
-
-## Overview
-Brief summary of what will be built.
-
-## Phases
-
-### Phase 1: [Phase Name]
-**Goal**: What this phase accomplishes
-**Checkpoint**: What will be verified before moving to Phase 2
-
-#### Tasks
-1. **Task Name**
-   - Description: What needs to be done
-   - Repo: Which repository/directory
-   - Dependencies: What must be done first
-   - Acceptance Criteria:
-     - [ ] Criterion 1
-     - [ ] Criterion 2
-
-2. **Task Name**
-   ...
-
-### Phase 2: [Phase Name]
-...
-
-## Merge Strategy
-[Chosen strategy and rationale]
-
-## Checkpoints
-[When and how verification will happen]
-
-## Risk & Dependencies
-- Known risks
-- External dependencies
-- Potential blockers
-
-## Open Questions
-- Any decisions that need to be made during implementation
+{{PLAN_TEMPLATE}}
 ```
+
+Expand upon this template as needed. For each phase, include:
+- **Goal**: What this phase accomplishes
+- **Tasks**: Specific work items with descriptions, repos, branches, and acceptance criteria
+- **Checkpoint**: What will be verified before moving to the next phase
+
+For each task, specify:
+- Description: What needs to be done
+- Repo: Which repository/directory
+- Branch: feature/task-name (created from base branch)
+- Dependencies: What must be done first
+- Acceptance Criteria: Testable conditions for completion
 
 ## Guidelines
 
