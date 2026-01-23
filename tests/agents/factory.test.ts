@@ -5,7 +5,16 @@ import { join } from "node:path";
 import * as YAML from "yaml";
 import { ClaudeAgentProvider } from "../../src/agents/claude";
 import { ClineAgentProvider } from "../../src/agents/cline";
-import { createAgent, getRegisteredAgents, isAgentRegistered } from "../../src/agents/factory";
+import { CodexAgentProvider } from "../../src/agents/codex";
+import { CopilotAgentProvider } from "../../src/agents/copilot";
+import {
+  createAgent,
+  createAgentByName,
+  getAgentCapabilities,
+  getRegisteredAgents,
+  isAgentRegistered,
+  listAvailableAgents,
+} from "../../src/agents/factory";
 import { OpenCodeAgentProvider } from "../../src/agents/opencode";
 
 describe("agent factory", () => {
@@ -89,6 +98,22 @@ describe("agent factory", () => {
       expect(agent).toBeInstanceOf(ClineAgentProvider);
     });
 
+    test("respects interactiveAgent config for copilot", async () => {
+      await writeConfig({
+        interactiveAgent: { agent: "copilot" },
+      });
+      const agent = await createAgent("interactive");
+      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+    });
+
+    test("respects interactiveAgent config for codex", async () => {
+      await writeConfig({
+        interactiveAgent: { agent: "codex" },
+      });
+      const agent = await createAgent("interactive");
+      expect(agent).toBeInstanceOf(CodexAgentProvider);
+    });
+
     test("uses interactiveAgent config only for interactive mode", async () => {
       await writeConfig({
         interactiveAgent: { agent: "opencode" },
@@ -122,6 +147,22 @@ describe("agent factory", () => {
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(ClineAgentProvider);
+    });
+
+    test("respects nonInteractiveAgent config for copilot", async () => {
+      await writeConfig({
+        nonInteractiveAgent: { agent: "copilot" },
+      });
+      const agent = await createAgent("nonInteractive");
+      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+    });
+
+    test("respects nonInteractiveAgent config for codex", async () => {
+      await writeConfig({
+        nonInteractiveAgent: { agent: "codex" },
+      });
+      const agent = await createAgent("nonInteractive");
+      expect(agent).toBeInstanceOf(CodexAgentProvider);
     });
 
     test("uses nonInteractiveAgent config only for nonInteractive mode", async () => {
@@ -164,30 +205,82 @@ describe("agent factory", () => {
     });
   });
 
-  describe("unknown agent name fallback", () => {
-    test("falls back to ClaudeAgentProvider for unknown agent name", async () => {
+  describe("invalid agent name errors", () => {
+    test("throws error for unknown agent name with helpful message", async () => {
       await writeConfig({
         interactiveAgent: { agent: "unknown-agent" },
       });
-      const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      await expect(createAgent("interactive")).rejects.toThrow(
+        "Unknown agent 'unknown-agent'. Available: claude, copilot, codex, cline, opencode"
+      );
     });
 
-    test("falls back to ClaudeAgentProvider for nonInteractive unknown agent", async () => {
+    test("throws error for nonexistent provider", async () => {
       await writeConfig({
         nonInteractiveAgent: { agent: "nonexistent-provider" },
       });
-      const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      await expect(createAgent("nonInteractive")).rejects.toThrow(
+        "Unknown agent 'nonexistent-provider'. Available: claude, copilot, codex, cline, opencode"
+      );
     });
 
-    test("falls back to ClaudeAgentProvider for empty agent name", async () => {
+    test("throws error for empty agent name", async () => {
       await writeConfig({
         interactiveAgent: { agent: "" },
       });
-      // Empty string will be parsed, but fallback to claude due to switch default
-      const agent = await createAgent("interactive");
+      await expect(createAgent("interactive")).rejects.toThrow(
+        "Unknown agent ''. Available: claude, copilot, codex, cline, opencode"
+      );
+    });
+
+    test("error message lists all available agents", async () => {
+      await writeConfig({
+        interactiveAgent: { agent: "invalid" },
+      });
+      try {
+        await createAgent("interactive");
+        expect.unreachable("Should have thrown");
+      } catch (e) {
+        const error = e as Error;
+        expect(error.message).toContain("claude");
+        expect(error.message).toContain("copilot");
+        expect(error.message).toContain("codex");
+        expect(error.message).toContain("cline");
+        expect(error.message).toContain("opencode");
+      }
+    });
+  });
+
+  describe("createAgentByName", () => {
+    test("creates ClaudeAgentProvider for 'claude'", () => {
+      const agent = createAgentByName("claude", true);
       expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+    });
+
+    test("creates CopilotAgentProvider for 'copilot'", () => {
+      const agent = createAgentByName("copilot", true);
+      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+    });
+
+    test("creates CodexAgentProvider for 'codex'", () => {
+      const agent = createAgentByName("codex", true);
+      expect(agent).toBeInstanceOf(CodexAgentProvider);
+    });
+
+    test("creates ClineAgentProvider for 'cline'", () => {
+      const agent = createAgentByName("cline", true);
+      expect(agent).toBeInstanceOf(ClineAgentProvider);
+    });
+
+    test("creates OpenCodeAgentProvider for 'opencode'", () => {
+      const agent = createAgentByName("opencode", true);
+      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+    });
+
+    test("throws error for invalid agent name", () => {
+      expect(() => createAgentByName("invalid", true)).toThrow(
+        "Unknown agent 'invalid'. Available: claude, copilot, codex, cline, opencode"
+      );
     });
   });
 
@@ -195,13 +288,22 @@ describe("agent factory", () => {
     test("getRegisteredAgents returns registered agent names", () => {
       const agents = getRegisteredAgents();
       expect(agents).toContain("claude");
+      expect(agents).toContain("copilot");
+      expect(agents).toContain("codex");
       expect(agents).toContain("cline");
       expect(agents).toContain("opencode");
-      expect(agents.length).toBe(3);
+      expect(agents.length).toBe(5);
+    });
+
+    test("listAvailableAgents returns all agent names", () => {
+      const agents = listAvailableAgents();
+      expect(agents).toEqual(["claude", "copilot", "codex", "cline", "opencode"]);
     });
 
     test("isAgentRegistered returns true for registered agents", () => {
       expect(isAgentRegistered("claude")).toBe(true);
+      expect(isAgentRegistered("copilot")).toBe(true);
+      expect(isAgentRegistered("codex")).toBe(true);
       expect(isAgentRegistered("cline")).toBe(true);
       expect(isAgentRegistered("opencode")).toBe(true);
     });
@@ -210,6 +312,59 @@ describe("agent factory", () => {
       expect(isAgentRegistered("unknown")).toBe(false);
       expect(isAgentRegistered("")).toBe(false);
       expect(isAgentRegistered("CLAUDE")).toBe(false); // case sensitive
+    });
+  });
+
+  describe("capability queries", () => {
+    test("getAgentCapabilities returns capabilities for claude", () => {
+      const caps = getAgentCapabilities("claude");
+      expect(caps).toBeDefined();
+      expect(caps?.supportsFileRead).toBe(true);
+      expect(caps?.supportsFileWrite).toBe(true);
+      expect(caps?.supportsBash).toBe(true);
+      expect(caps?.supportsSessionResume).toBe(true);
+    });
+
+    test("getAgentCapabilities returns capabilities for copilot", () => {
+      const caps = getAgentCapabilities("copilot");
+      expect(caps).toBeDefined();
+      expect(caps?.supportsFileRead).toBe(true);
+      expect(caps?.supportsWebSearch).toBe(true);
+      expect(caps?.supportsHumanQuestions).toBe(false);
+    });
+
+    test("getAgentCapabilities returns capabilities for codex", () => {
+      const caps = getAgentCapabilities("codex");
+      expect(caps).toBeDefined();
+      expect(caps?.supportsSessionFork).toBe(true);
+      expect(caps?.supportsStructuredOutput).toBe(true);
+    });
+
+    test("getAgentCapabilities returns capabilities for cline", () => {
+      const caps = getAgentCapabilities("cline");
+      expect(caps).toBeDefined();
+      expect(caps?.supportsPlanMode).toBe(true);
+      expect(caps?.supportsHumanQuestions).toBe(true);
+    });
+
+    test("getAgentCapabilities returns capabilities for opencode", () => {
+      const caps = getAgentCapabilities("opencode");
+      expect(caps).toBeDefined();
+      expect(caps?.supportsLSP).toBe(true);
+      expect(caps?.supportsFileRead).toBe(true);
+    });
+
+    test("getAgentCapabilities returns undefined for unknown agent", () => {
+      const caps = getAgentCapabilities("unknown");
+      expect(caps).toBeUndefined();
+    });
+
+    test("capability queries work without instantiating agent", () => {
+      // This test verifies that capabilities can be queried
+      // without creating an agent instance
+      const caps = getAgentCapabilities("claude");
+      expect(caps).toBeDefined();
+      // No agent instance was created - just capabilities retrieved
     });
   });
 });
