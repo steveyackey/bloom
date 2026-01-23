@@ -235,18 +235,34 @@ class ClaudeEventTestAdapter {
   }
 
   /**
-   * Simulates what renderEvent CURRENTLY does (buggy behavior)
+   * Simulates what renderEvent CURRENTLY does (fixed implementation)
    * This mirrors the actual implementation in claude.ts
    */
   renderEventCurrent(event: StreamEvent): void {
     switch (event.type) {
-      case "assistant":
-        // BUG: Looks for event.content but Claude sends message.content
-        // Also checks subtype === "text" which isn't how Claude structures it
-        if (event.subtype === "text" && event.content) {
-          process.stdout.write(event.content as string);
+      case "assistant": {
+        // FIXED: Extract text from message.content array
+        const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
+        if (message?.content) {
+          for (const block of message.content) {
+            if (block.type === "text" && block.text) {
+              process.stdout.write(block.text);
+              this.accumulatedOutput += block.text;
+            }
+          }
         }
         break;
+      }
+
+      case "content_block_delta": {
+        // Handle streaming text deltas
+        const delta = event.delta as { type?: string; text?: string } | undefined;
+        if (delta?.type === "text_delta" && delta.text) {
+          process.stdout.write(delta.text);
+          this.accumulatedOutput += delta.text;
+        }
+        break;
+      }
 
       case "tool_use":
         process.stdout.write(`\n[tool: ${event.tool_name}]\n`);
@@ -256,23 +272,38 @@ class ClaudeEventTestAdapter {
         process.stdout.write("[tool result]\n");
         break;
 
-      case "result":
-        // BUG: Uses cost_usd but Claude sends total_cost_usd
-        if (event.cost_usd !== undefined) {
-          process.stdout.write(`\n[cost: $${(event.cost_usd as number).toFixed(4)}]\n`);
+      case "result": {
+        // FIXED: Use total_cost_usd NOT cost_usd
+        const totalCost = event.total_cost_usd as number | undefined;
+        const durationMs = event.duration_ms as number | undefined;
+
+        if (totalCost !== undefined) {
+          process.stdout.write(`\n[cost: $${totalCost.toFixed(4)}]\n`);
+        }
+        if (durationMs !== undefined) {
+          const durationSec = (durationMs / 1000).toFixed(1);
+          process.stdout.write(`[duration: ${durationSec}s]\n`);
         }
         break;
+      }
 
-      case "error":
-        // BUG: Uses event.content but Claude sends error.message
-        process.stdout.write(`\n[error: ${event.content || "unknown"}]\n`);
+      case "error": {
+        // FIXED: Extract message from error.message NOT event.content
+        const errorObj = event.error as { message?: string } | undefined;
+        const errorMessage = errorObj?.message || "unknown error";
+        process.stdout.write(`\n[ERROR: ${errorMessage}]\n`);
         break;
+      }
 
       case "system":
-        if (event.subtype === "init" && event.session_id) {
-          process.stdout.write(`[session: ${event.session_id}]\n`);
+        if (event.subtype === "init") {
+          if (event.session_id) {
+            process.stdout.write(`[session: ${event.session_id}]\n`);
+          }
+          if (event.model) {
+            process.stdout.write(`[model: ${event.model}]\n`);
+          }
         }
-        // BUG: Does not display model
         break;
     }
   }
@@ -312,25 +343,21 @@ describe("Claude CLI Event Parsing", () => {
   });
 
   describe("Assistant Message Events", () => {
-    test("should extract text from message.content array (EXPECTED to FAIL)", () => {
+    test("should extract text from message.content array ", () => {
       // GIVEN: Real Claude CLI assistant event with message.content array structure
       const event = REAL_ASSISTANT_EVENT as unknown as StreamEvent;
 
-      // WHEN: renderEvent is called with current (buggy) implementation
+      // WHEN: renderEvent is called with current implementation
       const currentOutput = adapter.captureCurrentOutput(event);
 
-      // THEN: Current implementation produces NO output (bug!)
-      // Expected output should be "Hello"
+      // THEN: Current implementation correctly extracts text from message.content
       const expectedOutput = adapter.captureExpectedOutput(event);
 
-      // This test SHOULD fail - proving the bug exists
-      // Current code doesn't extract text from message.content
+      // Both outputs should match: "Hello"
       expect(currentOutput.stdout).toBe(expectedOutput.stdout);
-      // Expected: "Hello"
-      // Actual (current buggy code): ""
     });
 
-    test("should concatenate multiple text blocks in order (EXPECTED to FAIL)", () => {
+    test("should concatenate multiple text blocks in order ", () => {
       // GIVEN: Assistant event with multiple content blocks
       const event = REAL_ASSISTANT_MULTI_BLOCK_EVENT as unknown as StreamEvent;
 
@@ -340,13 +367,11 @@ describe("Claude CLI Event Parsing", () => {
       // THEN: All text blocks should be concatenated
       const expectedOutput = adapter.captureExpectedOutput(event);
 
-      // This test SHOULD fail - current code doesn't handle multi-block
+      // Both outputs should match: "First part. Second part."
       expect(currentOutput.stdout).toBe(expectedOutput.stdout);
-      // Expected: "First part. Second part."
-      // Actual: ""
     });
 
-    test("should accumulate output for return value (EXPECTED to FAIL)", () => {
+    test("should accumulate output for return value ", () => {
       // GIVEN: Real assistant event
       const event = REAL_ASSISTANT_EVENT as unknown as StreamEvent;
 
@@ -359,36 +384,30 @@ describe("Claude CLI Event Parsing", () => {
   });
 
   describe("Result Events", () => {
-    test("should display cost from total_cost_usd field (EXPECTED to FAIL)", () => {
-      // GIVEN: Real result event with total_cost_usd (NOT cost_usd)
+    test("should display cost from total_cost_usd field ", () => {
+      // GIVEN: Real result event with total_cost_usd
       const event = REAL_RESULT_EVENT as unknown as StreamEvent;
 
       // WHEN: renderEvent is called
       const currentOutput = adapter.captureCurrentOutput(event);
       const expectedOutput = adapter.captureExpectedOutput(event);
 
-      // THEN: Cost should be displayed
-      // This test SHOULD fail - current code looks for cost_usd
+      // THEN: Cost should be displayed using total_cost_usd field
       expect(currentOutput.stdout).toContain("$0.0500");
-      // Expected: contains "$0.0500"
-      // Actual: does not contain cost (uses wrong field name)
     });
 
-    test("should display duration in seconds (EXPECTED to FAIL)", () => {
+    test("should display duration in seconds ", () => {
       // GIVEN: Result event with duration_ms
       const event = REAL_RESULT_EVENT as unknown as StreamEvent;
 
       // WHEN: renderEvent is called
       const currentOutput = adapter.captureCurrentOutput(event);
 
-      // THEN: Duration should be displayed as seconds
-      // This test SHOULD fail - current code doesn't show duration
+      // THEN: Duration should be displayed as seconds (1234ms -> 1.2s)
       expect(currentOutput.stdout).toContain("1.2s");
-      // Expected: contains "1.2s" (1234ms -> 1.2s)
-      // Actual: no duration displayed
     });
 
-    test("cost should not be undefined when total_cost_usd is present (EXPECTED to FAIL)", () => {
+    test("cost should not be undefined when total_cost_usd is present ", () => {
       // GIVEN: Result event with total_cost_usd
       const event = REAL_RESULT_EVENT as unknown as StreamEvent;
 
@@ -416,7 +435,7 @@ describe("Claude CLI Event Parsing", () => {
       expect(currentOutput.stdout).toContain("abc123-def456-ghi789");
     });
 
-    test("should display model name (EXPECTED to FAIL)", () => {
+    test("should display model name ", () => {
       // GIVEN: System init event with model
       const event = REAL_SYSTEM_INIT_EVENT as unknown as StreamEvent;
 
@@ -424,10 +443,7 @@ describe("Claude CLI Event Parsing", () => {
       const currentOutput = adapter.captureCurrentOutput(event);
 
       // THEN: Model should be displayed
-      // This test SHOULD fail - current code doesn't show model
       expect(currentOutput.stdout).toContain("claude-sonnet-4");
-      // Expected: contains "claude-sonnet-4"
-      // Actual: model is not displayed
     });
   });
 
@@ -446,7 +462,7 @@ describe("Claude CLI Event Parsing", () => {
   });
 
   describe("Error Events", () => {
-    test("should extract error message from error.message field (EXPECTED to FAIL)", () => {
+    test("should extract error message from error.message field ", () => {
       // GIVEN: Error event with error.message structure
       const event = REAL_ERROR_EVENT as unknown as StreamEvent;
 
@@ -454,13 +470,10 @@ describe("Claude CLI Event Parsing", () => {
       const currentOutput = adapter.captureCurrentOutput(event);
 
       // THEN: Error message should be extracted from error.message
-      // This test SHOULD fail - current code looks for event.content
       expect(currentOutput.stdout).toContain("Rate limited");
-      // Expected: contains "Rate limited"
-      // Actual: contains "unknown" (because event.content is undefined)
     });
 
-    test("should display error prominently (EXPECTED to FAIL)", () => {
+    test("should display error prominently ", () => {
       // GIVEN: Error event
       const event = REAL_ERROR_EVENT as unknown as StreamEvent;
 
@@ -469,7 +482,6 @@ describe("Claude CLI Event Parsing", () => {
 
       // THEN: Error should be prominently displayed with ERROR prefix
       expect(expectedOutput.stdout).toContain("[ERROR:");
-      // Current code uses "[error:" which is less prominent
     });
   });
 
@@ -551,7 +563,7 @@ describe("Claude CLI Event Parsing", () => {
   });
 
   describe("Content Block Delta Events (Streaming)", () => {
-    test("should handle text delta events (EXPECTED to FAIL)", () => {
+    test("should handle text delta events ", () => {
       // GIVEN: Content block delta event with text
       const event = REAL_CONTENT_BLOCK_DELTA_EVENT as unknown as StreamEvent;
 
@@ -560,7 +572,6 @@ describe("Claude CLI Event Parsing", () => {
 
       // THEN: Streaming text should be output
       expect(expectedOutput.stdout).toBe("streaming text");
-      // Current code doesn't handle content_block_delta events at all
     });
   });
 });
@@ -576,7 +587,7 @@ describe("Claude CLI Event Sequence Integration", () => {
     adapter = new ClaudeEventTestAdapter();
   });
 
-  test("should handle a realistic event sequence (EXPECTED to FAIL)", () => {
+  test("should handle a realistic event sequence ", () => {
     // GIVEN: A realistic sequence of events from Claude CLI
     const events: StreamEvent[] = [
       // 1. System init

@@ -203,7 +203,7 @@ export class ClaudeAgentProvider implements Agent {
       let lastActivity = now;
       let sessionId: string | undefined;
       let buffer = "";
-      let output = "";
+      const outputAccumulator = { value: "" };
       let timedOut = false;
 
       // Track session for interjection support
@@ -269,14 +269,12 @@ export class ClaudeAgentProvider implements Agent {
             this.onEvent(event);
           }
 
-          // Stream human-readable output
+          // Stream human-readable output and accumulate text output
           if (this.streamOutput) {
-            this.renderEvent(event);
-          }
-
-          // Capture text output
-          if (event.type === "assistant" && event.content) {
-            output += event.content;
+            this.renderEvent(event, outputAccumulator);
+          } else {
+            // Even when not streaming, we need to accumulate text from assistant events
+            this.extractTextFromEvent(event, outputAccumulator);
           }
         } catch {
           // Not JSON, output raw
@@ -310,7 +308,7 @@ export class ClaudeAgentProvider implements Agent {
         }
         resolve({
           success: false,
-          output,
+          output: outputAccumulator.value,
           error: `Failed to spawn claude: ${error.message}`,
           sessionId,
         });
@@ -330,7 +328,7 @@ export class ClaudeAgentProvider implements Agent {
         const exitCode = code ?? 0;
         resolve({
           success: !timedOut && exitCode === 0,
-          output,
+          output: outputAccumulator.value,
           error: timedOut ? "Agent timed out due to inactivity" : undefined,
           sessionId,
         });
@@ -342,13 +340,35 @@ export class ClaudeAgentProvider implements Agent {
     });
   }
 
-  private renderEvent(event: StreamEvent): void {
+  private renderEvent(event: StreamEvent, outputAccumulator?: { value: string }): void {
     switch (event.type) {
-      case "assistant":
-        if (event.subtype === "text" && event.content) {
-          process.stdout.write(event.content);
+      case "assistant": {
+        // Claude CLI sends message.content as an array of content blocks
+        const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
+        if (message?.content) {
+          for (const block of message.content) {
+            if (block.type === "text" && block.text) {
+              process.stdout.write(block.text);
+              if (outputAccumulator) {
+                outputAccumulator.value += block.text;
+              }
+            }
+          }
         }
         break;
+      }
+
+      case "content_block_delta": {
+        // Handle streaming text deltas
+        const delta = event.delta as { type?: string; text?: string } | undefined;
+        if (delta?.type === "text_delta" && delta.text) {
+          process.stdout.write(delta.text);
+          if (outputAccumulator) {
+            outputAccumulator.value += delta.text;
+          }
+        }
+        break;
+      }
 
       case "tool_use":
         process.stdout.write(`\n[tool: ${event.tool_name}]\n`);
@@ -359,21 +379,66 @@ export class ClaudeAgentProvider implements Agent {
         process.stdout.write(`[tool result]\n`);
         break;
 
-      case "result":
-        if (event.cost_usd !== undefined) {
-          process.stdout.write(`\n[cost: $${event.cost_usd.toFixed(4)}]\n`);
+      case "result": {
+        // Claude CLI uses total_cost_usd NOT cost_usd
+        const totalCost = event.total_cost_usd as number | undefined;
+        const durationMs = event.duration_ms as number | undefined;
+
+        if (totalCost !== undefined) {
+          process.stdout.write(`\n[cost: $${totalCost.toFixed(4)}]\n`);
+        }
+        if (durationMs !== undefined) {
+          const durationSec = (durationMs / 1000).toFixed(1);
+          process.stdout.write(`[duration: ${durationSec}s]\n`);
         }
         break;
+      }
 
-      case "error":
-        process.stdout.write(`\n[error: ${event.content || "unknown"}]\n`);
+      case "error": {
+        // Claude CLI uses error.message NOT event.content
+        const errorObj = event.error as { message?: string } | undefined;
+        const errorMessage = errorObj?.message || "unknown error";
+        process.stdout.write(`\n[ERROR: ${errorMessage}]\n`);
         break;
+      }
 
       case "system":
-        if (event.subtype === "init" && event.session_id) {
-          process.stdout.write(`[session: ${event.session_id}]\n`);
+        if (event.subtype === "init") {
+          if (event.session_id) {
+            process.stdout.write(`[session: ${event.session_id}]\n`);
+          }
+          if (event.model) {
+            process.stdout.write(`[model: ${event.model}]\n`);
+          }
         }
         break;
+    }
+  }
+
+  /**
+   * Extract text from event without writing to stdout (for non-streaming mode)
+   */
+  private extractTextFromEvent(event: StreamEvent, outputAccumulator: { value: string }): void {
+    switch (event.type) {
+      case "assistant": {
+        const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined;
+        if (message?.content) {
+          for (const block of message.content) {
+            if (block.type === "text" && block.text) {
+              outputAccumulator.value += block.text;
+            }
+          }
+        }
+        break;
+      }
+
+      case "content_block_delta": {
+        const delta = event.delta as { type?: string; text?: string } | undefined;
+        if (delta?.type === "text_delta" && delta.text) {
+          outputAccumulator.value += delta.text;
+        }
+        break;
+      }
     }
   }
 
