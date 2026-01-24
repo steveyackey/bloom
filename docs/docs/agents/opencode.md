@@ -9,35 +9,12 @@ OpenCode is a multi-provider coding agent with native Language Server Protocol (
 
 ## Installation
 
-```bash
-# Install OpenCode via Go
-go install github.com/sst/opencode@latest
+See the official [OpenCode documentation](https://opencode.ai/) for installation instructions.
 
-# Verify installation
+After installation, verify it's working:
+
+```bash
 opencode --version
-
-# Ensure Go bin is in PATH
-export PATH=$PATH:$(go env GOPATH)/bin
-```
-
-Add to your shell profile for persistence:
-
-```bash
-echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.zshrc
-```
-
-### Provider API Keys
-
-Configure API keys for your chosen provider:
-
-```bash
-# Anthropic (Claude models)
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# OpenAI (GPT models)
-export OPENAI_API_KEY="sk-..."
-
-# Or configure in ~/.opencode/config.yaml
 ```
 
 ## Configuration
@@ -170,17 +147,7 @@ opencode run --format json -s <session_id> -m provider/model "prompt"
 
 **Cause**: OpenCode not installed or not in PATH
 
-**Solution**:
-```bash
-# Install OpenCode
-go install github.com/sst/opencode@latest
-
-# Add Go bin to PATH
-export PATH=$PATH:$(go env GOPATH)/bin
-
-# Verify
-which opencode
-```
+**Solution**: Install OpenCode using the [official docs](https://opencode.ai/) and ensure the binary is in your PATH.
 
 ### "Model selection is REQUIRED"
 
@@ -279,13 +246,13 @@ bloom run
 
 ## Comparison with Other Agents
 
-| Aspect | OpenCode | Claude | Cline |
+| Aspect | OpenCode | Claude | Goose |
 |--------|----------|--------|-------|
 | LSP Support | Yes | No | No |
 | Web Search | No | Yes | No |
 | Human Questions | No | Yes | Yes |
 | Multi-Provider | Yes | No | Yes |
-| Plan Mode | No | No | Yes |
+| MCP Extensions | No | No | Yes |
 
 Use OpenCode when:
 - Need precise code intelligence via LSP
@@ -298,6 +265,7 @@ Use Claude when:
 - Want human-in-the-loop features
 - Prefer TodoWrite progress tracking
 
-Use Cline when:
-- Want explicit plan approval
-- Need careful, reviewed execution
+Use Goose when:
+- Want extensibility via MCP
+- Need scheduled automation
+- Prefer open-source, local execution

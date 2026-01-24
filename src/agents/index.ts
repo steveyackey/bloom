@@ -10,15 +10,9 @@ export {
   getAgentDefaultModel,
   getAgentModels,
 } from "./availability";
-// Agent capability registry
-export type { AgentCapabilities, AgentCapabilityName, AgentName } from "./capabilities";
-export {
-  agentCapabilities,
-  getAgentCapabilities,
-  getRegisteredAgentNames,
-  hasCapability,
-  isValidAgentName,
-} from "./capabilities";
+// Agent registry
+export type { AgentName } from "./capabilities";
+export { getRegisteredAgentNames, isValidAgentName, REGISTERED_AGENTS } from "./capabilities";
 
 // Claude provider with session management utilities
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
@@ -45,7 +39,6 @@ export {
   type AgentMode,
   createAgent,
   createAgentByName,
-  getAgentCapabilities as getAgentCapabilitiesFromFactory,
   getRegisteredAgents,
   isAgentRegistered,
   listAvailableAgents,

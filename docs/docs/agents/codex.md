@@ -10,24 +10,12 @@ Codex is OpenAI's coding agent CLI, offering unique features like session forkin
 
 ## Installation
 
+See the official [OpenAI Codex CLI documentation](https://github.com/openai/codex) for installation instructions.
+
+After installation, verify it's working:
+
 ```bash
-# Install Codex CLI (via npm)
-npm install -g @openai/codex
-
-# Or via Cargo (Rust)
-cargo install openai-codex
-
-# Set your API key
-export OPENAI_API_KEY="sk-..."
-
-# Verify installation
 codex --version
-```
-
-Add the API key to your shell profile for persistence:
-
-```bash
-echo 'export OPENAI_API_KEY="sk-..."' >> ~/.zshrc
 ```
 
 ## Configuration
@@ -173,15 +161,7 @@ codex fork
 
 **Cause**: Codex CLI not installed
 
-**Solution**:
-```bash
-# Install Codex
-npm install -g @openai/codex
-
-# Verify npm global bin is in PATH
-npm config get prefix
-# Add <prefix>/bin to PATH if needed
-```
+**Solution**: Install Codex using the [official docs](https://github.com/openai/codex) and ensure the binary is in your PATH.
 
 ### "Authentication failed"
 

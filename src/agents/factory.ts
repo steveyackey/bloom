@@ -4,12 +4,7 @@
 
 import type { AgentConfig, PerAgentConfig } from "../user-config";
 import { getAgentConfig, getDefaultAgentName, loadUserConfig } from "../user-config";
-import {
-  type AgentCapabilities,
-  type AgentName,
-  getAgentCapabilities as getCapabilities,
-  isValidAgentName,
-} from "./capabilities";
+import { type AgentName, isValidAgentName } from "./capabilities";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
 import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
 import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
@@ -190,26 +185,6 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
  */
 export function listAvailableAgents(): AgentName[] {
   return Object.keys(agentRegistry) as AgentName[];
-}
-
-/**
- * Get capabilities for a specific agent without instantiating it.
- * This is useful for determining what features an agent supports
- * before creating an instance.
- *
- * @param agentName - The name of the agent
- * @returns The agent's capabilities, or undefined if agent not found
- *
- * @example
- * ```ts
- * const caps = getAgentCapabilities("claude");
- * if (caps?.supportsSessionResume) {
- *   // Agent supports resuming sessions
- * }
- * ```
- */
-export function getAgentCapabilities(agentName: string): AgentCapabilities | undefined {
-  return getCapabilities(agentName);
 }
 
 /**

@@ -1,10 +1,46 @@
 # Adding New Agent Providers
 
-This guide explains how to add a new AI agent provider to Bloom. Follow these steps to integrate a new agent CLI.
+This guide explains how to add a new AI agent provider to Bloom.
 
-## Overview
+## Philosophy
 
-Bloom supports multiple AI agent providers through a unified abstraction layer. Each agent provider implements the `Agent` interface and is registered in the factory.
+Bloom trusts agents to know their own capabilities. Each agent injects its own system prompt with its features, tools, and limitations. Bloom only needs to know:
+
+1. How to spawn and communicate with the agent CLI
+2. How to check if the CLI is installed
+3. How to list available models
+
+This keeps Bloom simple and avoids the need to update docs every time an agent adds features.
+
+## Required CLI Commands
+
+For Bloom to fully support an agent CLI, these commands/flags are needed:
+
+### Essential (Required)
+
+| Purpose | Example | Notes |
+|---------|---------|-------|
+| **Version check** | `myagent --version` | For availability checking |
+| **Accept prompt** | `myagent --prompt "..."` or `myagent -p "..."` | How to pass the task |
+| **Working directory** | Respects `cwd` when spawned | Agent runs in project directory |
+
+### Recommended (For Full Features)
+
+| Purpose | Example | Notes |
+|---------|---------|-------|
+| **Model selection** | `myagent --model <name>` | For multi-model support |
+| **Session resume** | `myagent --resume <id>` | For session continuity |
+| **System prompt** | `myagent --system "..."` | For Bloom context injection |
+| **JSON output** | `myagent --output-format json` | For streaming progress |
+| **List models** | `myagent models` | For model discovery |
+
+### Optional (Nice to Have)
+
+| Purpose | Example | Notes |
+|---------|---------|-------|
+| **Non-interactive mode** | `myagent --print` or `--non-interactive` | For autonomous execution |
+| **Approval bypass** | `myagent --yes` or `--dangerously-skip-permissions` | For headless runs |
+| **Timeout** | `myagent --timeout 600` | For long-running tasks |
 
 ## Step 1: Create the Provider File
 
@@ -25,17 +61,10 @@ const logger = createLogger("myagent-provider");
 // Types
 // =============================================================================
 
-export interface MyAgentStreamEvent {
-  // Define the JSON structure of streaming output from the CLI
-  type: string;
-  // ... other fields
-}
-
 export interface MyAgentProviderOptions {
   interactive: boolean;
   streamOutput?: boolean;
   model?: string;
-  // Add agent-specific options
 }
 
 export interface MyAgentRunningSession extends AgentSession {
@@ -79,26 +108,22 @@ export class MyAgentProvider implements Agent {
 
     // Build CLI arguments
     const args: string[] = [];
-
-    // Add prompt
     args.push("--prompt", prompt);
 
-    // Add model if specified
     if (this.options.model) {
       args.push("--model", this.options.model);
     }
 
-    // Add session resume if available
     if (sessionId) {
       args.push("--resume", sessionId);
     }
 
-    // Interactive mode: inherit stdio for user interaction
+    // Interactive mode: inherit stdio
     if (this.options.interactive) {
       return this.runInteractive(args, startingDirectory, agentName);
     }
 
-    // Streaming mode: capture output for processing
+    // Streaming mode: capture output
     return this.runStreaming(args, startingDirectory, agentName);
   }
 
@@ -147,7 +172,6 @@ export class MyAgentProvider implements Agent {
     cwd: string,
     agentName: string
   ): Promise<AgentRunResult> {
-    // Add streaming output flag
     args.push("--output-format", "json");
 
     return new Promise((resolve) => {
@@ -161,16 +185,7 @@ export class MyAgentProvider implements Agent {
       let sessionId: string | undefined;
 
       proc.stdout?.on("data", (data) => {
-        const text = data.toString();
-        output += text;
-
-        // Parse streaming JSON events
-        try {
-          const event: MyAgentStreamEvent = JSON.parse(text);
-          // Handle events (log, update progress, etc.)
-        } catch {
-          // Not JSON, just text output
-        }
+        output += data.toString();
       });
 
       proc.stderr?.on("data", (data) => {
@@ -203,113 +218,14 @@ export class MyAgentProvider implements Agent {
 }
 ```
 
-## Step 2: Update the Capabilities Registry
+## Step 2: Update the Agent Registry
 
 Edit `src/agents/capabilities.ts`:
 
-### How Capabilities Are Used
-
-Capabilities define what features an agent supports. Bloom uses these capabilities in several ways:
-
-1. **Prompt Compilation**: The prompt compiler uses conditional sections based on capabilities. For example:
-   ```markdown
-   <!-- @if supportsWebSearch -->
-   ## Web Search
-   You can use web search to find information.
-   <!-- @endif -->
-   ```
-   This section is only included in the prompt if the agent has `supportsWebSearch: true`.
-
-2. **Feature Gating**: Bloom checks capabilities before attempting certain operations:
-   - `supportsSessionResume`: Whether to pass a session ID for resuming previous work
-   - `supportsSystemPrompt`: Whether the agent accepts system prompts separately
-   - `supportsHumanQuestions`: Whether the agent can pause to ask clarifying questions
-
-3. **UI/UX Decisions**: Capabilities inform user-facing behavior:
-   - Agents with `supportsWebSearch` may show different help text
-   - Agents with `supportsPlanMode` may have additional workflow options
-
-4. **Capability Queries**: Other parts of the codebase can query capabilities:
-   ```typescript
-   import { getAgentCapabilities, hasCapability } from "./agents/capabilities";
-
-   const caps = getAgentCapabilities("myagent");
-   if (hasCapability("myagent", "supportsWebSearch")) {
-     // Include web search instructions
-   }
-   ```
-
-5. **Graceful Degradation**: When a task requires a capability the agent lacks, Bloom gracefully degrades by omitting that section from the prompt rather than failing.
-
-### Capability Reference
-
-| Capability | Description | Effect When True |
-|------------|-------------|------------------|
-| `supportsFileRead` | Can read files | Include file reading instructions |
-| `supportsFileWrite` | Can write/edit files | Include file writing instructions |
-| `supportsBash` | Can execute shell commands | Include terminal instructions |
-| `supportsGit` | Can perform git operations | Include git workflow instructions |
-| `supportsWebSearch` | Can search the web | Include web search instructions |
-| `supportsWebFetch` | Can fetch URL content | Include URL fetching instructions |
-| `supportsSystemPrompt` | Accepts system prompt separately | Pass system prompt via dedicated flag |
-| `supportsAppendSystemPrompt` | Can append to system prompt | Append project context to system prompt |
-| `maxPromptLength` | Maximum prompt size | Truncate prompts exceeding limit |
-| `supportsSessionResume` | Can resume previous sessions | Pass session ID for continuity |
-| `supportsSessionFork` | Can branch sessions | Enable "try alternative" workflows |
-| `supportsStructuredOutput` | Returns structured JSON | Parse output as structured data |
-| `supportsStreamingJson` | Streams JSON events | Enable real-time progress tracking |
-| `supportsHumanQuestions` | Can pause for user input | Enable interactive clarification |
-| `supportsPlanMode` | Has explicit planning phase | Enable plan-then-execute workflow |
-| `supportsLSP` | Has Language Server Protocol | Include LSP-specific instructions |
-| `specialInstructions` | Agent-specific notes | Append to compiled prompts |
-
-### 2.1 Add to AgentName Type
-
 ```typescript
 export type AgentName = "claude" | "copilot" | "codex" | "goose" | "opencode" | "myagent";
-```
 
-### 2.2 Add Capabilities Definition
-
-```typescript
-export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
-  // ... existing agents ...
-
-  myagent: {
-    // Tools
-    supportsFileRead: true,
-    supportsFileWrite: true,
-    supportsBash: true,
-    supportsGit: true,
-    supportsWebSearch: false,  // Set based on agent features
-    supportsWebFetch: false,
-
-    // Prompt features
-    supportsSystemPrompt: false,  // Or true if agent supports it
-    supportsAppendSystemPrompt: false,
-    maxPromptLength: undefined,
-
-    // Session features
-    supportsSessionResume: true,  // Set based on agent features
-    supportsSessionFork: false,
-
-    // Output features
-    supportsStructuredOutput: false,
-    supportsStreamingJson: true,
-
-    // Interaction
-    supportsHumanQuestions: false,
-    supportsPlanMode: false,
-
-    // Code intelligence
-    supportsLSP: false,
-
-    // Special instructions
-    specialInstructions: [
-      "Add any agent-specific instructions here",
-    ],
-  },
-};
+export const REGISTERED_AGENTS: AgentName[] = ["claude", "copilot", "codex", "goose", "myagent", "opencode"];
 ```
 
 ## Step 3: Update the Factory
@@ -330,20 +246,14 @@ const agentRegistry = {
   codex: CodexAgentProvider,
   copilot: CopilotAgentProvider,
   goose: GooseAgentProvider,
-  myagent: MyAgentProvider,  // Add here
+  myagent: MyAgentProvider,
   opencode: OpenCodeAgentProvider,
 } as const;
 ```
 
 ### 3.3 Add Switch Cases
 
-In `createAgentByName()`:
-```typescript
-case "myagent":
-  return createMyAgentAgent(isInteractive, model);
-```
-
-In `createAgent()`:
+In `createAgentByName()` and `createAgent()`:
 ```typescript
 case "myagent":
   return createMyAgentAgent(isInteractive, model, perAgentConfig);
@@ -357,13 +267,11 @@ function createMyAgentAgent(
   model?: string,
   _perAgentConfig?: PerAgentConfig
 ): MyAgentProvider {
-  const options: MyAgentProviderOptions = {
+  return new MyAgentProvider({
     interactive,
     streamOutput: true,
-    model: model,
-  };
-
-  return new MyAgentProvider(options);
+    model,
+  });
 }
 ```
 
@@ -382,12 +290,15 @@ const agentCliConfig: Record<string, { command: string; checkArgs: string[] }> =
 
 ### 4.2 Add Model Config
 
+Include how to list available models:
+
 ```typescript
-const agentModels: Record<string, { models: string[]; default?: string }> = {
+const agentModels: Record<string, { models: string[]; default?: string; listCommand?: string }> = {
   // ... existing agents ...
   myagent: {
-    models: ["model-a", "model-b", "model-c"],
+    models: ["model-a", "model-b"],
     default: "model-a",
+    listCommand: "myagent models",  // Command to list available models
   },
 };
 ```
@@ -396,28 +307,16 @@ const agentModels: Record<string, { models: string[]; default?: string }> = {
 
 Edit `src/user-config.ts`:
 
-### 5.1 Add to KNOWN_AGENTS
-
 ```typescript
 export const KNOWN_AGENTS = ["claude", "copilot", "codex", "goose", "myagent", "opencode"] as const;
 ```
 
-### 5.2 Add Config Schema (if needed)
+Add a config schema if the agent has specific options:
 
 ```typescript
 const MyAgentConfigSchema = BaseAgentConfigSchema.extend({
-  // Add any agent-specific config fields
   customOption: z.boolean().optional(),
 });
-```
-
-### 5.3 Add to AgentSectionSchema
-
-```typescript
-const AgentSectionSchema = z.object({
-  // ... existing agents ...
-  myagent: MyAgentConfigSchema.optional(),
-}).passthrough();
 ```
 
 ## Step 6: Export from Index
@@ -425,8 +324,7 @@ const AgentSectionSchema = z.object({
 Edit `src/agents/index.ts`:
 
 ```typescript
-// MyAgent provider
-export type { MyAgentProviderOptions, MyAgentRunningSession, MyAgentStreamEvent } from "./myagent";
+export type { MyAgentProviderOptions, MyAgentRunningSession } from "./myagent";
 export { MyAgentProvider, getActiveMyAgentSession, interjectMyAgentSession } from "./myagent";
 ```
 
@@ -437,12 +335,11 @@ export { MyAgentProvider, getActiveMyAgentSession, interjectMyAgentSession } fro
 Create `docs/docs/agents/myagent.md` with:
 - Installation instructions
 - Configuration options
-- Usage examples
-- Troubleshooting guide
+- How to list available models
 
 ### 7.2 Update Sidebar
 
-Edit `docs/sidebars.ts` to add the new doc page:
+Edit `docs/sidebars.ts`:
 ```typescript
 items: [
   'agents/README',
@@ -452,33 +349,11 @@ items: [
 ],
 ```
 
-### 7.3 Update Agent Overview
+### 7.3 Update Main README
 
-Edit `docs/docs/agents/README.md`:
-- Add to supported agents table
-- Add to capability comparison
-- Add installation instructions
+Add to supported agents table in `README.md`.
 
-### 7.4 Update Main README
-
-Edit `README.md`:
-- Add to supported agents table
-- Add to agent capabilities table
-- Add installation command
-
-## Step 8: Add Tests
-
-Create test files:
-
-### 8.1 Update Factory Tests
-
-Edit `tests/agents/factory.test.ts` to test the new agent.
-
-### 8.2 Update Integration Tests
-
-Edit `tests/integration/multi-agent-integration.test.ts` to include the new agent.
-
-## Step 9: Validate and Build
+## Step 8: Validate and Build
 
 ```bash
 # Run type checking and linting
@@ -496,16 +371,14 @@ cd docs && bun install && bun run build
 Before submitting a PR for a new agent:
 
 - [ ] Provider file created in `src/agents/`
-- [ ] Capabilities defined in `src/agents/capabilities.ts`
+- [ ] Agent name added to registry in `src/agents/capabilities.ts`
 - [ ] Factory updated in `src/agents/factory.ts`
 - [ ] Availability config in `src/agents/availability.ts`
 - [ ] User config updated in `src/user-config.ts`
 - [ ] Exports added in `src/agents/index.ts`
 - [ ] Documentation page created
 - [ ] Sidebar updated
-- [ ] Agent overview updated
 - [ ] Main README updated
-- [ ] Tests added/updated
 - [ ] `bun validate` passes
 - [ ] `bun test` passes
 - [ ] Docs build successfully

@@ -4,7 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { type AgentName, createAgent, getAgentCapabilities } from "../agents";
+import { type AgentName, createAgent } from "../agents";
 import { logger } from "../logger";
 import { OrchestratorTUI } from "../orchestrator-tui";
 import { PromptCompiler } from "../prompts/compiler";
@@ -329,11 +329,9 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
       const agent = await getOrCreateAgent(taskProvider);
 
       // Compile the agent system prompt using the PromptCompiler
-      // This allows capability-based conditional sections and variable substitution
+      // This injects task context variables into the prompt template
       const compiler = new PromptCompiler();
-      const agentCapabilities = getAgentCapabilities(taskProvider) || {};
       const systemPrompt = await compiler.loadAndCompile("agent-system", {
-        capabilities: agentCapabilities,
         variables: {
           AGENT_NAME: agentName,
           TASK_ID: taskResult.taskId!,
