@@ -181,7 +181,7 @@ export interface AgentCapabilities {
 /**
  * Supported agent names.
  */
-export type AgentName = "claude" | "copilot" | "codex" | "cline" | "opencode";
+export type AgentName = "claude" | "copilot" | "codex" | "cline" | "goose" | "opencode";
 
 /**
  * Capability registry for all supported agents.
@@ -361,6 +361,51 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
       "Switch to Act mode with --mode act for direct execution",
       "Requires Cline Core gRPC service running on localhost:50052",
       "Use cline task commands for checkpoint and restore capabilities",
+    ],
+  },
+
+  // ===========================================================================
+  // Goose (Block)
+  // ===========================================================================
+  // CLI: goose
+  // Features: Extensible via MCP, multi-provider, scheduling, recipes
+  // Strengths: Open source, extensible, local execution, browser automation
+  // ===========================================================================
+  goose: {
+    // Tools
+    supportsFileRead: true,
+    supportsFileWrite: true,
+    supportsBash: true,
+    supportsGit: true,
+    supportsWebSearch: false, // No built-in web search
+    supportsWebFetch: true, // Via Computer Controller extension
+
+    // Prompt features
+    supportsSystemPrompt: true, // Via --system flag
+    supportsAppendSystemPrompt: false,
+    maxPromptLength: undefined,
+
+    // Session features
+    supportsSessionResume: true, // Via --session-id or -r flag
+    supportsSessionFork: false,
+
+    // Output features
+    supportsStructuredOutput: false,
+    supportsStreamingJson: true, // Via --output-format stream-json
+
+    // Interaction
+    supportsHumanQuestions: true, // Interactive session mode
+    supportsPlanMode: false, // No explicit plan mode
+
+    // Code intelligence
+    supportsLSP: false, // No native LSP support
+
+    // Special instructions
+    specialInstructions: [
+      "Extensible via MCP (Model Context Protocol) servers",
+      "Use `goose configure` to add extensions and providers",
+      "Supports scheduled automation via `goose schedule`",
+      "Browser automation available via Computer Controller extension",
     ],
   },
 

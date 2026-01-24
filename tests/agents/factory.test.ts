@@ -253,8 +253,9 @@ describe("agent factory", () => {
       expect(agents).toContain("cline");
       expect(agents).toContain("codex");
       expect(agents).toContain("copilot");
+      expect(agents).toContain("goose");
       expect(agents).toContain("opencode");
-      expect(agents.length).toBe(5);
+      expect(agents.length).toBe(6);
     });
 
     test("isAgentRegistered returns true for registered agents", () => {
@@ -262,6 +263,7 @@ describe("agent factory", () => {
       expect(isAgentRegistered("cline")).toBe(true);
       expect(isAgentRegistered("codex")).toBe(true);
       expect(isAgentRegistered("copilot")).toBe(true);
+      expect(isAgentRegistered("goose")).toBe(true);
       expect(isAgentRegistered("opencode")).toBe(true);
     });
 
