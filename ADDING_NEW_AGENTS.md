@@ -207,6 +207,62 @@ export class MyAgentProvider implements Agent {
 
 Edit `src/agents/capabilities.ts`:
 
+### How Capabilities Are Used
+
+Capabilities define what features an agent supports. Bloom uses these capabilities in several ways:
+
+1. **Prompt Compilation**: The prompt compiler uses conditional sections based on capabilities. For example:
+   ```markdown
+   <!-- @if supportsWebSearch -->
+   ## Web Search
+   You can use web search to find information.
+   <!-- @endif -->
+   ```
+   This section is only included in the prompt if the agent has `supportsWebSearch: true`.
+
+2. **Feature Gating**: Bloom checks capabilities before attempting certain operations:
+   - `supportsSessionResume`: Whether to pass a session ID for resuming previous work
+   - `supportsSystemPrompt`: Whether the agent accepts system prompts separately
+   - `supportsHumanQuestions`: Whether the agent can pause to ask clarifying questions
+
+3. **UI/UX Decisions**: Capabilities inform user-facing behavior:
+   - Agents with `supportsWebSearch` may show different help text
+   - Agents with `supportsPlanMode` may have additional workflow options
+
+4. **Capability Queries**: Other parts of the codebase can query capabilities:
+   ```typescript
+   import { getAgentCapabilities, hasCapability } from "./agents/capabilities";
+
+   const caps = getAgentCapabilities("myagent");
+   if (hasCapability("myagent", "supportsWebSearch")) {
+     // Include web search instructions
+   }
+   ```
+
+5. **Graceful Degradation**: When a task requires a capability the agent lacks, Bloom gracefully degrades by omitting that section from the prompt rather than failing.
+
+### Capability Reference
+
+| Capability | Description | Effect When True |
+|------------|-------------|------------------|
+| `supportsFileRead` | Can read files | Include file reading instructions |
+| `supportsFileWrite` | Can write/edit files | Include file writing instructions |
+| `supportsBash` | Can execute shell commands | Include terminal instructions |
+| `supportsGit` | Can perform git operations | Include git workflow instructions |
+| `supportsWebSearch` | Can search the web | Include web search instructions |
+| `supportsWebFetch` | Can fetch URL content | Include URL fetching instructions |
+| `supportsSystemPrompt` | Accepts system prompt separately | Pass system prompt via dedicated flag |
+| `supportsAppendSystemPrompt` | Can append to system prompt | Append project context to system prompt |
+| `maxPromptLength` | Maximum prompt size | Truncate prompts exceeding limit |
+| `supportsSessionResume` | Can resume previous sessions | Pass session ID for continuity |
+| `supportsSessionFork` | Can branch sessions | Enable "try alternative" workflows |
+| `supportsStructuredOutput` | Returns structured JSON | Parse output as structured data |
+| `supportsStreamingJson` | Streams JSON events | Enable real-time progress tracking |
+| `supportsHumanQuestions` | Can pause for user input | Enable interactive clarification |
+| `supportsPlanMode` | Has explicit planning phase | Enable plan-then-execute workflow |
+| `supportsLSP` | Has Language Server Protocol | Include LSP-specific instructions |
+| `specialInstructions` | Agent-specific notes | Append to compiled prompts |
+
 ### 2.1 Add to AgentName Type
 
 ```typescript
