@@ -1,34 +1,33 @@
 # Copilot Agent
 
-GitHub Copilot is GitHub's AI coding assistant, offering multi-model support and native GitHub integration through the MCP (Model Context Protocol) server.
+GitHub Copilot CLI brings AI-powered coding assistance directly to your terminal with GitHub integration.
 
 ## Prerequisites
 
 1. **GitHub Account**: With active Copilot subscription (Individual, Business, or Enterprise)
-2. **GitHub CLI**: Install the `gh` command-line tool
-3. **Copilot Extension**: Install the Copilot CLI extension
+2. **Copilot CLI**: The standalone GitHub Copilot CLI tool
 
 ## Installation
 
+Choose one of the following installation methods:
+
 ```bash
-# Install GitHub CLI (if not already installed)
-# macOS
-brew install gh
+# npm (macOS, Linux, Windows)
+npm install -g @github/copilot
 
-# Linux (Debian/Ubuntu)
-sudo apt install gh
+# Homebrew (macOS, Linux)
+brew install copilot-cli
 
-# Windows
-winget install GitHub.cli
+# WinGet (Windows)
+winget install GitHub.Copilot
 
-# Authenticate with GitHub
-gh auth login
+# Install script (macOS, Linux)
+curl -fsSL https://gh.io/copilot-install | bash
+```
 
-# Install Copilot extension
-gh extension install github/gh-copilot
-
-# Verify installation
-gh copilot --version
+**Verify installation:**
+```bash
+copilot --version
 ```
 
 ## Configuration
@@ -102,45 +101,36 @@ When Bloom runs Copilot, it uses these patterns:
 
 ```bash
 # Interactive mode
-gh copilot "prompt"
+copilot "prompt"
 
 # With model selection
-gh copilot --model claude-3.5-sonnet "prompt"
+copilot --model claude-3.5-sonnet "prompt"
 
 # Resume session
-gh copilot --resume <session_id> "prompt"
+copilot --resume <session_id> "prompt"
 ```
 
 ## Troubleshooting
 
-### "gh: command not found"
+### "copilot: command not found"
 
-**Cause**: GitHub CLI not installed
-
-**Solution**:
-```bash
-# Install GitHub CLI for your platform
-# macOS
-brew install gh
-
-# Linux
-sudo apt install gh
-
-# Windows
-winget install GitHub.cli
-```
-
-### "Copilot extension not installed"
-
-**Cause**: Missing Copilot CLI extension
+**Cause**: Copilot CLI not installed
 
 **Solution**:
 ```bash
-# Install the extension
-gh extension install github/gh-copilot
+# Choose one installation method:
 
-# Verify
-gh copilot --version
+# npm
+npm install -g @github/copilot
+
+# Homebrew (macOS/Linux)
+brew install copilot-cli
+
+# WinGet (Windows)
+winget install GitHub.Copilot
+
+# Install script (macOS/Linux)
+curl -fsSL https://gh.io/copilot-install | bash
 ```
 
 ### "Authentication required"
@@ -149,11 +139,11 @@ gh copilot --version
 
 **Solution**:
 ```bash
-# Check auth status
-gh auth status
+# The copilot CLI will prompt for authentication on first use
+copilot
 
-# Login if needed
-gh auth login
+# Or authenticate manually via GitHub
+# Visit github.com/settings/tokens if needed
 ```
 
 ### "Copilot access denied"
@@ -195,7 +185,7 @@ gh auth login
 For sensitive environments:
 ```bash
 # Restrict tool access
-gh copilot --deny-tool bash "prompt"
+copilot --deny-tool bash "prompt"
 ```
 
 ## Example Session

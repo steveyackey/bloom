@@ -134,12 +134,14 @@ GitHub Copilot CLI is not installed or not found in PATH.
 
 To install GitHub Copilot CLI:
 1. Ensure you have an active GitHub Copilot subscription
-2. Install GitHub CLI: brew install gh (macOS) or see https://cli.github.com/
-3. Authenticate with GitHub: gh auth login
-4. Install Copilot extension: gh extension install github/gh-copilot
-5. Verify installation: gh copilot --version
+2. Install via one of the following methods:
+   - npm: npm install -g @github/copilot
+   - Homebrew (macOS/Linux): brew install copilot-cli
+   - WinGet (Windows): winget install GitHub.Copilot
+   - Install script: curl -fsSL https://gh.io/copilot-install | bash
+3. Authenticate: copilot auth (or will prompt on first use)
 
-For more information, visit: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
+For more information, visit: https://github.com/github/copilot-cli
 `;
 
 // =============================================================================
@@ -200,7 +202,7 @@ export class CopilotAgentProvider implements Agent {
     return new Promise((resolve) => {
       const args = this.buildInteractiveArgs(options);
 
-      const proc = spawn("gh", ["copilot", ...args], {
+      const proc = spawn("copilot", args, {
         cwd: options.startingDirectory,
         stdio: "inherit",
       });
@@ -228,7 +230,7 @@ export class CopilotAgentProvider implements Agent {
     return new Promise((resolve) => {
       const args = this.buildStreamingArgs(options);
 
-      const proc = spawn("gh", ["copilot", ...args], {
+      const proc = spawn("copilot", args, {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -380,9 +382,9 @@ export class CopilotAgentProvider implements Agent {
    */
   private formatSpawnError(error: NodeJS.ErrnoException): string {
     if (error.code === "ENOENT") {
-      return `GitHub CLI (gh) not found: ${error.message}${INSTALLATION_INSTRUCTIONS}`;
+      return `GitHub Copilot CLI not found: ${error.message}${INSTALLATION_INSTRUCTIONS}`;
     }
-    return `Failed to spawn gh copilot: ${error.message}`;
+    return `Failed to spawn copilot: ${error.message}`;
   }
 
   private renderEvent(event: CopilotStreamEvent, outputAccumulator?: { value: string }): void {
