@@ -15,6 +15,7 @@ import { ClineAgentProvider, type ClineMode, type ClineProviderOptions } from ".
 import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
 import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
 import type { Agent } from "./core";
+import { GooseAgentProvider, type GooseProviderOptions } from "./goose";
 import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
 
 // =============================================================================
@@ -30,6 +31,7 @@ const agentRegistry = {
   cline: ClineAgentProvider,
   codex: CodexAgentProvider,
   copilot: CopilotAgentProvider,
+  goose: GooseAgentProvider,
   opencode: OpenCodeAgentProvider,
 } as const;
 
@@ -85,6 +87,8 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
       return createCodexAgent(isInteractive, model);
     case "copilot":
       return createCopilotAgent(isInteractive, model);
+    case "goose":
+      return createGooseAgent(isInteractive, model);
     case "opencode":
       return createOpenCodeAgent(isInteractive, model);
     default:
@@ -164,6 +168,8 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
       return createCodexAgent(isInteractive, model);
     case "copilot":
       return createCopilotAgent(isInteractive, model);
+    case "goose":
+      return createGooseAgent(isInteractive, model);
     case "opencode":
       return createOpenCodeAgent(isInteractive, model, perAgentConfig);
     default:
@@ -321,4 +327,18 @@ function createOpenCodeAgent(
   };
 
   return new OpenCodeAgentProvider(options);
+}
+
+/**
+ * Creates a Goose agent with the specified mode and optional model.
+ * Goose is Block's open-source AI agent with extensible MCP support.
+ */
+function createGooseAgent(interactive: boolean, model?: string): GooseAgentProvider {
+  const options: GooseProviderOptions = {
+    interactive,
+    streamOutput: true,
+    model: model,
+  };
+
+  return new GooseAgentProvider(options);
 }

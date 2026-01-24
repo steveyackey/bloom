@@ -54,6 +54,9 @@ export {
   isAgentRegistered,
   listAvailableAgents,
 } from "./factory";
+// Goose provider with session management utilities
+export type { GooseProviderOptions, GooseRunningSession, GooseStreamEvent } from "./goose";
+export { GooseAgentProvider, getActiveGooseSession, interjectGooseSession } from "./goose";
 // OpenCode provider
 export type { OpenCodeProviderOptions } from "./opencode";
 export { OpenCodeAgentProvider } from "./opencode";

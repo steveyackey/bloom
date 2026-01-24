@@ -10,32 +10,35 @@ Bloom supports multiple AI coding agents, enabling you to choose the best tool f
 | [Copilot](./copilot.md) | `copilot` | GitHub | GitHub-integrated workflows |
 | [Codex](./codex.md) | `codex` | OpenAI | Structured output, exploratory work |
 | [Cline](./cline.md) | `cline` | Multi-provider | Careful, planned execution |
+| [Goose](./goose.md) | `goose` | Multi-provider | Extensible automation via MCP |
 | [OpenCode](./opencode.md) | `opencode` | Multi-provider | Code intelligence via LSP |
 
 ## Capability Comparison
 
-| Feature | Claude | Copilot | Codex | Cline | OpenCode |
-|---------|:------:|:-------:|:-----:|:-----:|:--------:|
-| File Read/Write | Yes | Yes | Yes | Yes | Yes |
-| Bash/Terminal | Yes | Yes | Yes | Yes | Yes |
-| Git Operations | Yes | Yes | Yes | Yes | Yes |
-| **Web Search** | Yes | Yes | Yes | No | No |
-| **Web Fetch** | Yes | Yes | No | No | No |
-| **Session Resume** | Yes | Yes | Yes | Yes | Yes |
-| **Session Fork** | No | No | Yes | No | No |
-| **Structured Output** | No | No | Yes | No | No |
-| **Plan Mode** | No | No | No | Yes | No |
-| **Human Questions** | Yes | No | No | Yes | No |
-| **LSP Integration** | No | No | No | No | Yes |
-| Streaming JSON | Yes | Yes | Yes | Yes | Yes |
+| Feature | Claude | Copilot | Codex | Cline | Goose | OpenCode |
+|---------|:------:|:-------:|:-----:|:-----:|:-----:|:--------:|
+| File Read/Write | Yes | Yes | Yes | Yes | Yes | Yes |
+| Bash/Terminal | Yes | Yes | Yes | Yes | Yes | Yes |
+| Git Operations | Yes | Yes | Yes | Yes | Yes | Yes |
+| **Web Search** | Yes | Yes | Yes | No | No | No |
+| **Web Fetch** | Yes | Yes | No | No | Yes | No |
+| **Session Resume** | Yes | Yes | Yes | Yes | Yes | Yes |
+| **Session Fork** | No | No | Yes | No | No | No |
+| **Structured Output** | No | No | Yes | No | No | No |
+| **MCP Extensions** | No | No | No | No | Yes | No |
+| **Plan Mode** | No | No | No | Yes | No | No |
+| **Human Questions** | Yes | No | No | Yes | Yes | No |
+| **LSP Integration** | No | No | No | No | No | Yes |
+| Streaming JSON | Yes | Yes | Yes | Yes | Yes | Yes |
 
 ### Key Differentiators
 
 - **Web Search**: Claude, Copilot, and Codex can search the web for documentation and examples
 - **Plan Mode**: Cline creates a detailed plan and waits for approval before executing
 - **Session Fork**: Codex can branch sessions to explore alternative approaches
+- **MCP Extensions**: Goose is extensible via Model Context Protocol servers for custom capabilities
 - **LSP Integration**: OpenCode has native Language Server Protocol support for accurate code intelligence
-- **Human Questions**: Claude and Cline can pause to ask clarifying questions during execution
+- **Human Questions**: Claude, Cline, and Goose can pause to ask clarifying questions during execution
 
 ## Configuration
 
@@ -67,7 +70,7 @@ nonInteractiveAgent:
 
 ### Agent Names
 
-Valid agent names: `claude`, `copilot`, `codex`, `cline`, `opencode`
+Valid agent names: `claude`, `copilot`, `codex`, `cline`, `goose`, `opencode`
 
 ## Choosing an Agent
 
@@ -106,6 +109,11 @@ export OPENAI_API_KEY="your-key"
 # Cline (requires gRPC service)
 npm install -g cline
 cline-core start  # Or use VS Code extension
+
+# Goose (Block)
+brew install block-goose-cli  # macOS
+# or: curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
+goose configure  # Set up provider
 
 # OpenCode (Go)
 go install github.com/sst/opencode@latest
@@ -153,15 +161,15 @@ Bloom uses a provider abstraction layer to support multiple agents:
 │  Agent Factory  │  ← Reads ~/.bloom/config.yaml
 └────────┬────────┘
          │
-    ┌────┴────┬────────┬────────┬─────────┐
-    ▼         ▼        ▼        ▼         ▼
-┌───────┐ ┌───────┐ ┌─────┐ ┌─────┐ ┌────────┐
-│Claude │ │Copilot│ │Codex│ │Cline│ │OpenCode│
-└───┬───┘ └───┬───┘ └──┬──┘ └──┬──┘ └───┬────┘
-    │         │        │       │        │
-    ▼         ▼        ▼       ▼        ▼
-  claude    copilot  codex   cline   opencode
-   CLI       CLI      CLI     CLI      CLI
+    ┌────┴────┬────────┬────────┬────────┬─────────┐
+    ▼         ▼        ▼        ▼        ▼         ▼
+┌───────┐ ┌───────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌────────┐
+│Claude │ │Copilot│ │Codex│ │Cline│ │Goose│ │OpenCode│
+└───┬───┘ └───┬───┘ └──┬──┘ └──┬──┘ └──┬──┘ └───┬────┘
+    │         │        │       │       │        │
+    ▼         ▼        ▼       ▼       ▼        ▼
+  claude    copilot  codex   cline   goose   opencode
+   CLI       CLI      CLI     CLI     CLI      CLI
 ```
 
 Each provider implements the `Agent` interface:

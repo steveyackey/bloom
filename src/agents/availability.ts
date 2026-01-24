@@ -39,6 +39,7 @@ export interface AgentAvailability {
 const agentCliConfig: Record<string, { command: string; checkArgs: string[] }> = {
   claude: { command: "claude", checkArgs: ["--version"] },
   cline: { command: "cline", checkArgs: ["--version"] },
+  goose: { command: "goose", checkArgs: ["version"] },
   opencode: { command: "opencode", checkArgs: ["--version"] },
 };
 
@@ -59,6 +60,12 @@ const agentModels: Record<string, { models: string[]; default?: string }> = {
   cline: {
     // Cline uses VS Code settings for model selection, these are common options
     models: ["claude-3.5-sonnet", "gpt-4", "gpt-4-turbo", "claude-3-opus"],
+    default: "claude-3.5-sonnet",
+  },
+  goose: {
+    // Goose uses configured providers, these are common options
+    // Run `goose configure` to set up providers
+    models: ["claude-3.5-sonnet", "gpt-4o", "gpt-4-turbo", "claude-3-opus"],
     default: "claude-3.5-sonnet",
   },
   opencode: {
