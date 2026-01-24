@@ -220,6 +220,49 @@ export const opencodeAgent: AgentDefinition = {
 };
 
 // =============================================================================
+// Test Agent (for e2e testing without LLM)
+// =============================================================================
+
+export const testAgent: AgentDefinition = {
+  command: "bun",
+  version: ["--version"], // Uses bun's version
+  docs: "https://github.com/your-org/bloom/blob/main/src/agents/test-agent/README.md",
+  description: "Mock agent for e2e testing without an LLM",
+
+  flags: {
+    model: ["--model"],
+    resume: ["--session-id"],
+    approval_bypass: ["--yes"],
+    system_prompt: ["--system"],
+  },
+
+  interactive: {
+    // Test agent doesn't have a true interactive mode, but we support it
+    base_args: ["src/agents/test-agent/cli.ts"],
+    prompt: { flag: "-p" },
+    prepend_system_prompt: true,
+  },
+
+  streaming: {
+    base_args: ["src/agents/test-agent/cli.ts", "--json"],
+    prompt: { flag: "-p" },
+    prepend_system_prompt: true,
+  },
+
+  env: {
+    inject: {},
+    required: [], // No API keys needed
+  },
+
+  output: {
+    format: "stream-json",
+    session_id_field: "session_id",
+  },
+
+  model_required_for_streaming: false,
+};
+
+// =============================================================================
 // Registry
 // =============================================================================
 
@@ -232,6 +275,7 @@ export const BUILTIN_AGENTS: Record<string, AgentDefinition> = {
   codex: codexAgent,
   goose: gooseAgent,
   opencode: opencodeAgent,
+  test: testAgent,
 };
 
 /**
