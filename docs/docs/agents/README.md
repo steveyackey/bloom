@@ -77,7 +77,7 @@ Each agent has its own installation process. See their official documentation:
 | Agent | Official Docs |
 |-------|---------------|
 | Claude | [Claude Code Docs](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) |
-| Copilot | [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) |
+| Copilot | [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli) |
 | Codex | [OpenAI Codex CLI](https://github.com/openai/codex) |
 | Goose | [Goose Docs](https://block.github.io/goose/) |
 | OpenCode | [OpenCode Docs](https://opencode.ai/) |
