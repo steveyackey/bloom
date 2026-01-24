@@ -275,12 +275,12 @@ function createClineAgent(interactive: boolean, model?: string, perAgentConfig?:
 
 /**
  * Creates a Codex agent with the specified mode and optional model.
- * Codex supports session forking and structured output via JSON schemas.
+ * Codex supports session forking and sandbox control.
  */
 function createCodexAgent(interactive: boolean, model?: string): CodexAgentProvider {
   const options: CodexProviderOptions = {
     interactive,
-    approvalMode: "full-auto",
+    // dangerouslyBypassApprovalsAndSandbox defaults to true (matches Claude's behavior)
     streamOutput: true,
     model: model,
   };

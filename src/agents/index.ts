@@ -30,9 +30,10 @@ export { ClineAgentProvider, getActiveClineSession, interjectClineSession } from
 
 // Codex provider with session management and fork utilities
 export type {
-  CodexApprovalMode,
+  CodexApprovalPolicy,
   CodexProviderOptions,
   CodexRunningSession,
+  CodexSandboxMode,
   CodexStreamEvent,
   ForkResult,
 } from "./codex";

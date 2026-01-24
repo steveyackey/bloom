@@ -659,13 +659,4 @@ export class ClineAgentProvider implements Agent {
 
     return args;
   }
-
-  private buildResumeArgs(options: AgentRunOptions): string[] {
-    // Resume a previous task using task resume
-    const args: string[] = ["task", "resume", options.sessionId!];
-
-    args.push("-F", "json");
-
-    return args;
-  }
 }
