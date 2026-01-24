@@ -280,8 +280,8 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
   // Codex (OpenAI)
   // ===========================================================================
   // CLI: codex
-  // Features: Session forking, structured output, JSON schemas
-  // Strengths: Output schema enforcement, session branching, sandbox control
+  // Features: Session forking/resume, sandbox control, approval policies
+  // Strengths: Session branching, sandbox control, web search
   // ===========================================================================
   codex: {
     // Tools
@@ -298,15 +298,15 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     maxPromptLength: undefined,
 
     // Session features
-    supportsSessionResume: true, // Via resume --session <id>
-    supportsSessionFork: true, // Via codex fork <session_id>
+    supportsSessionResume: true, // Via `codex resume` (--last for most recent)
+    supportsSessionFork: true, // Via `codex fork` (--last for most recent)
 
     // Output features
-    supportsStructuredOutput: true, // Via --output-schema
-    supportsStreamingJson: true, // Via --json flag
+    supportsStructuredOutput: false,
+    supportsStreamingJson: true, // Via `codex exec` subcommand
 
     // Interaction
-    supportsHumanQuestions: false, // Runs to completion (approval modes are CLI-level)
+    supportsHumanQuestions: false, // Runs to completion (approval policies are CLI-level)
     supportsPlanMode: false,
 
     // Code intelligence
@@ -315,8 +315,7 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     // Special instructions
     specialInstructions: [
       "Supports session forking to explore alternative approaches",
-      "Can enforce output format via --output-schema with JSON schema",
-      "Use --sandbox flag to control file system access level",
+      "Use -s/--sandbox flag to control file system access level",
     ],
   },
 

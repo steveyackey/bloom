@@ -194,15 +194,17 @@ Begin working on the task now.`;
 }
 
 /**
- * Save the session ID to a task for later resumption.
+ * Save or clear the session ID on a task for later resumption.
+ * Pass empty string or undefined to clear the session ID.
  */
-async function saveTaskSessionId(taskId: string, sessionId: string): Promise<void> {
+async function saveTaskSessionId(taskId: string, sessionId: string | undefined): Promise<void> {
   const tasksFile = await loadTasks(getTasksFile());
 
   function updateSession(tasks: import("../task-schema").Task[]): boolean {
     for (const task of tasks) {
       if (task.id === taskId) {
-        task.session_id = sessionId;
+        // Clear session_id if empty, otherwise set it
+        task.session_id = sessionId || undefined;
         return true;
       }
       if (updateSession(task.subtasks)) return true;
@@ -341,6 +343,11 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
 
       agentLog.info(`Starting ${taskProvider} session in: ${workingDir}`);
 
+      // Only use session ID if the task's agent matches the provider
+      // Session IDs are provider-specific (Claude IDs won't work with OpenCode, etc.)
+      const canResumeSession = !taskResult.agent || taskResult.agent === defaultProvider;
+      const sessionIdToUse = canResumeSession ? taskResult.sessionId : undefined;
+
       const startTime = Date.now();
       let result = await agent.run({
         systemPrompt,
@@ -348,13 +355,27 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         startingDirectory: workingDir,
         agentName,
         taskId: taskResult.taskId,
-        sessionId: taskResult.sessionId, // Resume existing session if available
+        sessionId: sessionIdToUse,
       });
       const duration = Math.round((Date.now() - startTime) / 1000);
 
-      // Save session ID for future resumption
-      if (result.sessionId && taskResult.taskId) {
+      // Check for fatal session errors that indicate corrupted state
+      // These errors mean we should NOT save/reuse this session
+      const isFatalSessionError =
+        result.error &&
+        (result.error.includes("tool_use") ||
+          result.error.includes("concurrency") ||
+          result.error.includes("must be unique") ||
+          result.error.includes("must start with") ||
+          result.error.includes("invalid_format"));
+
+      // Save session ID for future resumption (only if session is healthy)
+      if (result.sessionId && taskResult.taskId && !isFatalSessionError) {
         await saveTaskSessionId(taskResult.taskId, result.sessionId);
+      } else if (isFatalSessionError && taskResult.taskId) {
+        // Clear corrupted session ID so next attempt starts fresh
+        agentLog.warn("Session appears corrupted, clearing session ID for fresh start");
+        await saveTaskSessionId(taskResult.taskId, undefined);
       }
 
       if (result.success) {

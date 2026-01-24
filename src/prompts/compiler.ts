@@ -17,6 +17,7 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { EMBEDDED_PROMPTS } from "../prompts-embedded";
 
 // =============================================================================
 // Types
@@ -131,6 +132,7 @@ export class PromptCompiler {
 
   /**
    * Load and compile a prompt from a file.
+   * Falls back to embedded prompts if the file doesn't exist (for bundled binary).
    *
    * @param name - The prompt file name (without .md extension)
    * @param options - Compilation options
@@ -139,11 +141,20 @@ export class PromptCompiler {
   async loadAndCompile(name: string, options: CompileOptions = {}): Promise<string> {
     const filePath = join(this.promptsDir, `${name}.md`);
 
-    if (!existsSync(filePath)) {
-      throw new Error(`Prompt file not found: ${name} (checked: ${filePath})`);
+    let content: string;
+
+    if (existsSync(filePath)) {
+      // Load from filesystem
+      content = await Bun.file(filePath).text();
+    } else if (EMBEDDED_PROMPTS[name]) {
+      // Fall back to embedded prompts (for bundled binary)
+      content = EMBEDDED_PROMPTS[name];
+    } else {
+      throw new Error(
+        `Prompt file not found: ${name} (checked: ${filePath}, embedded: ${Object.keys(EMBEDDED_PROMPTS).join(", ")})`
+      );
     }
 
-    const content = await Bun.file(filePath).text();
     return this.compile(content, { ...options, fileName: `${name}.md` });
   }
 

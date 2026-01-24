@@ -368,8 +368,7 @@ export class CopilotAgentProvider implements Agent {
         });
       });
 
-      // Send prompt via stdin and close
-      proc.stdin?.write(options.prompt);
+      // Close stdin - prompt is passed as CLI argument
       proc.stdin?.end();
     });
   }
@@ -526,8 +525,9 @@ export class CopilotAgentProvider implements Agent {
   }
 
   private buildInteractiveArgs(options: AgentRunOptions): string[] {
-    // Interactive mode: no -p flag, Copilot runs in REPL mode
-    const args: string[] = [];
+    // Interactive mode: -i flag starts interactive mode with initial prompt
+    const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
+    const args: string[] = ["-i", fullPrompt];
 
     // Add tool permissions
     this.addToolPermissionArgs(args);
@@ -537,20 +537,15 @@ export class CopilotAgentProvider implements Agent {
       args.push("--model", this.model);
     }
 
-    // Copilot doesn't support --append-system-prompt, so prepend system prompt to user prompt
-    // For interactive mode, we pass the initial prompt with system context
-    if (options.prompt) {
-      const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
-      args.push(fullPrompt);
-    }
-
     return args;
   }
 
   private buildStreamingArgs(options: AgentRunOptions): string[] {
-    // Streaming/print mode: -p flag for single-shot execution
-    // -s flag for streaming JSON output
-    const args: string[] = ["-p", "-s"];
+    // Copilot doesn't support --append-system-prompt, so prepend system prompt
+    const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
+
+    // Non-interactive mode: -p takes the prompt directly
+    const args: string[] = ["-p", fullPrompt];
 
     // Add tool permissions
     this.addToolPermissionArgs(args);
@@ -564,10 +559,6 @@ export class CopilotAgentProvider implements Agent {
     if (options.sessionId) {
       args.push("--resume", options.sessionId);
     }
-
-    // Copilot doesn't support --append-system-prompt, so prepend system prompt
-    const fullPrompt = options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt;
-    args.push(fullPrompt);
 
     return args;
   }

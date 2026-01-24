@@ -212,6 +212,7 @@ export class ClaudeAgentProvider implements Agent {
       let sessionId: string | undefined;
       let buffer = "";
       const outputAccumulator = { value: "" };
+      const errorAccumulator = { value: "" };
       let timedOut = false;
 
       // Track session for interjection support
@@ -279,10 +280,15 @@ export class ClaudeAgentProvider implements Agent {
 
           // Stream human-readable output and accumulate text output
           if (this.streamOutput) {
-            this.renderEvent(event, outputAccumulator);
+            this.renderEvent(event, outputAccumulator, errorAccumulator);
           } else {
             // Even when not streaming, we need to accumulate text from assistant events
             this.extractTextFromEvent(event, outputAccumulator);
+            // Still capture errors even when not streaming
+            if (event.type === "error") {
+              const errorObj = event.error as { message?: string } | undefined;
+              errorAccumulator.value = errorObj?.message || "unknown error";
+            }
           }
         } catch {
           // Not JSON, output raw
@@ -334,21 +340,27 @@ export class ClaudeAgentProvider implements Agent {
         }
 
         const exitCode = code ?? 0;
+        const hasError = timedOut || exitCode !== 0 || errorAccumulator.value;
         resolve({
-          success: !timedOut && exitCode === 0,
+          success: !hasError,
           output: outputAccumulator.value,
-          error: timedOut ? "Agent timed out due to inactivity" : undefined,
+          error: timedOut
+            ? "Agent timed out due to inactivity"
+            : errorAccumulator.value || (exitCode !== 0 ? `Process exited with code ${exitCode}` : undefined),
           sessionId,
         });
       });
 
-      // Send prompt via stdin and close
-      proc.stdin?.write(options.prompt);
+      // Close stdin - prompt is passed as CLI argument
       proc.stdin?.end();
     });
   }
 
-  private renderEvent(event: StreamEvent, outputAccumulator?: { value: string }): void {
+  private renderEvent(
+    event: StreamEvent,
+    outputAccumulator?: { value: string },
+    errorAccumulator?: { value: string }
+  ): void {
     switch (event.type) {
       case "assistant": {
         // Claude CLI sends message.content as an array of content blocks
@@ -416,6 +428,10 @@ export class ClaudeAgentProvider implements Agent {
         const errorObj = event.error as { message?: string } | undefined;
         const errorMessage = errorObj?.message || "unknown error";
         process.stdout.write(`\n[ERROR: ${errorMessage}]\n`);
+        // Capture error for result
+        if (errorAccumulator) {
+          errorAccumulator.value = errorMessage;
+        }
         break;
       }
 

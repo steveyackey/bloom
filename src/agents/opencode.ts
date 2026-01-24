@@ -77,7 +77,8 @@ export interface OpenCodeProviderOptions extends AgentConfig {
    */
   onTimeout?: () => void;
   /**
-   * Model to use in provider/model format (e.g., 'opencode/grok-code').
+   * Model to use in provider/model format.
+   * Run `opencode models` to see available options.
    * REQUIRED in streaming mode - no default model is used.
    */
   model?: string;
@@ -235,7 +236,7 @@ export class OpenCodeAgentProvider implements Agent {
         success: false,
         output: "",
         error:
-          "Model selection is REQUIRED for OpenCode in streaming mode. Use provider/model format (e.g., opencode/grok-code).",
+          "Model selection is REQUIRED for OpenCode in streaming mode. Run `opencode models` to see available options.",
       };
     }
 

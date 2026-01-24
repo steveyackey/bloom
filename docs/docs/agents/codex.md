@@ -1,6 +1,6 @@
 # Codex Agent
 
-Codex is OpenAI's coding agent CLI, offering unique features like session forking and structured output enforcement. It's ideal for exploratory work where you want to try multiple approaches.
+Codex is OpenAI's coding agent CLI, offering unique features like session forking and resume capabilities. It's ideal for exploratory work where you want to try multiple approaches.
 
 ## Prerequisites
 
@@ -11,8 +11,11 @@ Codex is OpenAI's coding agent CLI, offering unique features like session forkin
 ## Installation
 
 ```bash
-# Install Codex CLI
+# Install Codex CLI (via npm)
 npm install -g @openai/codex
+
+# Or via Cargo (Rust)
+cargo install openai-codex
 
 # Set your API key
 export OPENAI_API_KEY="sk-..."
@@ -54,75 +57,114 @@ nonInteractiveAgent:
 |------------|:---------:|-------|
 | File Read | Yes | Read files in working directory |
 | File Write | Yes | Create and modify files |
-| Bash/Terminal | Yes | Execute shell commands |
+| Bash/Terminal | Yes | Execute shell commands (sandboxed) |
 | Git Operations | Yes | Full git support |
 | Web Search | Yes | Via `--search` flag |
 | Web Fetch | No | No direct URL fetching |
-| Session Resume | Yes | Via `codex resume --session <id>` |
-| Session Fork | Yes | Via `codex fork <session_id>` |
-| Structured Output | Yes | Via `--output-schema` |
+| Session Resume | Yes | Via `codex resume` |
+| Session Fork | Yes | Via `codex fork` |
 | Human Questions | No | Runs to completion |
 
 ### Unique Features
 
-#### Session Forking
-Codex can fork an existing session to explore alternative approaches:
+#### Session Resume & Fork
+
+Resume or fork previous sessions:
 
 ```bash
-# Fork a session to try a different approach
-codex fork <session_id>
+# Resume with interactive picker
+codex resume
+
+# Resume most recent session
+codex resume --last
+
+# Fork with interactive picker  
+codex fork
+
+# Fork most recent session
+codex fork --last
 ```
 
-This creates a new session with the same context, allowing you to:
+Session forking creates a new session with the same context, allowing you to:
 - Try different implementations
 - Compare approaches
 - Recover from mistakes without starting over
 
-#### Structured Output
-Enforce output format using JSON schemas:
+#### Web Search
+
+Enable live web search for the model:
 
 ```bash
-codex --output-schema '{"type": "object", "properties": {"files": {"type": "array"}}}' "prompt"
+codex --search "find the latest React 19 features"
 ```
-
-Useful for:
-- Extracting specific data formats
-- Ensuring consistent output structure
-- Integration with other tools
 
 #### Sandbox Control
-Control filesystem access levels:
+
+Control filesystem access levels with `-s/--sandbox`:
 
 ```bash
-codex --sandbox read-only "analyze this code"
-codex --sandbox full "implement this feature"
+# Read-only access (safest)
+codex -s read-only "analyze this code"
+
+# Write to workspace only
+codex -s workspace-write "implement this feature"
+
+# Full access (dangerous)
+codex -s danger-full-access "system-wide changes"
 ```
+
+#### Approval Policies
+
+Control when the model requires approval with `-a/--ask-for-approval`:
+
+| Policy | Behavior |
+|--------|----------|
+| `untrusted` | Only run "trusted" commands without asking |
+| `on-failure` | Ask only when a command fails |
+| `on-request` | Model decides when to ask |
+| `never` | Never ask for approval |
+
+The `--full-auto` flag is a convenience alias for `-a on-request -s workspace-write`.
 
 ## Provider-Specific Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `model` | string | (default) | OpenAI model to use |
+| `model` | string | (CLI default) | Model to use (`-m/--model`) |
+| `dangerouslyBypassApprovalsAndSandbox` | boolean | `true` | Skip all prompts and sandbox (matches Claude's default) |
+| `fullAuto` | boolean | `false` | Use `--full-auto` mode (sandboxed) |
+| `approvalPolicy` | string | - | Override approval policy (`-a`) |
+| `sandbox` | string | - | Override sandbox mode (`-s`) |
+| `enableSearch` | boolean | `false` | Enable web search (`--search`) |
 
 ## CLI Flags Reference
 
 When Bloom runs Codex, it uses these patterns:
 
 ```bash
-# Standard execution
-codex --json "prompt"
+# Non-interactive execution (default - matches Claude's behavior)
+codex exec --dangerously-bypass-approvals-and-sandbox "prompt"
+
+# Interactive TUI mode
+codex --dangerously-bypass-approvals-and-sandbox "prompt"
+
+# With specific model
+codex exec -m o3 --dangerously-bypass-approvals-and-sandbox "prompt"
 
 # With search enabled
-codex --search "prompt"
+codex exec --dangerously-bypass-approvals-and-sandbox --search "prompt"
 
-# Resume session
-codex resume --session <session_id>
+# Sandboxed mode (use fullAuto: true)
+codex exec --full-auto "prompt"
+
+# Resume session (interactive picker)
+codex resume
+
+# Resume most recent session
+codex resume --last
 
 # Fork session
-codex fork <session_id>
-
-# Structured output
-codex --output-schema <schema.json> "prompt"
+codex fork
 ```
 
 ## Troubleshooting
@@ -179,9 +221,9 @@ export OPENAI_API_KEY="sk-..."
 **Cause**: Invalid session ID or session expired
 
 **Solution**:
-- Verify session ID is correct
+- Use `codex resume` or `codex fork` without arguments to see available sessions
+- Use `--last` flag to quickly access most recent session
 - Sessions may expire after some time
-- Start a new session if needed
 
 ## Best Practices
 
@@ -191,31 +233,37 @@ export OPENAI_API_KEY="sk-..."
 2. Fork before risky changes
 3. Compare results across forks
 
-### For Structured Data
-
-1. Define JSON schemas for expected output
-2. Use structured output for data extraction
-3. Validate output against schema
-
 ### Sandbox Guidelines
 
 | Sandbox Level | Use Case |
 |---------------|----------|
 | `read-only` | Code analysis, review |
-| `minimal` | Limited writes, safer execution |
-| `full` | Full implementation work |
+| `workspace-write` | Standard development (default with `--full-auto`) |
+| `danger-full-access` | System-wide changes (use with caution) |
+
+### Approval Policy Guidelines
+
+| Policy | Use Case |
+|--------|----------|
+| `untrusted` | Maximum safety, approve most commands |
+| `on-failure` | Trust most operations, escalate on errors |
+| `on-request` | Let the model decide (default with `--full-auto`) |
+| `never` | Fully autonomous, no interruptions |
 
 ## Example Session
 
 ```bash
-# Start session
-codex "implement user authentication"
+# Start interactive session with full auto
+codex --full-auto "implement user authentication"
 
-# Fork to try alternative approach
-codex fork abc123
+# Run non-interactively
+codex exec --full-auto "add unit tests for auth module"
 
-# Continue with structured output
-codex --output-schema schema.json "extract API endpoints"
+# Fork most recent session to try alternative approach
+codex fork --last
+
+# Resume where you left off
+codex resume --last
 ```
 
 ## Comparison with Other Agents
@@ -223,16 +271,17 @@ codex --output-schema schema.json "extract API endpoints"
 | Aspect | Codex | Claude | OpenCode |
 |--------|-------|--------|----------|
 | Session Fork | Yes | No | No |
-| Structured Output | Yes | No | No |
+| Session Resume | Yes | Yes | Yes |
+| Web Search | Yes | Yes | No |
 | Human Questions | No | Yes | No |
 | Web Fetch | No | Yes | No |
 | LSP Support | No | No | Yes |
 
 Use Codex when:
 - Exploring multiple implementation approaches
-- Need structured/schema-enforced output
 - Want sandbox control over file access
 - Prefer OpenAI models
+- Need session forking capabilities
 
 Use Claude when:
 - Need human-in-the-loop capabilities

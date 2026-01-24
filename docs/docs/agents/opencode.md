@@ -67,11 +67,13 @@ nonInteractiveAgent:
 
 #### Available Models
 
-| Provider | Model Format | Example |
-|----------|--------------|---------|
-| Anthropic | `anthropic/<model>` | `anthropic/claude-sonnet-4` |
-| OpenAI | `openai/<model>` | `openai/gpt-4o` |
-| OpenCode | `opencode/<model>` | `opencode/grok-code` |
+To see available models for your configured providers, run:
+
+```bash
+opencode models
+```
+
+Models use the `provider/model` format (e.g., `anthropic/claude-sonnet-4`, `openai/gpt-4o`).
 
 ## Capabilities
 
@@ -224,10 +226,7 @@ echo $ANTHROPIC_API_KEY
 **Cause**: Unknown provider name
 
 **Solution**:
-Use supported providers:
-- `anthropic` - Anthropic (Claude models)
-- `openai` - OpenAI (GPT models)
-- `opencode` - OpenCode native models
+Run `opencode models` to see models for your configured providers.
 
 ### LSP Features Not Working
 
@@ -248,11 +247,7 @@ Use supported providers:
 
 ### Model Selection
 
-| Task Type | Recommended Model |
-|-----------|-------------------|
-| General coding | `anthropic/claude-sonnet-4` |
-| Complex reasoning | `anthropic/claude-opus-4` |
-| Fast iterations | `openai/gpt-4o-mini` |
+Run `opencode models` to see models for your configured providers. Models are specified in `provider/model` format.
 
 ### Session Management
 

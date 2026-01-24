@@ -28,14 +28,15 @@ export interface CodexStreamEvent {
 // =============================================================================
 //
 // These options extend the generic AgentConfig with Codex-specific features:
-// - approvalMode: Codex's --approval-mode flag (suggest, auto-edit, full-auto)
-// - sandbox: Codex's sandbox mode configuration
+// - approvalPolicy: Codex's -a/--ask-for-approval flag
+// - sandbox: Codex's -s/--sandbox mode configuration
+// - fullAuto: Convenience alias for low-friction sandboxed automatic execution
 // - search: Enable web search capability
-// - outputSchema: JSON schema for structured output enforcement
 //
 // =============================================================================
 
-export type CodexApprovalMode = "suggest" | "auto-edit" | "full-auto";
+export type CodexApprovalPolicy = "untrusted" | "on-failure" | "on-request" | "never";
+export type CodexSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 
 export interface CodexProviderOptions extends AgentConfig {
   /**
@@ -43,13 +44,32 @@ export interface CodexProviderOptions extends AgentConfig {
    */
   interactive?: boolean;
   /**
-   * PROVIDER-SPECIFIC: Approval mode for Codex.
-   * - 'suggest': All actions require approval (default)
-   * - 'auto-edit': File writes auto-approved, shell commands need approval
-   * - 'full-auto': All actions auto-approved (sandboxed)
-   * Maps to --approval-mode flag.
+   * PROVIDER-SPECIFIC: Approval policy for Codex (-a/--ask-for-approval).
+   * - 'untrusted': Only run "trusted" commands without asking for user approval
+   * - 'on-failure': Run all commands without approval; ask only on failure
+   * - 'on-request': The model decides when to ask the user for approval
+   * - 'never': Never ask for user approval
    */
-  approvalMode?: CodexApprovalMode;
+  approvalPolicy?: CodexApprovalPolicy;
+  /**
+   * PROVIDER-SPECIFIC: Sandbox mode for shell command execution (-s/--sandbox).
+   * - 'read-only': Read-only access
+   * - 'workspace-write': Write access to workspace
+   * - 'danger-full-access': Full filesystem access (dangerous)
+   */
+  sandbox?: CodexSandboxMode;
+  /**
+   * PROVIDER-SPECIFIC: Convenience alias for --full-auto flag.
+   * Equivalent to -a on-request --sandbox workspace-write.
+   * When true, overrides approvalPolicy and sandbox settings.
+   */
+  fullAuto?: boolean;
+  /**
+   * PROVIDER-SPECIFIC: Skip all confirmation prompts and execute without sandboxing.
+   * EXTREMELY DANGEROUS. Only use in externally sandboxed environments.
+   * Maps to --dangerously-bypass-approvals-and-sandbox flag.
+   */
+  dangerouslyBypassApprovalsAndSandbox?: boolean;
   /**
    * PROVIDER-SPECIFIC: Timeout in ms before considering agent dead.
    * Default: 600000 (10 min). Only applies in streaming mode.
@@ -75,19 +95,13 @@ export interface CodexProviderOptions extends AgentConfig {
    * Only applies in streaming mode.
    */
   onTimeout?: () => void;
-  /** Model to use. If not specified, uses Codex CLI default. */
+  /** Model to use (-m/--model). If not specified, uses Codex CLI default. */
   model?: string;
   /**
-   * PROVIDER-SPECIFIC: Enable web search capability.
-   * Maps to --search flag if supported.
+   * PROVIDER-SPECIFIC: Enable web search capability (--search flag).
+   * When enabled, the native web_search tool is available to the model.
    */
   enableSearch?: boolean;
-  /**
-   * PROVIDER-SPECIFIC: JSON schema for structured output.
-   * Codex can enforce output format via --output-schema.
-   * Pass a JSON schema object or a path to a schema file.
-   */
-  outputSchema?: Record<string, unknown> | string;
   /**
    * Enable verbose mode for additional event detail.
    */
@@ -203,7 +217,10 @@ export async function forkCodexSession(sessionId: string, workingDirectory: stri
 
 export class CodexAgentProvider implements Agent {
   private mode: "interactive" | "streaming";
-  private approvalMode: CodexApprovalMode;
+  private approvalPolicy?: CodexApprovalPolicy;
+  private sandbox?: CodexSandboxMode;
+  private fullAuto: boolean;
+  private dangerouslyBypassApprovalsAndSandbox: boolean;
   private streamOutput: boolean;
   private activityTimeoutMs: number;
   private heartbeatIntervalMs: number;
@@ -213,7 +230,6 @@ export class CodexAgentProvider implements Agent {
   private currentAgentName?: string;
   private model?: string;
   private enableSearch: boolean;
-  private outputSchema?: Record<string, unknown> | string;
   private verbose: boolean;
 
   constructor(options: CodexProviderOptions = {}) {
@@ -223,7 +239,11 @@ export class CodexAgentProvider implements Agent {
     } else {
       this.mode = options.interactive ? "interactive" : "streaming";
     }
-    this.approvalMode = options.approvalMode ?? "full-auto";
+    this.approvalPolicy = options.approvalPolicy;
+    this.sandbox = options.sandbox;
+    this.fullAuto = options.fullAuto ?? false;
+    // Default to true to match Claude's dangerouslySkipPermissions behavior
+    this.dangerouslyBypassApprovalsAndSandbox = options.dangerouslyBypassApprovalsAndSandbox ?? true;
     this.streamOutput = options.streamOutput ?? true;
     this.activityTimeoutMs = options.activityTimeoutMs ?? 600_000; // 10 min
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000; // 10s
@@ -232,7 +252,6 @@ export class CodexAgentProvider implements Agent {
     this.onTimeout = options.onTimeout;
     this.model = options.model;
     this.enableSearch = options.enableSearch ?? false;
-    this.outputSchema = options.outputSchema;
     this.verbose = options.verbose ?? false;
   }
 
@@ -599,20 +618,31 @@ export class CodexAgentProvider implements Agent {
     // Interactive mode: codex runs in TUI/REPL mode
     const args: string[] = [];
 
-    // Set approval mode
-    if (this.approvalMode) {
-      args.push("--approval-mode", this.approvalMode);
+    // Dangerous bypass takes precedence
+    if (this.dangerouslyBypassApprovalsAndSandbox) {
+      args.push("--dangerously-bypass-approvals-and-sandbox");
+    } else if (this.fullAuto) {
+      // --full-auto is convenience alias for -a on-request --sandbox workspace-write
+      args.push("--full-auto");
+    } else {
+      // Set approval policy if specified
+      if (this.approvalPolicy) {
+        args.push("-a", this.approvalPolicy);
+      }
+      // Set sandbox mode if specified
+      if (this.sandbox) {
+        args.push("-s", this.sandbox);
+      }
     }
 
     // Set model if specified
     if (this.model) {
-      args.push("--model", this.model);
+      args.push("-m", this.model);
     }
 
-    // Session resume - if sessionId provided, we're resuming
-    // Note: Codex may use different syntax for resume
-    if (options.sessionId) {
-      args.push("--resume", options.sessionId);
+    // Enable web search if specified
+    if (this.enableSearch) {
+      args.push("--search");
     }
 
     // Prepend system prompt to user prompt since Codex doesn't have --append-system-prompt
@@ -627,34 +657,34 @@ export class CodexAgentProvider implements Agent {
   }
 
   private buildStreamingArgs(options: AgentRunOptions): string[] {
-    // Streaming/quiet mode: codex -q --json for non-interactive execution
-    const args: string[] = ["-q", "--json"];
+    // Non-interactive mode: codex exec for autonomous execution
+    const args: string[] = ["exec"];
 
-    // Set approval mode (full-auto for autonomous execution)
-    if (this.approvalMode) {
-      args.push("--approval-mode", this.approvalMode);
+    // Dangerous bypass takes precedence
+    if (this.dangerouslyBypassApprovalsAndSandbox) {
+      args.push("--dangerously-bypass-approvals-and-sandbox");
+    } else if (this.fullAuto) {
+      // --full-auto is convenience alias for -a on-request --sandbox workspace-write
+      args.push("--full-auto");
+    } else {
+      // Set approval policy if specified
+      if (this.approvalPolicy) {
+        args.push("-a", this.approvalPolicy);
+      }
+      // Set sandbox mode if specified
+      if (this.sandbox) {
+        args.push("-s", this.sandbox);
+      }
     }
 
     // Set model if specified
     if (this.model) {
-      args.push("--model", this.model);
+      args.push("-m", this.model);
     }
 
-    // Session resume
-    if (options.sessionId) {
-      args.push("--resume", options.sessionId);
-    }
-
-    // Output schema for structured output enforcement (unique to Codex)
-    if (this.outputSchema) {
-      if (typeof this.outputSchema === "string") {
-        // Path to schema file
-        args.push("--output-schema", this.outputSchema);
-      } else {
-        // Inline JSON schema - write to temp file or pass as JSON string
-        // For now, pass as JSON string (CLI may support this)
-        args.push("--output-schema", JSON.stringify(this.outputSchema));
-      }
+    // Enable web search if specified
+    if (this.enableSearch) {
+      args.push("--search");
     }
 
     // Prepend system prompt to user prompt

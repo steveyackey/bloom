@@ -438,9 +438,7 @@ export class ClineAgentProvider implements Agent {
         });
       });
 
-      // Build full prompt with system context
-      const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
-      proc.stdin?.write(fullPrompt);
+      // Close stdin - prompt is passed as CLI argument
       proc.stdin?.end();
     });
   }
@@ -639,64 +637,34 @@ export class ClineAgentProvider implements Agent {
   }
 
   private buildInteractiveArgs(options: AgentRunOptions): string[] {
-    // Interactive mode: Plan mode for human review
+    // Interactive mode: just run cline with the prompt (no --yolo)
     const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
     const args: string[] = [fullPrompt];
-
-    args.push("--mode", "plan"); // Interactive uses plan mode for human approval
-
-    if (this.model) {
-      args.push("--model", this.model);
-    }
 
     return args;
   }
 
   private buildStreamingArgs(options: AgentRunOptions): string[] {
-    // Streaming mode: Use task new for autonomous execution
-    const args: string[] = ["task", "new"];
+    // New Cline CLI: cline "prompt" [--yolo]
+    const fullPrompt = `${options.systemPrompt}\n\n${options.prompt}`;
+    const args: string[] = [fullPrompt];
 
-    // For resume, use task resume instead
-    if (options.sessionId) {
-      return this.buildResumeArgs(options);
-    }
-
-    // Add the prompt placeholder - will be sent via stdin
-    args.push("--stdin");
-
-    // Mode selection
-    args.push("--mode", this.clineMode);
-
-    // Skip approvals in act mode
-    if (this.clineMode === "act" && this.yolo) {
+    // Skip approvals with --yolo
+    if (this.yolo) {
       args.push("--yolo");
     }
 
     // JSON output for parsing
     args.push("-F", "json");
 
-    if (this.model) {
-      args.push("--model", this.model);
-    }
-
     return args;
   }
 
   private buildResumeArgs(options: AgentRunOptions): string[] {
-    // Resume a previous task
+    // Resume a previous task using task resume
     const args: string[] = ["task", "resume", options.sessionId!];
 
-    args.push("--mode", this.clineMode);
-
-    if (this.clineMode === "act" && this.yolo) {
-      args.push("--yolo");
-    }
-
     args.push("-F", "json");
-
-    if (this.model) {
-      args.push("--model", this.model);
-    }
 
     return args;
   }
