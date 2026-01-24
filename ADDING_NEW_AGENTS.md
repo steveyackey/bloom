@@ -23,6 +23,8 @@ For Bloom to fully support an agent CLI, these commands/flags are needed:
 | **Version check** | `myagent --version` | For availability checking |
 | **Accept prompt** | `myagent --prompt "..."` or `myagent -p "..."` | How to pass the task |
 | **Working directory** | Respects `cwd` when spawned | Agent runs in project directory |
+| **Non-interactive mode** | `myagent --print` or `--non-interactive` | For autonomous execution without TTY |
+| **Approval bypass** | `myagent --yes` or `--dangerously-skip-permissions` | For headless runs without prompts |
 
 ### Recommended (For Full Features)
 
@@ -38,8 +40,6 @@ For Bloom to fully support an agent CLI, these commands/flags are needed:
 
 | Purpose | Example | Notes |
 |---------|---------|-------|
-| **Non-interactive mode** | `myagent --print` or `--non-interactive` | For autonomous execution |
-| **Approval bypass** | `myagent --yes` or `--dangerously-skip-permissions` | For headless runs |
 | **Timeout** | `myagent --timeout 600` | For long-running tasks |
 
 ## Step 1: Create the Provider File
