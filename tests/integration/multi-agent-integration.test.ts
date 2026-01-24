@@ -111,7 +111,7 @@ export const FIXTURE_TASKS = {
 
   /**
    * Fixture 3: Task requiring web search capability.
-   * Tests capability mismatch handling with Cline (no web search).
+   * Tests capability mismatch handling with Goose (no web search).
    */
   taskWithWebSearch: {
     tasks: [
@@ -120,7 +120,7 @@ export const FIXTURE_TASKS = {
         title: "Research latest React patterns",
         status: "ready_for_agent",
         agent_name: "researcher",
-        agent: "cline",
+        agent: "goose",
         requires_capabilities: ["supportsWebSearch"],
         depends_on: [],
         acceptance_criteria: ["Document React 19 features"],
@@ -203,10 +203,10 @@ export const FIXTURE_CONFIGS = {
   },
 
   /**
-   * Configuration with Cline for interactive sessions.
+   * Configuration with Goose for interactive sessions.
    */
-  clineInteractive: {
-    interactiveAgent: { agent: "cline" },
+  gooseInteractive: {
+    interactiveAgent: { agent: "goose" },
     nonInteractiveAgent: { agent: "claude" },
   },
 
@@ -237,10 +237,10 @@ export const FIXTURE_EXPECTED_PROMPTS = {
   },
 
   /**
-   * Cline should include plan mode instructions, exclude web search.
+   * Goose should include human questions, exclude web search.
    */
-  clinePromptSections: {
-    shouldInclude: ["Plan mode", "Ask human questions"],
+  goosePromptSections: {
+    shouldInclude: ["Ask human questions", "MCP extensions"],
     shouldExclude: ["Web search", "WebFetch"],
   },
 
@@ -591,7 +591,7 @@ describe("Multi-Agent Integration Tests", () => {
   describe("5. Capability Mismatch Handling", () => {
     /**
      * GIVEN: task that uses web search
-     * AND: agent=cline (does not support web search)
+     * AND: agent=goose (does not support web search)
      * WHEN: task executes
      * THEN: compiled prompt does NOT include web search instructions
      * (graceful degradation, not error)
@@ -599,28 +599,28 @@ describe("Multi-Agent Integration Tests", () => {
     test("gracefully degrades when agent lacks required capability", () => {
       const task = FIXTURE_TASKS.taskWithWebSearch.tasks[0];
 
-      // Task specifies cline as the agent
-      expect(task?.agent).toBe("cline");
+      // Task specifies goose as the agent
+      expect(task?.agent).toBe("goose");
 
-      // Cline capabilities - does NOT support web search
-      const clineCapabilities = {
+      // Goose capabilities - does NOT support web search
+      const gooseCapabilities = {
         supportsWebSearch: false,
         supportsFileRead: true,
         supportsBash: true,
         supportsGit: true,
         supportsHumanQuestions: true,
-        supportsPlanMode: true,
+        supportsPlanMode: false,
       };
 
       // Prompt should be compiled without web search section
-      const expectedExclusions = FIXTURE_EXPECTED_PROMPTS.clinePromptSections.shouldExclude;
+      const expectedExclusions = FIXTURE_EXPECTED_PROMPTS.goosePromptSections.shouldExclude;
       expect(expectedExclusions).toContain("Web search");
 
       // Task specifies agent_name (group) and agent (provider)
       expect(task?.agent_name).toBe("researcher");
 
-      // Cline capability check - no web search support
-      expect(clineCapabilities.supportsWebSearch).toBe(false);
+      // Goose capability check - no web search support
+      expect(gooseCapabilities.supportsWebSearch).toBe(false);
     });
 
     test("does not throw error for capability mismatch", () => {
@@ -631,14 +631,14 @@ describe("Multi-Agent Integration Tests", () => {
       expect(requiredCapability).toBe("supportsWebSearch");
 
       // Should NOT throw - just compile without the capability section
-      const compilePromptForCline = () => {
+      const compilePromptForGoose = () => {
         // Simulated prompt compilation that gracefully handles missing capability
-        const clineCapabilities = { supportsWebSearch: false };
-        return clineCapabilities.supportsWebSearch ? "Has web search" : "No web search";
+        const gooseCapabilities = { supportsWebSearch: false };
+        return gooseCapabilities.supportsWebSearch ? "Has web search" : "No web search";
       };
 
-      expect(() => compilePromptForCline()).not.toThrow();
-      expect(compilePromptForCline()).toBe("No web search");
+      expect(() => compilePromptForGoose()).not.toThrow();
+      expect(compilePromptForGoose()).toBe("No web search");
     });
   });
 
@@ -783,7 +783,7 @@ describe("Multi-Agent Integration Tests", () => {
  *
  * 3. Agent CLI Requirements (for full integration testing):
  *    - claude CLI installed (npm install -g @anthropic-ai/claude-cli)
- *    - cline CLI installed (cline-core gRPC service required)
+ *    - goose CLI installed (brew install block-goose-cli)
  *    - opencode CLI installed
  *    - copilot CLI installed (GitHub Copilot)
  *
@@ -866,7 +866,7 @@ export const CI_REQUIREMENTS = {
   },
   agentCLIs: {
     claude: "@anthropic-ai/claude-cli",
-    cline: "cline-cli (requires gRPC service)",
+    goose: "block-goose-cli",
     opencode: "opencode CLI",
     copilot: "GitHub Copilot CLI",
   },
@@ -946,9 +946,9 @@ You have access to Language Server Protocol features.
       expect(compiled).toContain("Web search");
     });
 
-    test("compiles Cline-specific prompt with plan mode capability", () => {
-      const clineCapabilities = getAgentCapabilities("cline");
-      expect(clineCapabilities).toBeDefined();
+    test("compiles Goose-specific prompt with human questions capability", () => {
+      const gooseCapabilities = getAgentCapabilities("goose");
+      expect(gooseCapabilities).toBeDefined();
 
       const promptTemplate = `# Agent Instructions
 
@@ -968,15 +968,15 @@ You can ask clarifying questions.
 <!-- @endif -->`;
 
       const compiled = compilePrompt(promptTemplate, {
-        capabilities: clineCapabilities!,
+        capabilities: gooseCapabilities!,
       });
 
-      // Cline supports plan mode and human questions
-      expect(compiled).toContain("Plan Mode");
+      // Goose supports human questions
       expect(compiled).toContain("Human Questions");
 
-      // Cline does not support web search
+      // Goose does not support web search or plan mode
       expect(compiled).not.toContain("Web Search");
+      expect(compiled).not.toContain("Plan Mode");
     });
 
     test("compiles OpenCode-specific prompt with LSP capability", () => {
@@ -1013,7 +1013,7 @@ You can search the web.
   // ===========================================================================
   describe("Agent Capability Registry", () => {
     test("all registered agents have required base capabilities", () => {
-      const agents: AgentName[] = ["claude", "cline", "opencode"];
+      const agents: AgentName[] = ["claude", "goose", "opencode"];
 
       for (const agent of agents) {
         const caps = getAgentCapabilities(agent);
@@ -1030,8 +1030,8 @@ You can search the web.
     test("hasCapability utility works correctly", () => {
       // Claude has web search
       expect(hasCapability("claude", "supportsWebSearch")).toBe(true);
-      // Cline does not have web search
-      expect(hasCapability("cline", "supportsWebSearch")).toBe(false);
+      // Goose does not have web search
+      expect(hasCapability("goose", "supportsWebSearch")).toBe(false);
       // OpenCode has LSP
       expect(hasCapability("opencode", "supportsLSP")).toBe(true);
       // Claude does not have LSP
@@ -1041,16 +1041,16 @@ You can search the web.
     test("capability differences match expected fixtures", () => {
       // Verify our FIXTURE_EXPECTED_PROMPTS match reality
       const claudeCaps = getAgentCapabilities("claude")!;
-      const clineCaps = getAgentCapabilities("cline")!;
+      const gooseCaps = getAgentCapabilities("goose")!;
       const openCodeCaps = getAgentCapabilities("opencode")!;
 
       // Claude expectations
       expect(claudeCaps.supportsWebSearch).toBe(true);
       expect(claudeCaps.supportsPlanMode).toBe(false);
 
-      // Cline expectations
-      expect(clineCaps.supportsWebSearch).toBe(false);
-      expect(clineCaps.supportsPlanMode).toBe(true);
+      // Goose expectations
+      expect(gooseCaps.supportsWebSearch).toBe(false);
+      expect(gooseCaps.supportsHumanQuestions).toBe(true);
 
       // OpenCode expectations
       expect(openCodeCaps.supportsLSP).toBe(true);
@@ -1300,11 +1300,11 @@ describe("Smoke Tests (Real CLI)", () => {
     });
   });
 
-  describe.skipIf(SKIP_SMOKE)("Cline CLI Smoke Test", () => {
-    const CLINE_INSTALLED = isCLIInstalled("cline");
+  describe.skipIf(SKIP_SMOKE)("Goose CLI Smoke Test", () => {
+    const GOOSE_INSTALLED = isCLIInstalled("goose");
 
-    test.skipIf(!CLINE_INSTALLED)("cline CLI responds to version check", async () => {
-      const result = Bun.spawnSync(["cline", "--version"], {
+    test.skipIf(!GOOSE_INSTALLED)("goose CLI responds to version check", async () => {
+      const result = Bun.spawnSync(["goose", "version"], {
         stdout: "pipe",
         stderr: "pipe",
         timeout: 10000,

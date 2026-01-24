@@ -11,7 +11,6 @@ import {
   isValidAgentName,
 } from "./capabilities";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
-import { ClineAgentProvider, type ClineMode, type ClineProviderOptions } from "./cline";
 import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
 import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
 import type { Agent } from "./core";
@@ -28,7 +27,6 @@ import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode"
  */
 const agentRegistry = {
   claude: ClaudeAgentProvider,
-  cline: ClineAgentProvider,
   codex: CodexAgentProvider,
   copilot: CopilotAgentProvider,
   goose: GooseAgentProvider,
@@ -58,7 +56,7 @@ export interface CreateAgentOptions {
 /**
  * Creates an agent by name with the specified mode settings.
  *
- * @param agentName - The name of the agent to create (claude, copilot, codex, cline, opencode)
+ * @param agentName - The name of the agent to create (claude, copilot, codex, goose, opencode)
  * @param isInteractive - Whether to create the agent in interactive mode
  * @param model - Optional model override
  * @returns A configured Agent instance
@@ -81,8 +79,6 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
   switch (agentName) {
     case "claude":
       return createClaudeAgent(isInteractive, model);
-    case "cline":
-      return createClineAgent(isInteractive, model);
     case "codex":
       return createCodexAgent(isInteractive, model);
     case "copilot":
@@ -162,8 +158,6 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
   switch (agentName) {
     case "claude":
       return createClaudeAgent(isInteractive, model, perAgentConfig);
-    case "cline":
-      return createClineAgent(isInteractive, model, perAgentConfig);
     case "codex":
       return createCodexAgent(isInteractive, model);
     case "copilot":
@@ -191,7 +185,7 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
  * @example
  * ```ts
  * const agents = listAvailableAgents();
- * // Returns: ["claude", "copilot", "codex", "cline", "opencode"]
+ * // Returns: ["claude", "copilot", "codex", "goose", "opencode"]
  * ```
  */
 export function listAvailableAgents(): AgentName[] {
@@ -255,28 +249,6 @@ function createClaudeAgent(
   };
 
   return new ClaudeAgentProvider(options);
-}
-
-/**
- * Creates a Cline agent with the specified mode and optional model.
- * Cline uses task-based session management with Plan/Act modes.
- * Applies per-agent configuration including mode and provider settings.
- */
-function createClineAgent(interactive: boolean, model?: string, perAgentConfig?: PerAgentConfig): ClineAgentProvider {
-  // Get Cline-specific config
-  const clineConfig = perAgentConfig as (PerAgentConfig & { mode?: ClineMode; provider?: string }) | undefined;
-
-  const options: ClineProviderOptions = {
-    mode: interactive ? "interactive" : "streaming",
-    // Use config mode if provided, otherwise default based on interactive mode
-    clineMode: clineConfig?.mode ?? (interactive ? "plan" : "act"),
-    // Skip approvals in non-interactive (act) mode
-    yolo: !interactive,
-    streamOutput: true,
-    model: model,
-  };
-
-  return new ClineAgentProvider(options);
 }
 
 /**

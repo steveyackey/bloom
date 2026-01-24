@@ -24,10 +24,6 @@ export {
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
 
-// Cline provider with session management utilities
-export type { ClineMode, ClineProviderOptions, ClineRunningSession, ClineStreamEvent } from "./cline";
-export { ClineAgentProvider, getActiveClineSession, interjectClineSession } from "./cline";
-
 // Codex provider with session management and fork utilities
 export type {
   CodexApprovalPolicy,

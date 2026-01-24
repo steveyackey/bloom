@@ -50,7 +50,6 @@ const sidebars: SidebarsConfig = {
         'agents/claude',
         'agents/copilot',
         'agents/codex',
-        'agents/cline',
         'agents/goose',
         'agents/opencode',
       ],

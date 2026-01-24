@@ -469,20 +469,18 @@ Bloom supports multiple AI agents, allowing you to choose the best tool for your
 | **Claude** | `claude` | General development | TodoWrite tracking, web search, human questions |
 | **Copilot** | `copilot` | GitHub integration | Multi-model support, GitHub MCP server |
 | **Codex** | `codex` | Structured output | Session forking, output schema enforcement |
-| **Cline** | `cline` | Careful planning | Plan/Act modes, explicit approval gates |
 | **Goose** | `goose` | Extensible automation | MCP extensions, browser automation, scheduling |
 | **OpenCode** | `opencode` | Code intelligence | Native LSP support, multi-provider |
 
 ### Agent Capabilities
 
-| Feature | Claude | Copilot | Codex | Cline | Goose | OpenCode |
-|---------|--------|---------|-------|-------|-------|----------|
-| Web Search | Yes | Yes | Yes | No | No | No |
-| Plan Mode | No | No | No | Yes | No | No |
-| Session Fork | No | No | Yes | No | No | No |
-| MCP Extensions | No | No | No | No | Yes | No |
-| LSP Integration | No | No | No | No | No | Yes |
-| Human Questions | Yes | No | No | Yes | Yes | No |
+| Feature | Claude | Copilot | Codex | Goose | OpenCode |
+|---------|--------|---------|-------|-------|----------|
+| Web Search | Yes | Yes | Yes | No | No |
+| Session Fork | No | No | Yes | No | No |
+| MCP Extensions | No | No | No | Yes | No |
+| LSP Integration | No | No | No | No | Yes |
+| Human Questions | Yes | No | No | Yes | No |
 
 ### Quick Configuration
 
@@ -502,7 +500,7 @@ nonInteractiveAgent:
   model: anthropic/claude-sonnet-4
 ```
 
-**Available agents**: `claude`, `copilot`, `codex`, `cline`, `goose`, `opencode`
+**Available agents**: `claude`, `copilot`, `codex`, `goose`, `opencode`
 
 ### Agent-Specific Setup
 
@@ -511,7 +509,6 @@ Each agent has its own CLI and configuration requirements:
 - **Claude**: `npm install -g @anthropic-ai/claude-code` - Uses Anthropic API key
 - **Copilot**: `gh extension install github/gh-copilot` - Uses GitHub authentication
 - **Codex**: `npm install -g @openai/codex` - Uses OpenAI API key
-- **Cline**: `npm install -g cline` - Requires Cline Core gRPC service
 - **Goose**: `brew install block-goose-cli` or curl installer - Extensible via MCP
 - **OpenCode**: `go install github.com/sst/opencode@latest` - Multi-provider support
 

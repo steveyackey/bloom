@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as YAML from "yaml";
 import { ClaudeAgentProvider } from "../../src/agents/claude";
-import { ClineAgentProvider } from "../../src/agents/cline";
 import { CodexAgentProvider } from "../../src/agents/codex";
 import { CopilotAgentProvider } from "../../src/agents/copilot";
 import { createAgent, getRegisteredAgents, isAgentRegistered } from "../../src/agents/factory";
+import { GooseAgentProvider } from "../../src/agents/goose";
 import { OpenCodeAgentProvider } from "../../src/agents/opencode";
 
 describe("agent factory", () => {
@@ -83,12 +83,12 @@ describe("agent factory", () => {
       expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
     });
 
-    test("respects interactiveAgent config for cline", async () => {
+    test("respects interactiveAgent config for goose", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "cline" },
+        interactiveAgent: { agent: "goose" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClineAgentProvider);
+      expect(agent).toBeInstanceOf(GooseAgentProvider);
     });
 
     test("uses interactiveAgent config only for interactive mode", async () => {
@@ -118,12 +118,12 @@ describe("agent factory", () => {
       expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
     });
 
-    test("respects nonInteractiveAgent config for cline", async () => {
+    test("respects nonInteractiveAgent config for goose", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "cline" },
+        nonInteractiveAgent: { agent: "goose" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(ClineAgentProvider);
+      expect(agent).toBeInstanceOf(GooseAgentProvider);
     });
 
     test("uses nonInteractiveAgent config only for nonInteractive mode", async () => {
@@ -250,17 +250,15 @@ describe("agent factory", () => {
     test("getRegisteredAgents returns registered agent names", () => {
       const agents = getRegisteredAgents();
       expect(agents).toContain("claude");
-      expect(agents).toContain("cline");
       expect(agents).toContain("codex");
       expect(agents).toContain("copilot");
       expect(agents).toContain("goose");
       expect(agents).toContain("opencode");
-      expect(agents.length).toBe(6);
+      expect(agents.length).toBe(5);
     });
 
     test("isAgentRegistered returns true for registered agents", () => {
       expect(isAgentRegistered("claude")).toBe(true);
-      expect(isAgentRegistered("cline")).toBe(true);
       expect(isAgentRegistered("codex")).toBe(true);
       expect(isAgentRegistered("copilot")).toBe(true);
       expect(isAgentRegistered("goose")).toBe(true);

@@ -140,15 +140,15 @@ export interface AgentCapabilities {
 
   /**
    * Whether the agent can ask clarifying questions to the human.
-   * Claude and Cline support this - agent pauses for human input.
+   * Claude and Goose support this - agent pauses for human input.
    * Copilot and Codex run to completion without interruption.
    */
   supportsHumanQuestions: boolean;
 
   /**
    * Whether the agent supports a plan-then-act workflow.
-   * Cline has explicit Plan/Act modes - creates plan, waits for approval.
-   * Other agents typically act directly without explicit planning phase.
+   * Some agents may have explicit plan modes - creates plan, waits for approval.
+   * Most agents act directly without explicit planning phase.
    */
   supportsPlanMode: boolean;
 
@@ -181,7 +181,7 @@ export interface AgentCapabilities {
 /**
  * Supported agent names.
  */
-export type AgentName = "claude" | "copilot" | "codex" | "cline" | "goose" | "opencode";
+export type AgentName = "claude" | "copilot" | "codex" | "goose" | "opencode";
 
 /**
  * Capability registry for all supported agents.
@@ -316,51 +316,6 @@ export const agentCapabilities: Record<AgentName, AgentCapabilities> = {
     specialInstructions: [
       "Supports session forking to explore alternative approaches",
       "Use -s/--sandbox flag to control file system access level",
-    ],
-  },
-
-  // ===========================================================================
-  // Cline
-  // ===========================================================================
-  // CLI: cline
-  // Features: Plan/Act modes, task management, multi-provider support
-  // Strengths: Explicit planning workflow, task checkpoints, approval gates
-  // ===========================================================================
-  cline: {
-    // Tools
-    supportsFileRead: true,
-    supportsFileWrite: true,
-    supportsBash: true,
-    supportsGit: true,
-    supportsWebSearch: false, // No web search capability
-    supportsWebFetch: false, // No web fetching
-
-    // Prompt features
-    supportsSystemPrompt: false, // Prepend to user prompt
-    supportsAppendSystemPrompt: false,
-    maxPromptLength: undefined,
-
-    // Session features
-    supportsSessionResume: true, // Via task ID management
-    supportsSessionFork: false,
-
-    // Output features
-    supportsStructuredOutput: false,
-    supportsStreamingJson: true, // Via -F json flag
-
-    // Interaction
-    supportsHumanQuestions: true, // Plan mode waits for approval
-    supportsPlanMode: true, // Explicit Plan/Act mode switching
-
-    // Code intelligence
-    supportsLSP: false, // No native LSP support
-
-    // Special instructions
-    specialInstructions: [
-      "Uses Plan mode by default - creates detailed plan before acting",
-      "Switch to Act mode with --mode act for direct execution",
-      "Requires Cline Core gRPC service running on localhost:50052",
-      "Use cline task commands for checkpoint and restore capabilities",
     ],
   },
 

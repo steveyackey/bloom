@@ -14,8 +14,8 @@ import { join } from "node:path";
 import YAML from "yaml";
 import { getAgentCapabilities } from "../../src/agents/capabilities";
 import { ClaudeAgentProvider } from "../../src/agents/claude";
-import { ClineAgentProvider } from "../../src/agents/cline";
 import { createAgent } from "../../src/agents/factory";
+import { GooseAgentProvider } from "../../src/agents/goose";
 import { OpenCodeAgentProvider } from "../../src/agents/opencode";
 
 describe("Orchestrator Agent Selection", () => {
@@ -57,9 +57,9 @@ describe("Orchestrator Agent Selection", () => {
       expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
     });
 
-    test("createAgent respects agentName option for cline", async () => {
-      const agent = await createAgent("nonInteractive", { agentName: "cline" });
-      expect(agent).toBeInstanceOf(ClineAgentProvider);
+    test("createAgent respects agentName option for goose", async () => {
+      const agent = await createAgent("nonInteractive", { agentName: "goose" });
+      expect(agent).toBeInstanceOf(GooseAgentProvider);
     });
 
     test("createAgent respects agentName option over config default", async () => {
@@ -75,8 +75,8 @@ describe("Orchestrator Agent Selection", () => {
       await writeConfig({
         agent: { default: "claude" },
       });
-      const agent = await createAgent("nonInteractive", { agentName: "cline" });
-      expect(agent).toBeInstanceOf(ClineAgentProvider);
+      const agent = await createAgent("nonInteractive", { agentName: "goose" });
+      expect(agent).toBeInstanceOf(GooseAgentProvider);
     });
   });
 
@@ -88,16 +88,16 @@ describe("Orchestrator Agent Selection", () => {
      */
     test("getAgentCapabilities returns different capabilities for different agents", () => {
       const claudeCaps = getAgentCapabilities("claude");
-      const clineCaps = getAgentCapabilities("cline");
+      const gooseCaps = getAgentCapabilities("goose");
       const opencodeCaps = getAgentCapabilities("opencode");
 
-      // Claude supports web search, Cline does not
+      // Claude supports web search, Goose does not
       expect(claudeCaps?.supportsWebSearch).toBe(true);
-      expect(clineCaps?.supportsWebSearch).toBe(false);
+      expect(gooseCaps?.supportsWebSearch).toBe(false);
 
-      // Cline supports plan mode, Claude does not
-      expect(clineCaps?.supportsPlanMode).toBe(true);
-      expect(claudeCaps?.supportsPlanMode).toBe(false);
+      // Goose supports human questions
+      expect(gooseCaps?.supportsHumanQuestions).toBe(true);
+      expect(claudeCaps?.supportsHumanQuestions).toBe(true);
 
       // OpenCode supports LSP, Claude does not
       expect(opencodeCaps?.supportsLSP).toBe(true);
@@ -106,14 +106,14 @@ describe("Orchestrator Agent Selection", () => {
 
     test("orchestrator should use correct agent capabilities (not hardcoded claude)", () => {
       // This test documents the expected behavior that orchestrator.ts violates
-      // When running tasks for "cline" agent, capabilities should be Cline's, not Claude's
+      // When running tasks for "goose" agent, capabilities should be Goose's, not Claude's
 
-      const clineCapabilities = getAgentCapabilities("cline");
+      const gooseCapabilities = getAgentCapabilities("goose");
 
-      // If orchestrator is fixed, it should get Cline's capabilities:
-      expect(clineCapabilities).toBeDefined();
-      expect(clineCapabilities?.supportsWebSearch).toBe(false);
-      expect(clineCapabilities?.supportsPlanMode).toBe(true);
+      // If orchestrator is fixed, it should get Goose's capabilities:
+      expect(gooseCapabilities).toBeDefined();
+      expect(gooseCapabilities?.supportsWebSearch).toBe(false);
+      expect(gooseCapabilities?.supportsHumanQuestions).toBe(true);
 
       // But currently orchestrator.ts:300 does:
       // const agentCapabilities = getAgentCapabilities("claude") || {};
@@ -129,13 +129,13 @@ describe("Orchestrator Agent Selection", () => {
      */
     test("agent providers should be identifiable", async () => {
       const claudeAgent = await createAgent("nonInteractive", { agentName: "claude" });
-      const clineAgent = await createAgent("nonInteractive", { agentName: "cline" });
+      const gooseAgent = await createAgent("nonInteractive", { agentName: "goose" });
       const opencodeAgent = await createAgent("nonInteractive", { agentName: "opencode" });
 
       // We can identify by instanceof, but the Agent interface doesn't
       // expose the provider name - orchestrator has to track it separately
       expect(claudeAgent).toBeInstanceOf(ClaudeAgentProvider);
-      expect(clineAgent).toBeInstanceOf(ClineAgentProvider);
+      expect(gooseAgent).toBeInstanceOf(GooseAgentProvider);
       expect(opencodeAgent).toBeInstanceOf(OpenCodeAgentProvider);
     });
   });

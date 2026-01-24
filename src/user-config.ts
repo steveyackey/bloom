@@ -63,12 +63,9 @@ const CodexAgentConfigSchema = BaseAgentConfigSchema.extend({
 });
 
 /**
- * Cline-specific configuration with mode and provider options.
+ * Goose-specific configuration.
  */
-const ClineAgentConfigSchema = BaseAgentConfigSchema.extend({
-  mode: z.enum(["plan", "act"]).optional(),
-  provider: z.string().optional(),
-});
+const GooseAgentConfigSchema = BaseAgentConfigSchema.extend({});
 
 /**
  * OpenCode-specific configuration.
@@ -80,8 +77,6 @@ const OpenCodeAgentConfigSchema = BaseAgentConfigSchema.extend({});
  * Type for per-agent config values.
  */
 export type PerAgentConfig = z.infer<typeof BaseAgentConfigSchema> & {
-  mode?: "plan" | "act";
-  provider?: string;
   fullAuto?: boolean;
 };
 
@@ -89,7 +84,7 @@ export type PerAgentConfig = z.infer<typeof BaseAgentConfigSchema> & {
 // Known Agent Names (for validation warnings)
 // =============================================================================
 
-export const KNOWN_AGENTS = ["claude", "copilot", "codex", "cline", "opencode"] as const;
+export const KNOWN_AGENTS = ["claude", "copilot", "codex", "goose", "opencode"] as const;
 export type KnownAgentName = (typeof KNOWN_AGENTS)[number];
 
 // =============================================================================
@@ -119,7 +114,7 @@ const AgentSectionSchema = z
     claude: ClaudeAgentConfigSchema.optional(),
     copilot: CopilotAgentConfigSchema.optional(),
     codex: CodexAgentConfigSchema.optional(),
-    cline: ClineAgentConfigSchema.optional(),
+    goose: GooseAgentConfigSchema.optional(),
     opencode: OpenCodeAgentConfigSchema.optional(),
   })
   .passthrough(); // Allow unknown agent names for forward compatibility
