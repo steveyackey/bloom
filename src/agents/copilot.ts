@@ -134,9 +134,10 @@ GitHub Copilot CLI is not installed or not found in PATH.
 
 To install GitHub Copilot CLI:
 1. Ensure you have an active GitHub Copilot subscription
-2. Install via npm: npm install -g @githubnext/github-copilot-cli
-   Or via Homebrew (macOS): brew install gh && gh extension install github/gh-copilot
-3. Authenticate: copilot auth login
+2. Install GitHub CLI: brew install gh (macOS) or see https://cli.github.com/
+3. Authenticate with GitHub: gh auth login
+4. Install Copilot extension: gh extension install github/gh-copilot
+5. Verify installation: gh copilot --version
 
 For more information, visit: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
 `;
@@ -199,7 +200,7 @@ export class CopilotAgentProvider implements Agent {
     return new Promise((resolve) => {
       const args = this.buildInteractiveArgs(options);
 
-      const proc = spawn("copilot", args, {
+      const proc = spawn("gh", ["copilot", ...args], {
         cwd: options.startingDirectory,
         stdio: "inherit",
       });
@@ -227,7 +228,7 @@ export class CopilotAgentProvider implements Agent {
     return new Promise((resolve) => {
       const args = this.buildStreamingArgs(options);
 
-      const proc = spawn("copilot", args, {
+      const proc = spawn("gh", ["copilot", ...args], {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -379,9 +380,9 @@ export class CopilotAgentProvider implements Agent {
    */
   private formatSpawnError(error: NodeJS.ErrnoException): string {
     if (error.code === "ENOENT") {
-      return `GitHub Copilot CLI not found: ${error.message}${INSTALLATION_INSTRUCTIONS}`;
+      return `GitHub CLI (gh) not found: ${error.message}${INSTALLATION_INSTRUCTIONS}`;
     }
-    return `Failed to spawn copilot: ${error.message}`;
+    return `Failed to spawn gh copilot: ${error.message}`;
   }
 
   private renderEvent(event: CopilotStreamEvent, outputAccumulator?: { value: string }): void {

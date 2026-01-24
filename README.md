@@ -258,7 +258,38 @@ Git protocol preference is set during `bloom init` and stored in `~/.bloom/confi
 
 ```bash
 bloom run                    # Start TUI with all agents
+bloom agent run <name>       # Run specific agent's work loop
+bloom agent list             # List all agents defined in tasks
+bloom agent interject <name> # Stop a running agent
 ```
+
+### Agents
+
+Bloom supports multiple AI agent providers with different capabilities:
+
+| Agent | Key Strengths | Session Resume | LSP |
+|-------|--------------|----------------|-----|
+| **Claude** | TodoWrite, Task subagents, Web search | ✓ | - |
+| **Copilot** | Multi-model, GitHub MCP, Fine permissions | ✓ | - |
+| **Codex** | Session forking, Structured output | ✓ | - |
+| **Cline** | Plan/Act modes, Task checkpoints | ✓ | - |
+| **OpenCode** | Native LSP, Multi-provider | ✓ | ✓ |
+
+Configure your default agent in `~/.bloom/config.yaml`:
+
+```yaml
+agent:
+  default: claude  # or copilot, codex, cline, opencode
+  
+  # Per-agent configuration
+  claude:
+    model: sonnet
+  
+  opencode:
+    model: anthropic/claude-sonnet-4  # REQUIRED for OpenCode
+```
+
+See the [Agent Reference](https://docs.use-bloom.dev/reference/agents) for detailed capabilities and configuration.
 
 ### Planning
 
