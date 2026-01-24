@@ -8,6 +8,10 @@ title: Introduction
 
 **Bloom** is a multi-agent task orchestration system that enables AI-powered development through YAML-based task definitions and Claude Code agents working in parallel. Whether you're a solo developer or part of a cross-functional team, Bloom adapts to your workflow.
 
+<div style={{textAlign: 'center', marginTop: '1.5rem', marginBottom: '1.5rem'}}>
+  <img src="/img/demo.svg" alt="Bloom Demo" style={{maxWidth: '100%', borderRadius: '8px'}} />
+</div>
+
 ## What is Bloom?
 
 Bloom bridges the gap between high-level project planning and AI-powered execution. It supports the entire development lifecycle—from requirements gathering to code generation—with built-in collaboration points for teams of any size.

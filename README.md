@@ -7,6 +7,10 @@
   <img src="https://img.shields.io/badge/built%20with-Bun-f9f1e1?logo=bun" alt="Built with Bun">
 </p>
 
+<p align="center">
+  <img src="assets/demo.svg" alt="Bloom Demo" width="800">
+</p>
+
 # Bloom - Multi-Agent Task Orchestrator
 
 A multi-agent task orchestration system that uses YAML-based task definitions and Claude Code agents to execute work in parallel. Designed for teams and solo developers alike.
