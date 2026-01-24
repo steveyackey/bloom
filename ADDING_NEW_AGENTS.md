@@ -12,6 +12,18 @@ Bloom trusts agents to know their own capabilities. Each agent injects its own s
 
 This keeps Bloom simple and avoids the need to update docs every time an agent adds features.
 
+## Two Ways to Add Agents
+
+### Option 1: YAML Schema (Recommended)
+
+For agents with standard CLI patterns, define them via YAML schema. This is the simplest approach and works for most agents.
+
+### Option 2: Custom TypeScript Provider
+
+For agents with unique streaming formats, special session handling, or other complex behavior, create a TypeScript provider class.
+
+---
+
 ## Required CLI Commands
 
 For Bloom to fully support an agent CLI, these commands/flags are needed:
@@ -42,343 +54,282 @@ For Bloom to fully support an agent CLI, these commands/flags are needed:
 |---------|---------|-------|
 | **Timeout** | `myagent --timeout 600` | For long-running tasks |
 
-## Step 1: Create the Provider File
+---
 
-Create a new file in `src/agents/` named after your agent (e.g., `myagent.ts`).
+## Option 1: YAML Schema Definition
 
-### Required Structure
+### Agent Definition Schema
+
+```yaml
+myagent:
+  command: myagent                        # CLI command name
+  version: ["--version"]                  # How to check version
+  docs: https://myagent.dev/docs          # Official documentation URL
+  description: "My custom AI agent"       # Description for help text
+
+  # Common flags
+  flags:
+    model: ["--model", "-m"]              # Model selection flag(s)
+    resume: ["--resume", "-r"]            # Session resume flag(s)
+    approval_bypass: ["--yes"]            # Approval bypass for headless runs
+    system_prompt: ["--system"]           # System prompt flag(s)
+
+  # Interactive mode configuration
+  interactive:
+    subcommand: null                      # Optional subcommand (e.g., "session")
+    base_args: []                         # Args always added in this mode
+    prompt: positional                    # "positional" or {flag: "-p"}
+    prepend_system_prompt: true           # Prepend system prompt to user prompt
+
+  # Streaming/non-interactive mode configuration
+  streaming:
+    subcommand: run                       # Optional subcommand (e.g., "run", "exec")
+    base_args: ["--output-format", "json"]
+    prompt: {flag: "-p"}
+    prepend_system_prompt: true
+
+  # Environment variables
+  env:
+    inject:                               # Env vars to always set
+      MY_CONFIG: '{"auto_approve": true}'
+    required:                             # Env vars that must be present
+      - MY_API_KEY
+
+  # Output parsing
+  output:
+    format: stream-json                   # "stream-json", "json", or "text"
+    session_id_field: session_id          # JSON field for session ID
+    session_id_field_alt: sessionID       # Alternative field name
+
+  # Optional features
+  models_command: ["models"]              # Command to list available models
+  model_required_for_streaming: false     # Whether model must be specified
+```
+
+### Adding a Built-in Agent via Schema
+
+1. **Edit `src/agents/builtin-agents.ts`:**
 
 ```typescript
-// src/agents/myagent.ts
+import type { AgentDefinition } from "./schema";
 
-import { spawn } from "node:child_process";
-import type { Agent, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
-import { createLogger } from "../logger";
+export const myagentAgent: AgentDefinition = {
+  command: "myagent",
+  version: ["--version"],
+  docs: "https://myagent.dev/docs",
+  description: "My custom AI agent",
 
-const logger = createLogger("myagent-provider");
+  flags: {
+    model: ["--model"],
+    resume: ["--resume"],
+    approval_bypass: ["--yes"],
+    system_prompt: ["--system"],
+  },
 
-// =============================================================================
-// Types
-// =============================================================================
+  interactive: {
+    base_args: [],
+    prompt: "positional",
+    prepend_system_prompt: true,
+  },
 
-export interface MyAgentProviderOptions {
-  interactive: boolean;
-  streamOutput?: boolean;
-  model?: string;
+  streaming: {
+    subcommand: "run",
+    base_args: ["--output-format", "json"],
+    prompt: { flag: "-p" },
+    prepend_system_prompt: true,
+  },
+
+  env: {
+    inject: {},
+    required: ["MY_API_KEY"],
+  },
+
+  output: {
+    format: "stream-json",
+    session_id_field: "session_id",
+  },
+
+  model_required_for_streaming: false,
+};
+
+// Add to BUILTIN_AGENTS
+export const BUILTIN_AGENTS: Record<string, AgentDefinition> = {
+  // ... existing agents ...
+  myagent: myagentAgent,
+};
+```
+
+2. **Update `src/agents/capabilities.ts`:**
+
+```typescript
+export type BuiltinAgentName = "claude" | "copilot" | "codex" | "goose" | "opencode" | "myagent";
+export const REGISTERED_AGENTS: BuiltinAgentName[] = [
+  "claude", "copilot", "codex", "goose", "myagent", "opencode"
+];
+```
+
+3. **Add documentation** in `docs/docs/agents/myagent.md`
+
+4. **Update `docs/sidebars.ts`** and `README.md`
+
+---
+
+## Option 2: Custom TypeScript Provider
+
+For agents with complex behavior that can't be captured in the schema (custom streaming formats, special session handling, etc.):
+
+### Step 1: Create the Provider File
+
+Create `src/agents/myagent.ts`:
+
+```typescript
+import { type ChildProcess, spawn } from "node:child_process";
+import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
+
+export interface MyAgentProviderOptions extends AgentConfig {
+  customOption?: boolean;
 }
-
-export interface MyAgentRunningSession extends AgentSession {
-  proc: import("node:child_process").ChildProcess;
-}
-
-// =============================================================================
-// Session Management
-// =============================================================================
-
-const activeSessions = new Map<string, MyAgentRunningSession>();
-
-export function getActiveMyAgentSession(agentName: string): MyAgentRunningSession | undefined {
-  return activeSessions.get(agentName);
-}
-
-export function interjectMyAgentSession(agentName: string): MyAgentRunningSession | undefined {
-  const session = activeSessions.get(agentName);
-  if (session) {
-    try {
-      session.proc.kill("SIGINT");
-    } catch {}
-    activeSessions.delete(agentName);
-  }
-  return session;
-}
-
-// =============================================================================
-// Provider Implementation
-// =============================================================================
 
 export class MyAgentProvider implements Agent {
   private options: MyAgentProviderOptions;
 
-  constructor(options: MyAgentProviderOptions) {
+  constructor(options: MyAgentProviderOptions = {}) {
     this.options = options;
   }
 
-  async run(runOptions: AgentRunOptions): Promise<AgentRunResult> {
-    const { prompt, startingDirectory, systemPrompt, sessionId, agentName } = runOptions;
-
-    // Build CLI arguments
-    const args: string[] = [];
-    args.push("--prompt", prompt);
-
-    if (this.options.model) {
-      args.push("--model", this.options.model);
-    }
-
-    if (sessionId) {
-      args.push("--resume", sessionId);
-    }
-
-    // Interactive mode: inherit stdio
-    if (this.options.interactive) {
-      return this.runInteractive(args, startingDirectory, agentName);
-    }
-
-    // Streaming mode: capture output
-    return this.runStreaming(args, startingDirectory, agentName);
-  }
-
-  private async runInteractive(
-    args: string[],
-    cwd: string,
-    agentName: string
-  ): Promise<AgentRunResult> {
-    return new Promise((resolve) => {
-      const proc = spawn("myagent", args, {
-        cwd,
-        stdio: "inherit",
-        env: { ...process.env },
-      });
-
-      const session: MyAgentRunningSession = {
-        sessionId: `myagent-${Date.now()}`,
-        startTime: new Date(),
-        agentName,
-        proc,
-      };
-      activeSessions.set(agentName, session);
-
-      proc.on("close", (code) => {
-        activeSessions.delete(agentName);
-        resolve({
-          success: code === 0,
-          output: "",
-          sessionId: session.sessionId,
-        });
-      });
-
-      proc.on("error", (error) => {
-        activeSessions.delete(agentName);
-        resolve({
-          success: false,
-          output: "",
-          error: error.message,
-        });
-      });
-    });
-  }
-
-  private async runStreaming(
-    args: string[],
-    cwd: string,
-    agentName: string
-  ): Promise<AgentRunResult> {
-    args.push("--output-format", "json");
-
-    return new Promise((resolve) => {
-      const proc = spawn("myagent", args, {
-        cwd,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env },
-      });
-
-      let output = "";
-      let sessionId: string | undefined;
-
-      proc.stdout?.on("data", (data) => {
-        output += data.toString();
-      });
-
-      proc.stderr?.on("data", (data) => {
-        logger.error(data.toString());
-      });
-
-      proc.on("close", (code) => {
-        activeSessions.delete(agentName);
-        resolve({
-          success: code === 0,
-          output,
-          sessionId,
-        });
-      });
-
-      proc.on("error", (error) => {
-        activeSessions.delete(agentName);
-        resolve({
-          success: false,
-          output: "",
-          error: error.message,
-        });
-      });
-    });
+  async run(options: AgentRunOptions): Promise<AgentRunResult> {
+    // Implement agent execution
+    // See existing providers for examples
   }
 
   getActiveSession(): AgentSession | undefined {
-    return activeSessions.values().next().value;
+    // Return active session if any
   }
 }
 ```
 
-## Step 2: Update the Agent Registry
-
-Edit `src/agents/capabilities.ts`:
-
-```typescript
-export type AgentName = "claude" | "copilot" | "codex" | "goose" | "opencode" | "myagent";
-
-export const REGISTERED_AGENTS: AgentName[] = ["claude", "copilot", "codex", "goose", "myagent", "opencode"];
-```
-
-## Step 3: Update the Factory
+### Step 2: Update the Factory
 
 Edit `src/agents/factory.ts`:
 
-### 3.1 Add Import
+1. Add import for your provider
+2. Add switch case in `createAgentByName()`
+3. Add factory helper function
 
-```typescript
-import { MyAgentProvider, type MyAgentProviderOptions } from "./myagent";
+### Step 3: Update Exports
+
+Edit `src/agents/index.ts` to export your provider types and class.
+
+---
+
+## User-Defined Custom Agents
+
+Users can define custom agents in `~/.bloom/config.yaml`:
+
+```yaml
+customAgents:
+  myagent:
+    command: myagent
+    version: ["--version"]
+    docs: https://myagent.dev
+    flags:
+      model: ["--model"]
+      approval_bypass: ["--yes"]
+    interactive:
+      base_args: []
+      prompt: positional
+      prepend_system_prompt: true
+    streaming:
+      subcommand: run
+      base_args: ["--json"]
+      prompt: {flag: "-p"}
+      prepend_system_prompt: true
+    env:
+      inject: {}
+      required: []
+    output:
+      format: stream-json
+      session_id_field: session_id
+    model_required_for_streaming: false
 ```
 
-### 3.2 Add to Registry
+These are loaded at runtime and merged with built-in agents.
 
-```typescript
-const agentRegistry = {
-  claude: ClaudeAgentProvider,
-  codex: CodexAgentProvider,
-  copilot: CopilotAgentProvider,
-  goose: GooseAgentProvider,
-  myagent: MyAgentProvider,
-  opencode: OpenCodeAgentProvider,
-} as const;
-```
+---
 
-### 3.3 Add Switch Cases
-
-In `createAgentByName()` and `createAgent()`:
-```typescript
-case "myagent":
-  return createMyAgentAgent(isInteractive, model, perAgentConfig);
-```
-
-### 3.4 Add Factory Helper
-
-```typescript
-function createMyAgentAgent(
-  interactive: boolean,
-  model?: string,
-  _perAgentConfig?: PerAgentConfig
-): MyAgentProvider {
-  return new MyAgentProvider({
-    interactive,
-    streamOutput: true,
-    model,
-  });
-}
-```
-
-## Step 4: Update Availability Checking
-
-Edit `src/agents/availability.ts`:
-
-### 4.1 Add CLI Config
-
-```typescript
-const agentCliConfig: Record<string, { command: string; checkArgs: string[] }> = {
-  // ... existing agents ...
-  myagent: { command: "myagent", checkArgs: ["--version"] },
-};
-```
-
-### 4.2 Add Model Config
-
-Include how to list available models:
-
-```typescript
-const agentModels: Record<string, { models: string[]; default?: string; listCommand?: string }> = {
-  // ... existing agents ...
-  myagent: {
-    models: ["model-a", "model-b"],
-    default: "model-a",
-    listCommand: "myagent models",  // Command to list available models
-  },
-};
-```
-
-## Step 5: Update User Config
-
-Edit `src/user-config.ts`:
-
-```typescript
-export const KNOWN_AGENTS = ["claude", "copilot", "codex", "goose", "myagent", "opencode"] as const;
-```
-
-Add a config schema if the agent has specific options:
-
-```typescript
-const MyAgentConfigSchema = BaseAgentConfigSchema.extend({
-  customOption: z.boolean().optional(),
-});
-```
-
-## Step 6: Export from Index
-
-Edit `src/agents/index.ts`:
-
-```typescript
-export type { MyAgentProviderOptions, MyAgentRunningSession } from "./myagent";
-export { MyAgentProvider, getActiveMyAgentSession, interjectMyAgentSession } from "./myagent";
-```
-
-## Step 7: Add Documentation
-
-### 7.1 Create Agent Doc Page
-
-Create `docs/docs/agents/myagent.md` with:
-- Installation instructions
-- Configuration options
-- How to list available models
-
-### 7.2 Update Sidebar
-
-Edit `docs/sidebars.ts`:
-```typescript
-items: [
-  'agents/README',
-  'agents/claude',
-  // ... existing agents ...
-  'agents/myagent',
-],
-```
-
-### 7.3 Update Main README
-
-Add to supported agents table in `README.md`.
-
-## Step 8: Validate and Build
+## Testing
 
 ```bash
-# Run type checking and linting
+# Run validation
 bun validate
-
-# Run tests
-bun test
 
 # Build docs
 cd docs && bun install && bun run build
 ```
 
+---
+
 ## Checklist
 
-Before submitting a PR for a new agent:
+### For Schema-Based Agents
 
-- [ ] Provider file created in `src/agents/`
-- [ ] Agent name added to registry in `src/agents/capabilities.ts`
-- [ ] Factory updated in `src/agents/factory.ts`
-- [ ] Availability config in `src/agents/availability.ts`
-- [ ] User config updated in `src/user-config.ts`
-- [ ] Exports added in `src/agents/index.ts`
-- [ ] Documentation page created
-- [ ] Sidebar updated
+- [ ] Agent definition added to `src/agents/builtin-agents.ts`
+- [ ] Agent name added to `src/agents/capabilities.ts`
+- [ ] Documentation page created in `docs/docs/agents/`
+- [ ] Sidebar updated in `docs/sidebars.ts`
 - [ ] Main README updated
 - [ ] `bun validate` passes
-- [ ] `bun test` passes
 - [ ] Docs build successfully
+
+### For Custom Provider Agents
+
+- [ ] Provider file created in `src/agents/`
+- [ ] Factory updated in `src/agents/factory.ts`
+- [ ] Exports added in `src/agents/index.ts`
+- [ ] Agent name added to `src/agents/capabilities.ts`
+- [ ] Documentation page created
+- [ ] Sidebar and README updated
+- [ ] `bun validate` passes
+- [ ] Docs build successfully
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Agent Factory                             │
+│  createAgentByName() → checks if built-in or custom         │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          ▼                       ▼
+┌─────────────────────┐   ┌─────────────────────┐
+│   Built-in Agents   │   │   Custom Agents     │
+│  (Optimized TS)     │   │  (GenericProvider)  │
+├─────────────────────┤   ├─────────────────────┤
+│ ClaudeAgentProvider │   │ Uses AgentDefinition│
+│ CopilotAgentProvider│   │ from YAML schema    │
+│ CodexAgentProvider  │   │                     │
+│ GooseAgentProvider  │   │                     │
+│ OpenCodeAgentProvider│  │                     │
+└─────────────────────┘   └─────────────────────┘
+          │                       │
+          └───────────┬───────────┘
+                      ▼
+              ┌───────────────┐
+              │  Agent CLI    │
+              │  (subprocess) │
+              └───────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/agents/schema.ts` | Zod schema for agent definitions |
+| `src/agents/builtin-agents.ts` | Built-in agent definitions |
+| `src/agents/generic-provider.ts` | Schema-driven provider for custom agents |
+| `src/agents/loader.ts` | Loads and merges built-in + user agents |
+| `src/agents/factory.ts` | Creates agent instances |
+| `src/agents/capabilities.ts` | Agent type definitions and re-exports |

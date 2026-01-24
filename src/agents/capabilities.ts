@@ -1,41 +1,39 @@
 // =============================================================================
-// Agent Registry
+// Agent Registry (Re-exports from Loader)
 // =============================================================================
 //
-// Simple registry of supported agent providers. Bloom trusts each agent to
-// know its own capabilities - agents inject their own system prompts with
-// their features, tools, and limitations.
-//
-// This registry only tracks:
-// - Which agents are supported
-// - How to check if agent CLI is available
-// - How to list available models
+// This module provides backward compatibility with the old capabilities API.
+// The actual agent registry is now in loader.ts which supports both built-in
+// and custom agents defined via YAML schema.
 //
 // =============================================================================
 
 /**
- * Supported agent names.
+ * Built-in agent names.
+ * Note: Custom agents can also be registered via user config.
  */
-export type AgentName = "claude" | "copilot" | "codex" | "goose" | "opencode";
+export type BuiltinAgentName = "claude" | "copilot" | "codex" | "goose" | "opencode";
 
 /**
- * List of all registered agent names.
+ * Agent name type - can be a built-in agent or a custom agent name.
  */
-export const REGISTERED_AGENTS: AgentName[] = ["claude", "copilot", "codex", "goose", "opencode"];
+export type AgentName = BuiltinAgentName | string;
 
 /**
- * Get list of all registered agent names.
- * @returns Array of agent names
+ * List of built-in agent names (for backward compatibility).
+ * Use getRegisteredAgentNames() to include custom agents.
  */
-export function getRegisteredAgentNames(): AgentName[] {
-  return [...REGISTERED_AGENTS];
-}
+export const REGISTERED_AGENTS: BuiltinAgentName[] = ["claude", "copilot", "codex", "goose", "opencode"];
 
-/**
- * Check if an agent name is valid/registered.
- * @param name - The name to check
- * @returns true if the agent is registered
- */
-export function isValidAgentName(name: string): name is AgentName {
-  return REGISTERED_AGENTS.includes(name as AgentName);
-}
+// Re-export from loader for convenience
+export {
+  checkAgentAvailability,
+  getAgentDefinition,
+  getAgentVersion,
+  getRegisteredAgentNames,
+  isBuiltinAgent,
+  isValidAgentName,
+  listAgentModels,
+  loadCustomAgents,
+  validateAgentDefinition,
+} from "./loader";
