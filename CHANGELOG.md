@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.8](https://github.com/steveyackey/bloom/compare/bloom-v0.2.7...bloom-v0.2.8) (2026-01-24)
+
+
+### Bug Fixes
+
+* update agent CLI integrations and session handling ([899dd56](https://github.com/steveyackey/bloom/commit/899dd56ee9b4a0f858a725fb43f8c58113756ba7))
+* update Codex type exports and remove unused method ([adb79dc](https://github.com/steveyackey/bloom/commit/adb79dcdc03778d2d68ee4abe7faa603251b94b8))
+
 ## [0.2.7](https://github.com/steveyackey/bloom/compare/bloom-v0.2.6...bloom-v0.2.7) (2026-01-23)
 
 
