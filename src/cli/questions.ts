@@ -3,11 +3,17 @@
 // =============================================================================
 
 import { type Clerc, Types } from "clerc";
-
-import { getAgentNamesSync, getQuestionIdsSync } from "../../completions/providers";
-import type { QuestionType } from "../../human-queue";
-import { getTasksFile } from "../context";
-import { cmdAnswer, cmdAsk, cmdClearAnswered, cmdQuestions, cmdQuestionsDashboard, cmdWaitAnswer } from "../questions";
+import { getTasksFile } from "../commands/context";
+import {
+  cmdAnswer,
+  cmdAsk,
+  cmdClearAnswered,
+  cmdQuestions,
+  cmdQuestionsDashboard,
+  cmdWaitAnswer,
+} from "../commands/questions";
+import { getAgentNamesSync, getQuestionIdsSync } from "../completions/providers";
+import type { QuestionType } from "../human-queue";
 
 // =============================================================================
 // Constants

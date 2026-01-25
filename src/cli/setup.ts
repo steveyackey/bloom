@@ -3,11 +3,10 @@
 // =============================================================================
 
 import type { Clerc } from "clerc";
-
-import { listRepos, syncRepos } from "../../repos";
-import { BLOOM_DIR } from "../context";
-import { cmdCreate } from "../create";
-import { cmdInit } from "../init";
+import { BLOOM_DIR } from "../commands/context";
+import { cmdCreate } from "../commands/create";
+import { cmdInit } from "../commands/init";
+import { listRepos, syncRepos } from "../repos";
 
 // =============================================================================
 // Command Registration

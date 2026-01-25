@@ -5,20 +5,20 @@
 import chalk from "chalk";
 import type { Clerc } from "clerc";
 
-import { createAgentByName } from "../../agents/factory";
+import { createAgentByName } from "../agents/factory";
 import {
   checkAllAgentAvailability,
   getAgentDefinition,
   getAgentVersion,
   getRegisteredAgentNames,
   isValidAgentName,
-} from "../../agents/loader";
-import { getAgentNamesSync } from "../../completions/providers";
-import { triggerInterject } from "../../human-queue";
-import { getDefaultInteractiveAgent, getDefaultNonInteractiveAgent, loadUserConfig } from "../../user-config";
-import { getTasksFile } from "../context";
-import { runAgentWorkLoop, startOrchestrator } from "../orchestrator";
-import { cmdAgents } from "../tasks";
+} from "../agents/loader";
+import { getTasksFile } from "../commands/context";
+import { runAgentWorkLoop, startOrchestrator } from "../commands/orchestrator";
+import { cmdAgents } from "../commands/tasks";
+import { getAgentNamesSync } from "../completions/providers";
+import { triggerInterject } from "../human-queue";
+import { getDefaultInteractiveAgent, getDefaultNonInteractiveAgent, loadUserConfig } from "../user-config";
 
 // =============================================================================
 // Command Registration

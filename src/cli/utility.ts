@@ -4,7 +4,7 @@
 
 import type { Clerc } from "clerc";
 
-import { cmdUpdate } from "../update";
+import { cmdUpdate } from "../commands/update";
 
 // =============================================================================
 // Command Registration

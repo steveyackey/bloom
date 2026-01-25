@@ -3,10 +3,9 @@
 // =============================================================================
 
 import type { Clerc } from "clerc";
-
-import { getInterjectionIdsSync } from "../../completions/providers";
-import { getTasksFile } from "../context";
-import { cmdInterjectDismiss, cmdInterjections, cmdInterjectResume } from "../interjections";
+import { getTasksFile } from "../commands/context";
+import { cmdInterjectDismiss, cmdInterjections, cmdInterjectResume } from "../commands/interjections";
+import { getInterjectionIdsSync } from "../completions/providers";
 
 // =============================================================================
 // Command Registration

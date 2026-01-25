@@ -19,7 +19,7 @@ import {
   registerTaskCommands,
   registerUtilityCommands,
   registerViewCommands,
-} from "./commands/cli";
+} from "./cli/index";
 import { setTasksFile } from "./commands/context";
 import { type LogLevel, setLogLevel } from "./logger";
 import { VERSION } from "./version";
