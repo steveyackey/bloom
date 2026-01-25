@@ -4,9 +4,12 @@
 
 import { type FSWatcher, watch } from "node:fs";
 import { dirname } from "node:path";
-import chalk from "chalk";
+import { createLogger } from "../infra/logger";
 import { loadTasks } from "../tasks";
 import { buildTaskGraph, type TaskGraph } from "./graph";
+
+const log = createLogger("view-server");
+
 import { buildSystemPrompt, buildTaskPrompt, computeWorkingDirectory } from "./prompts";
 import { renderHTML } from "./ui";
 
@@ -55,12 +58,12 @@ async function reloadTasks() {
     state.lastError = null;
     state.version++;
     notifyClients();
-    console.log(chalk.gray(`[${new Date().toLocaleTimeString()}] Tasks reloaded (v${state.version})`));
+    log.debug(`Tasks reloaded (v${state.version})`);
   } catch (err) {
     state.lastError = err instanceof Error ? err.message : String(err);
     state.version++;
     notifyClients();
-    console.error(chalk.red(`[${new Date().toLocaleTimeString()}] Error reloading tasks: ${state.lastError}`));
+    log.error(`Error reloading tasks: ${state.lastError}`);
   }
 }
 
@@ -173,7 +176,7 @@ export async function startViewServer(options: ServerOptions): Promise<void> {
       }
     });
   } catch {
-    console.log(chalk.yellow("File watching not available - use Refresh button"));
+    log.warn("File watching not available - use Refresh button");
   }
 
   const server = Bun.serve({
@@ -182,8 +185,8 @@ export async function startViewServer(options: ServerOptions): Promise<void> {
   });
 
   const url = `http://localhost:${server.port}`;
-  console.log(chalk.green(`\n  Bloom View running at ${chalk.bold(url)}\n`));
-  console.log(chalk.gray("  Press Ctrl+C to stop\n"));
+  log.info(`Bloom View running at ${url}`);
+  log.info("Press Ctrl+C to stop");
 
   // Open browser if requested
   if (options.open) {
@@ -198,7 +201,7 @@ export async function startViewServer(options: ServerOptions): Promise<void> {
 
   // Handle graceful shutdown
   const shutdown = () => {
-    console.log(chalk.gray("\n  Shutting down..."));
+    log.info("Shutting down...");
     if (watcher) watcher.close();
     if (debounceTimer) clearTimeout(debounceTimer);
     server.stop();

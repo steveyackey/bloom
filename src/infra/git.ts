@@ -193,7 +193,6 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
   }
 
   // Clone as bare repository
-  console.log(`Cloning ${normalizedUrl} as bare repo...`);
   const cloneResult = runGit(["clone", "--bare", normalizedUrl, bareRepoPath]);
 
   if (!cloneResult.success) {
@@ -218,8 +217,6 @@ export async function cloneRepo(bloomDir: string, url: string, options?: { name?
 
   // Create worktree for default branch
   const worktreePath = getWorktreePath(bloomDir, repoName, defaultBranch);
-  console.log(`Creating worktree for '${defaultBranch}' branch...`);
-
   const worktreeResult = runGit(["worktree", "add", worktreePath, defaultBranch], bareRepoPath);
 
   if (!worktreeResult.success) {
@@ -312,7 +309,6 @@ export async function createRepo(
   }
 
   // Initialize bare repository
-  console.log(`Creating new repository '${name}'...`);
   mkdirSync(bareRepoPath, { recursive: true });
   const initResult = runGit(["init", "--bare"], bareRepoPath);
 
@@ -337,7 +333,6 @@ export async function createRepo(
 
   // Create worktree for default branch with orphan (no commits yet)
   const worktreePath = getWorktreePath(bloomDir, name, defaultBranch);
-  console.log(`Creating worktree for '${defaultBranch}' branch...`);
 
   // For a new repo, we need to create an orphan branch worktree
   // Try the modern --orphan flag first (Git 2.38+)
@@ -564,7 +559,6 @@ export async function syncRepos(bloomDir: string): Promise<SyncResult> {
 
     if (existsSync(bareRepoPath)) {
       // Already exists, just fetch updates
-      console.log(`Fetching updates for ${repo.name}...`);
       const fetchResult = runGit(["fetch", "--all"], bareRepoPath);
       if (fetchResult.success) {
         result.skipped.push(repo.name);
@@ -575,7 +569,6 @@ export async function syncRepos(bloomDir: string): Promise<SyncResult> {
     }
 
     // Clone missing repo
-    console.log(`Cloning missing repo: ${repo.name}...`);
     const cloneResult = await cloneRepo(bloomDir, repo.url, { name: repo.name });
 
     if (cloneResult.success) {
@@ -606,7 +599,6 @@ export async function removeRepo(bloomDir: string, repoName: string): Promise<{ 
   // The bare repo lives at {worktreesDir}/{repoName}.git, so removing worktreesDir
   // removes everything
   if (existsSync(worktreesDir)) {
-    console.log(`Removing repository: ${worktreesDir}`);
     rmSync(worktreesDir, { recursive: true, force: true });
   }
 

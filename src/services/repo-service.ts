@@ -4,7 +4,7 @@
  */
 
 import chalk from "chalk";
-import { type PullAllResult, pullAllDefaultBranches } from "../infra/git";
+import type { PullAllResult } from "../infra/git";
 
 // Re-export types and functions from repos.ts
 export type { CloneResult, PullAllResult, PullResult, RepoInfo, SyncResult } from "../infra/git";
@@ -61,27 +61,4 @@ export function formatPullResults(result: PullAllResult): string[] {
   }
 
   return lines;
-}
-
-/**
- * Pulls all default branches and logs the formatted results to console.
- * Convenience wrapper that combines pullAllDefaultBranches with formatPullResults.
- *
- * @param bloomDir - The bloom workspace directory
- * @returns The pull result for further use by callers
- */
-export async function pullAndLogResults(bloomDir: string): Promise<PullAllResult> {
-  const result = await pullAllDefaultBranches(bloomDir);
-  const lines = formatPullResults(result);
-
-  for (const line of lines) {
-    console.log(line);
-  }
-
-  // Add blank line after results if there were any non-failed repos
-  if (result.failed.length === 0 && (result.updated.length > 0 || result.upToDate.length > 0)) {
-    console.log("");
-  }
-
-  return result;
 }

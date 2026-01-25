@@ -82,6 +82,47 @@ Key files for agent management:
 
 When changing agent support, update ADDING_NEW_AGENTS.md if the process changes.
 
+## Logging Standards
+
+Based on ARCHITECTURE.md, follow these rules for logging and console output:
+
+**Use `console.log/error` for direct user output in:**
+- `src/cli/*.ts` - CLI command handlers showing results to users
+- `src/commands/*.ts` - Command implementations with user-facing output (task lists, status displays, etc.)
+
+**Use the structured logger (`src/infra/logger.ts`) in:**
+- `src/adapters/cli/` - Event handlers converting orchestrator events to output
+- `src/infra/*.ts` - Infrastructure layer (use logger for all status/debug messages)
+- `src/core/*.ts` - Core business logic (emit events, never write to stdout)
+- `src/agents/*.ts` - Agent providers
+- `src/services/*.ts` - Service layer (return data to callers, don't print directly)
+
+**Key principles:**
+1. Core layer must be I/O-free - emit events, don't write to stdout
+2. Infrastructure layer should return results, not print status messages
+3. Only CLI/command layers should produce user-facing console output
+4. Use `createLogger("context")` from `src/infra/logger.ts` for structured logging
+5. The logger provides timestamps, log levels (debug/info/warn/error), and context tags
+
+**Example - Infrastructure returning results instead of printing:**
+```typescript
+// BAD: Infrastructure printing directly
+function cloneRepo(url: string) {
+  console.log(`Cloning ${url}...`);  // Don't do this
+  // ...
+}
+
+// GOOD: Return status, let CLI layer print
+function cloneRepo(url: string): CloneResult {
+  // Just do the work, return result
+  return { success: true, repoName, ... };
+}
+
+// CLI layer handles output
+const result = await cloneRepo(url);
+console.log(`Cloned ${result.repoName}`);
+```
+
 ## Building Docs and Web
 
 When editing files in `docs/` or `web/` directories, always run `bun install` and `bun run build` in the respective directory before committing to ensure the changes compile correctly.
