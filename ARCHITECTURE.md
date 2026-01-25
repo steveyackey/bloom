@@ -29,9 +29,14 @@ src/
 │       └── post-task.ts          # Post-task git operations (push, PR, merge)
 │
 ├── adapters/                     # Interface-specific implementations
-│   └── cli/                      # CLI adapter
+│   ├── cli/                      # CLI adapter
+│   │   ├── index.ts              # Public exports
+│   │   └── event-handler.ts      # Event → console output
+│   │
+│   └── tui/                      # Event-driven TUI adapter
 │       ├── index.ts              # Public exports
-│       └── event-handler.ts      # Event → console output
+│       ├── tui.ts                # EventDrivenTUI class
+│       └── types.ts              # TUI type definitions
 │
 ├── commands/                     # Command implementations
 │   ├── orchestrator.ts           # Orchestrator startup and TUI
@@ -56,7 +61,7 @@ src/
 │   │   └── git-url.ts            # Git URL utilities
 │   │
 │   ├── logger.ts                 # Structured logging
-│   └── terminal.ts               # PTY abstraction layer
+│   └── terminal.ts               # Process stats utilities
 │
 ├── agents/                       # Agent provider system
 │   ├── index.ts                  # Public exports
@@ -82,7 +87,6 @@ src/
 ├── completions/                  # CLI argument completions
 │   └── providers.ts              # Completion providers
 │
-├── orchestrator-tui.ts           # Multi-pane terminal UI
 ├── task-schema.ts                # Task data models (Zod schemas)
 └── prompts-embedded.ts           # Embedded prompt templates
 ```
@@ -129,7 +133,7 @@ Low-level operations and external integrations:
 - Agent-specific settings
 - Git URL normalization
 
-**`terminal.ts`** - PTY abstraction for cross-platform terminal spawning
+**`terminal.ts`** - Process stats utilities for CPU/memory monitoring
 
 **`output.ts`** - Unified output system:
 - Structured logging with levels
@@ -255,8 +259,8 @@ The orchestrator uses an event-based architecture to decouple core logic from ou
 │                        Adapters Layer                           │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
 │  │   adapters/cli  │  │  adapters/tui   │  │  adapters/web   │ │
-│  │                 │  │   (future)      │  │   (future)      │ │
-│  │  event-handler  │  │                 │  │                 │ │
+│  │                 │  │                 │  │   (future)      │ │
+│  │  event-handler  │  │  EventDrivenTUI │  │                 │ │
 │  │  → console.log  │  │  → TUI render   │  │  → WebSocket    │ │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
@@ -268,7 +272,7 @@ Events are defined in `src/core/orchestrator/events.ts`. Key event categories:
 
 | Category | Events |
 |----------|--------|
-| **Agent Lifecycle** | `agent:started`, `agent:idle` |
+| **Agent Lifecycle** | `agent:started`, `agent:idle`, `agent:output`, `agent:process_started`, `agent:process_ended` |
 | **Task Lifecycle** | `task:found`, `task:started`, `task:completed`, `task:failed`, `task:blocked` |
 | **Git Operations** | `git:pulling`, `git:pulled`, `git:pushing`, `git:pushed`, `git:merging`, `git:merged`, `git:merge_conflict`, `git:cleanup` |
 | **Worktree** | `worktree:creating`, `worktree:created` |
@@ -309,7 +313,7 @@ await runAgentWorkLoopCLI(agentName, options);
 | Phase 2 | ✅ Complete | Define event types for orchestrator |
 | Phase 3 | ✅ Complete | Add EventHandler parameter to work loop |
 | Phase 4 | ✅ Complete | Create CLI adapter that subscribes to events |
-| Phase 5 | 🔲 Future | Move TUI to adapters, subscribe to events |
+| Phase 5 | ✅ Complete | Event-driven TUI adapter (no xterm/PTY) |
 | Phase 6 | 🔲 Future | Add web adapter for GUI support |
 
 ### Benefits

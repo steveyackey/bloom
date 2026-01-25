@@ -7,6 +7,9 @@
 // Event types
 export type {
   AgentIdleEvent,
+  AgentOutputEvent,
+  AgentProcessEndedEvent,
+  AgentProcessStartedEvent,
   AgentStartedEvent,
   CommitRetryEvent,
   ErrorEvent,

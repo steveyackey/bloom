@@ -291,11 +291,43 @@ export interface LogEvent {
 }
 
 /**
+ * Event emitted when agent output is received (streaming)
+ */
+export interface AgentOutputEvent {
+  type: "agent:output";
+  agentName: string;
+  data: string;
+}
+
+/**
+ * Event emitted when the agent subprocess starts
+ */
+export interface AgentProcessStartedEvent {
+  type: "agent:process_started";
+  agentName: string;
+  pid: number;
+  command: string;
+}
+
+/**
+ * Event emitted when the agent subprocess ends
+ */
+export interface AgentProcessEndedEvent {
+  type: "agent:process_ended";
+  agentName: string;
+  pid: number;
+  exitCode: number | null;
+}
+
+/**
  * Union type of all orchestrator events
  */
 export type OrchestratorEvent =
   | AgentStartedEvent
   | AgentIdleEvent
+  | AgentOutputEvent
+  | AgentProcessStartedEvent
+  | AgentProcessEndedEvent
   | TaskFoundEvent
   | TaskStartedEvent
   | TaskCompletedEvent

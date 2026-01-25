@@ -3,25 +3,11 @@
 // =============================================================================
 
 import { runAgentWorkLoopCLI } from "../adapters/cli";
+import { runAgentWorkLoopTUI } from "../adapters/tui";
 import { listRepos, pullDefaultBranch } from "../infra/git";
 import { logger } from "../infra/logger";
-import { OrchestratorTUI } from "../orchestrator-tui";
-import { createDashboardService } from "../services";
 import { getAllAgents, getAllRepos, loadTasks, primeTasks, resetStuckTasks, saveTasks } from "../tasks";
 import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
-
-// =============================================================================
-// Types
-// =============================================================================
-
-interface AgentConfig {
-  name: string;
-  command?: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-  /** If set, run this service in-process instead of spawning a subprocess */
-  service?: import("../orchestrator-tui").InProcessService;
-}
 
 // =============================================================================
 // Agent Work Loop
@@ -62,13 +48,12 @@ export async function startOrchestrator(agentOverride?: string): Promise<void> {
   }
 
   let agents: Set<string>;
-  let taskRepos: Set<string>;
   try {
     logger.orchestrator.info("Validating tasks.yaml...");
     const tasksFile = await loadTasks(getTasksFile());
 
     // Extract repos referenced in tasks
-    taskRepos = getAllRepos(tasksFile.tasks);
+    const taskRepos = getAllRepos(tasksFile.tasks);
 
     // Pull latest updates only for repos used in tasks
     if (taskRepos.size > 0) {
@@ -132,7 +117,7 @@ export async function startOrchestrator(agentOverride?: string): Promise<void> {
       logger.orchestrator.error(`Error: ${err.message}`);
       process.exit(1);
     }
-    logger.orchestrator.warn("No tasks.yaml or no agents defined yet. Creating session with dashboard only.");
+    logger.orchestrator.warn("No tasks.yaml or no agents defined yet. Starting with floating agent only.");
     agents = new Set();
   }
 
@@ -140,43 +125,20 @@ export async function startOrchestrator(agentOverride?: string): Promise<void> {
 }
 
 async function startTUI(agents: Set<string>, agentOverride?: string): Promise<void> {
-  const agentConfigs: AgentConfig[] = [];
-  // Always pass the tasks file explicitly since subprocesses run in BLOOM_DIR,
-  // not the original pwd where the user ran `bloom run`
-  // Note: Global flags must come AFTER the command name for Clerc CLI parsing
-  const tasksFile = getTasksFile();
+  // Collect all agent names to run
+  const agentNames = [...agents].sort();
 
-  // If an agent override was specified via --agent flag, pass it to subprocesses
-  const agentEnv = agentOverride ? { BLOOM_AGENT_OVERRIDE: agentOverride } : undefined;
+  // Add floating agent
+  agentNames.push(FLOATING_AGENT);
 
-  // Dashboard pane (runs in-process - no subprocess needed)
-  agentConfigs.push({
-    name: "dashboard",
-    service: createDashboardService(tasksFile),
+  logger.orchestrator.info(`Starting event-driven TUI with ${agentNames.length} agent(s)...`);
+
+  await runAgentWorkLoopTUI({
+    agents: agentNames,
+    tasksFile: getTasksFile(),
+    bloomDir: BLOOM_DIR,
+    reposDir: REPOS_DIR,
+    pollIntervalMs: POLL_INTERVAL_MS,
+    agentProviderOverride: agentOverride,
   });
-
-  // Human Questions pane (needs interactive terminal, must be subprocess)
-  agentConfigs.push({ name: "questions", command: ["bloom", "questions-dashboard", "-f", tasksFile], cwd: BLOOM_DIR });
-
-  // Agent panes (spawn claude CLI, must be subprocess)
-  for (const agentName of [...agents].sort()) {
-    agentConfigs.push({
-      name: agentName,
-      command: ["bloom", "agent", "run", agentName, "-f", tasksFile],
-      cwd: BLOOM_DIR,
-      env: agentEnv,
-    });
-  }
-
-  // Floating agent (spawn claude CLI, must be subprocess)
-  agentConfigs.push({
-    name: FLOATING_AGENT,
-    command: ["bloom", "agent", "run", FLOATING_AGENT, "-f", tasksFile],
-    cwd: BLOOM_DIR,
-    env: agentEnv,
-  });
-
-  logger.orchestrator.info("Starting TUI...");
-  const tui = new OrchestratorTUI(agentConfigs);
-  await tui.start();
 }

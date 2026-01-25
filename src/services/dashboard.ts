@@ -1,14 +1,20 @@
 // =============================================================================
-// Dashboard In-Process Service
+// Dashboard Service
 // =============================================================================
-// Renders the task dashboard directly to a terminal buffer instead of
-// spawning a subprocess.
+// Renders the task dashboard for terminal output.
 
 import { type FSWatcher, watch } from "node:fs";
 import chalk from "chalk";
-import type { InProcessService } from "../orchestrator-tui";
 import type { Task, TaskStatus, TasksFile } from "../task-schema";
 import { getStatusIcon, loadTasks } from "../tasks";
+
+/**
+ * A service that runs in-process and writes to a terminal.
+ */
+export interface InProcessService {
+  /** Start the service, returns a cleanup function */
+  start(write: (data: string) => void, scheduleRender: () => void): () => void;
+}
 
 function colorStatusIcon(status: TaskStatus): string {
   const icon = getStatusIcon(status);

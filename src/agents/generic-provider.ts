@@ -148,7 +148,8 @@ export class GenericAgentProvider implements Agent {
       const args = this.buildArgs(options, "streaming");
 
       // Log the command being run for debugging
-      logger.debug(`Running: ${this.definition.command} ${args.join(" ")}`);
+      const commandString = `${this.definition.command} ${args.join(" ")}`;
+      logger.debug(`Running: ${commandString}`);
 
       const proc = spawn(this.definition.command, args, {
         cwd: options.startingDirectory,
@@ -163,6 +164,11 @@ export class GenericAgentProvider implements Agent {
       const outputAccumulator = { value: "" };
       const errorAccumulator = { value: "" };
       let timedOut = false;
+
+      // Notify process started
+      if (proc.pid && options.onProcessStart) {
+        options.onProcessStart(proc.pid, commandString);
+      }
 
       // Track session
       const session: GenericRunningSession = {
@@ -297,7 +303,12 @@ export class GenericAgentProvider implements Agent {
       };
 
       proc.stdout?.on("data", (data) => {
-        buffer += data.toString();
+        const text = data.toString();
+
+        // Emit raw output for event-driven consumers
+        options.onOutput?.(text);
+
+        buffer += text;
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
         for (const line of lines) {
@@ -307,6 +318,11 @@ export class GenericAgentProvider implements Agent {
 
       proc.stderr?.on("data", (data) => {
         lastActivity = Date.now();
+        const text = data.toString();
+
+        // Emit raw output for event-driven consumers
+        options.onOutput?.(text);
+
         if (this.streamOutput) {
           process.stderr.write(data);
         }
@@ -338,6 +354,11 @@ export class GenericAgentProvider implements Agent {
         // For batch JSON format, parse the complete output now
         if (isBatchJson) {
           processBatchJsonOutput();
+        }
+
+        // Notify process ended
+        if (proc.pid && options.onProcessEnd) {
+          options.onProcessEnd(proc.pid, code);
         }
 
         const exitCode = code ?? 0;

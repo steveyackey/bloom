@@ -249,6 +249,15 @@ export async function runAgentWorkLoop(
         agentName,
         taskId: taskResult.taskId,
         sessionId: sessionIdToUse,
+        onOutput: (data) => {
+          onEvent({ type: "agent:output", agentName, data });
+        },
+        onProcessStart: (pid, command) => {
+          onEvent({ type: "agent:process_started", agentName, pid, command });
+        },
+        onProcessEnd: (pid, exitCode) => {
+          onEvent({ type: "agent:process_ended", agentName, pid, exitCode });
+        },
       });
       const duration = Math.round((Date.now() - startTime) / 1000);
 
@@ -300,6 +309,15 @@ export async function runAgentWorkLoop(
               agentName,
               taskId: taskResult.taskId,
               sessionId: result.sessionId,
+              onOutput: (data) => {
+                onEvent({ type: "agent:output", agentName, data });
+              },
+              onProcessStart: (pid, command) => {
+                onEvent({ type: "agent:process_started", agentName, pid, command });
+              },
+              onProcessEnd: (pid, exitCode) => {
+                onEvent({ type: "agent:process_ended", agentName, pid, exitCode });
+              },
             });
 
             // Save updated session ID
@@ -504,6 +522,15 @@ async function handleMerge(
         agentName: ctx.agentName,
         taskId: ctx.taskId,
         sessionId,
+        onOutput: (data) => {
+          onEvent({ type: "agent:output", agentName: ctx.agentName, data });
+        },
+        onProcessStart: (pid, command) => {
+          onEvent({ type: "agent:process_started", agentName: ctx.agentName, pid, command });
+        },
+        onProcessEnd: (pid, exitCode) => {
+          onEvent({ type: "agent:process_ended", agentName: ctx.agentName, pid, exitCode });
+        },
       });
 
       if (conflictResult.sessionId && ctx.taskId) {

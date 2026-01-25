@@ -32,6 +32,19 @@ function handleEvent(event: OrchestratorEvent, log: Logger): void {
       log.debug("No work available. Sleeping...");
       break;
 
+    case "agent:output":
+      // In CLI mode, output is already streamed by the agent provider
+      // This event is for TUI/other adapters that need to capture output
+      break;
+
+    case "agent:process_started":
+      log.debug(`Agent process started (PID: ${event.pid})`);
+      break;
+
+    case "agent:process_ended":
+      log.debug(`Agent process ended (PID: ${event.pid}, exit: ${event.exitCode})`);
+      break;
+
     // Task lifecycle
     case "task:found":
       log.info(`Found work: ${event.taskId} - ${event.title}`);
