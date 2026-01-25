@@ -378,6 +378,10 @@ body {
   color: var(--status-in-progress);
 }
 
+.task-tag.steps {
+  color: var(--status-done-pending);
+}
+
 /* Status Colors */
 .status-todo { background: var(--status-todo); }
 .status-ready_for_agent { background: var(--status-ready); }
@@ -805,6 +809,10 @@ function renderGraph() {
     if (node.agent) tags.push(\`<span class="task-tag agent">\${node.agent}</span>\`);
     if (node.phase) tags.push(\`<span class="task-tag phase">P\${node.phase}</span>\`);
     if (node.checkpoint) tags.push(\`<span class="task-tag checkpoint">checkpoint</span>\`);
+    if (node.hasSteps) {
+      const doneSteps = node.steps.filter(s => s.status === 'done').length;
+      tags.push(\`<span class="task-tag steps">\${doneSteps}/\${node.steps.length} steps</span>\`);
+    }
 
     return \`
       <div class="task-node\${isSelected ? ' selected' : ''}"
@@ -1066,6 +1074,20 @@ async function renderDetails(node) {
         </div>
       </div>
 
+      \${node.hasSteps ? \`
+        <div class="accordion open" id="acc-steps">
+          <button class="accordion-trigger" onclick="toggleAccordion('acc-steps')">
+            <span>Steps (\${node.steps.length})</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+          <div class="accordion-content">
+            \${renderSteps(node.steps)}
+          </div>
+        </div>
+      \` : ''}
+
       <div class="accordion" id="acc-working-dir">
         <button class="accordion-trigger" onclick="toggleAccordion('acc-working-dir'); loadPromptSection('\${node.id}', 'pwd')">
           <span>Working Directory</span>
@@ -1171,6 +1193,39 @@ function showError(message) {
   container.innerHTML = \`
     <div class="error-banner">
       <strong>Error:</strong> \${escapeHtml(message)}
+    </div>
+  \`;
+}
+
+function renderSteps(steps) {
+  if (!steps || steps.length === 0) return '<span style="color: var(--text-tertiary)">No steps</span>';
+
+  const stepStatusIcon = (status) => {
+    switch (status) {
+      case 'done': return '<span style="color: var(--status-done)">✓</span>';
+      case 'in_progress': return '<span style="color: var(--status-in-progress)">▶</span>';
+      default: return '<span style="color: var(--text-tertiary)">○</span>';
+    }
+  };
+
+  return \`
+    <div class="steps-list">
+      \${steps.map((step, i) => \`
+        <div class="step-item" style="margin-bottom: var(--space-3); padding: var(--space-2); background: var(--bg-elevated); border-radius: var(--radius-sm);">
+          <div style="display: flex; align-items: flex-start; gap: var(--space-2);">
+            <span style="flex-shrink: 0;">\${stepStatusIcon(step.status)}</span>
+            <div style="flex: 1;">
+              <div style="font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono);">Step \${i + 1}: \${step.id}</div>
+              <div style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">\${escapeHtml(step.instruction)}</div>
+              \${step.acceptanceCriteria && step.acceptanceCriteria.length > 0 ? \`
+                <ul style="margin: var(--space-2) 0 0 var(--space-4); font-size: 12px; color: var(--text-tertiary);">
+                  \${step.acceptanceCriteria.map(c => \`<li>\${escapeHtml(c)}</li>\`).join('')}
+                </ul>
+              \` : ''}
+            </div>
+          </div>
+        </div>
+      \`).join('')}
     </div>
   \`;
 }

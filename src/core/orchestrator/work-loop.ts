@@ -49,6 +49,8 @@ export interface WorkLoopOptions {
   pollIntervalMs: number;
   /** Optional agent provider override (overrides user config) */
   agentProviderOverride?: string;
+  /** Whether to stream agent output directly to stdout (default: true). Set false for TUI. */
+  streamOutput?: boolean;
 }
 
 // =============================================================================
@@ -74,7 +76,7 @@ export async function runAgentWorkLoop(
   options: WorkLoopOptions,
   onEvent: EventHandler
 ): Promise<void> {
-  const { tasksFile, bloomDir, reposDir, pollIntervalMs, agentProviderOverride } = options;
+  const { tasksFile, bloomDir, reposDir, pollIntervalMs, agentProviderOverride, streamOutput = true } = options;
 
   // Load user config to determine default agent provider
   const userConfig = await loadUserConfig();
@@ -108,7 +110,7 @@ export async function runAgentWorkLoop(
         level: "debug",
         message: `Creating agent for provider: ${provider}`,
       });
-      const agent = await createAgent("nonInteractive", { agentName: provider });
+      const agent = await createAgent("nonInteractive", { agentName: provider, streamOutput });
       agentCache.set(provider, agent);
     }
     return agentCache.get(provider)!;

@@ -6,13 +6,20 @@ import type { QuestionType } from "../../human-queue";
 import type { ProcessStats } from "../../infra/terminal";
 
 /**
- * Represents an agent pane in the TUI.
+ * Type of pane in the TUI.
+ */
+export type PaneType = "agent" | "dashboard" | "questions";
+
+/**
+ * Represents a pane in the TUI.
  */
 export interface AgentPane {
   /** Unique identifier */
   id: string;
   /** Display name */
   name: string;
+  /** Type of pane */
+  paneType: PaneType;
   /** Current status */
   status: "idle" | "running" | "completed" | "failed" | "blocked";
   /** Scrollable output log (array of lines) */

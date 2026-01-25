@@ -8,6 +8,15 @@ import type { Task, TaskStatus, TasksFile } from "../task-schema";
 // Types
 // =============================================================================
 
+export interface TaskStepNode {
+  id: string;
+  instruction: string;
+  status: "pending" | "in_progress" | "done";
+  acceptanceCriteria: string[];
+  startedAt?: string;
+  completedAt?: string;
+}
+
 export interface TaskNode {
   id: string;
   title: string;
@@ -25,6 +34,8 @@ export interface TaskNode {
   dependsOn: string[];
   checkpoint?: boolean;
   hasSubtasks: boolean;
+  hasSteps: boolean;
+  steps: TaskStepNode[];
   parentId?: string;
   depth: number; // Nesting depth for subtasks
 }
@@ -54,6 +65,16 @@ function flattenTasks(tasks: Task[], parentId?: string, depth = 0): TaskNode[] {
   const nodes: TaskNode[] = [];
 
   for (const task of tasks) {
+    // Convert steps to TaskStepNode format
+    const steps: TaskStepNode[] = (task.steps || []).map((step) => ({
+      id: step.id,
+      instruction: step.instruction,
+      status: step.status,
+      acceptanceCriteria: step.acceptance_criteria,
+      startedAt: step.started_at,
+      completedAt: step.completed_at,
+    }));
+
     nodes.push({
       id: task.id,
       title: task.title,
@@ -71,6 +92,8 @@ function flattenTasks(tasks: Task[], parentId?: string, depth = 0): TaskNode[] {
       dependsOn: task.depends_on,
       checkpoint: task.checkpoint,
       hasSubtasks: task.subtasks.length > 0,
+      hasSteps: steps.length > 0,
+      steps,
       parentId,
       depth,
     });

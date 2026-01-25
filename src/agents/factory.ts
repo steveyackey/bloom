@@ -21,6 +21,8 @@ export interface CreateAgentOptions {
   agentName?: string;
   /** Override the model (ignores per-agent config) */
   model?: string;
+  /** Whether to stream output to stdout (default: true). Set false for TUI mode. */
+  streamOutput?: boolean;
 }
 
 // =============================================================================
@@ -44,14 +46,19 @@ export interface CreateAgentOptions {
  * const agent = createAgentByName("custom-agent", false);
  * ```
  */
-export function createAgentByName(agentName: string, isInteractive: boolean, model?: string): Agent {
+export function createAgentByName(
+  agentName: string,
+  isInteractive: boolean,
+  model?: string,
+  streamOutput = true
+): Agent {
   // Validate agent name
   if (!isValidAgentName(agentName)) {
     const available = listAvailableAgents().join(", ");
     throw new Error(`Unknown agent '${agentName}'. Available: ${available}`);
   }
 
-  return createGenericAgent(agentName, isInteractive, model);
+  return createGenericAgent(agentName, isInteractive, model, streamOutput);
 }
 
 /**
@@ -99,8 +106,9 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
   }
 
   const isInteractive = mode === "interactive";
+  const streamOutput = options.streamOutput ?? true;
 
-  return createAgentByName(agentName, isInteractive, model);
+  return createAgentByName(agentName, isInteractive, model, streamOutput);
 }
 
 // =============================================================================
@@ -148,7 +156,12 @@ export function isAgentRegistered(name: string): boolean {
  * Creates an agent using the schema-driven GenericAgentProvider.
  * All agents (built-in and custom) use this unified approach.
  */
-function createGenericAgent(agentName: string, interactive: boolean, model?: string): GenericAgentProvider {
+function createGenericAgent(
+  agentName: string,
+  interactive: boolean,
+  model?: string,
+  streamOutput = true
+): GenericAgentProvider {
   const definition = getAgentDefinition(agentName);
   if (!definition) {
     throw new Error(`Agent definition not found: ${agentName}`);
@@ -157,7 +170,7 @@ function createGenericAgent(agentName: string, interactive: boolean, model?: str
   return new GenericAgentProvider({
     definition,
     mode: interactive ? "interactive" : "streaming",
-    streamOutput: true,
+    streamOutput,
     model,
   });
 }

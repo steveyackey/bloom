@@ -23,6 +23,9 @@ export async function runAgentWorkLoopTUI(config: TUIConfig): Promise<void> {
     tui.addPane(agentName);
   }
 
+  // Add dashboard and questions panes
+  tui.addSpecialPanes();
+
   // Set tasks file for dashboard summary
   tui.setTasksFile(config.tasksFile);
 
@@ -39,6 +42,7 @@ export async function runAgentWorkLoopTUI(config: TUIConfig): Promise<void> {
     reposDir: config.reposDir,
     pollIntervalMs: config.pollIntervalMs,
     agentProviderOverride: config.agentProviderOverride,
+    streamOutput: false, // Output goes through event handler, not stdout
   };
 
   // Run work loops for all agents concurrently

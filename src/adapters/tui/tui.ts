@@ -8,18 +8,12 @@ import type { FSWatcher } from "node:fs";
 import { watch } from "node:fs";
 import { interjectGenericSession } from "../../agents";
 import type { EventHandler, OrchestratorEvent } from "../../core/orchestrator";
-import {
-  answerQuestion,
-  createInterjection,
-  listQuestions,
-  type Question,
-  type QueueEventHandler,
-  watchQueue,
-} from "../../human-queue";
+import { answerQuestion, createInterjection, listQuestions, watchQueue } from "../../human-queue";
 import { ansi, type BorderState, chalk, getBorderChalk, style } from "../../infra/colors";
 import { getProcessStatsBatch } from "../../infra/terminal";
+import type { Task } from "../../task-schema";
 import { loadTasks } from "../../tasks";
-import type { AgentPane, QuestionDisplay, TasksSummary, ViewMode } from "./types";
+import type { AgentPane, PaneType, QuestionDisplay, TasksSummary, ViewMode } from "./types";
 
 // Maximum lines to keep per pane (prevents unbounded memory growth)
 const MAX_OUTPUT_LINES = 2000;
@@ -40,10 +34,9 @@ export class EventDrivenTUI {
   private statsUpdateInterval?: ReturnType<typeof setInterval>;
   private isRunning = false;
 
-  // Questions panel state
+  // Questions state
   private pendingQuestions: QuestionDisplay[] = [];
   private selectedQuestionIndex = 0;
-  private showQuestionsPanel = false;
   private answerMode = false;
   private answerInput = "";
   private questionWatcherCleanup?: () => void;
@@ -52,6 +45,11 @@ export class EventDrivenTUI {
   private tasksFile?: string;
   private tasksWatcher?: FSWatcher;
   private tasksSummary?: TasksSummary;
+  private tasksList: Task[] = [];
+
+  // Special pane IDs
+  private static readonly DASHBOARD_PANE_ID = "__dashboard__";
+  private static readonly QUESTIONS_PANE_ID = "__questions__";
 
   constructor() {
     this.cols = process.stdout.columns || 80;
@@ -68,12 +66,13 @@ export class EventDrivenTUI {
   /**
    * Initialize a pane for an agent.
    */
-  addPane(agentName: string): void {
+  addPane(agentName: string, paneType: PaneType = "agent"): void {
     if (this.panes.has(agentName)) return;
 
     const pane: AgentPane = {
       id: agentName,
       name: agentName,
+      paneType,
       status: "idle",
       outputLines: [],
       scrollOffset: 0,
@@ -81,6 +80,42 @@ export class EventDrivenTUI {
 
     this.panes.set(agentName, pane);
     this.paneOrder.push(agentName);
+  }
+
+  /**
+   * Add the dashboard and questions panes at the front of the pane order.
+   * Dashboard is first (index 0) and focused by default.
+   * Questions is second (index 1).
+   */
+  addSpecialPanes(): void {
+    // Create dashboard pane
+    const dashboardPane: AgentPane = {
+      id: EventDrivenTUI.DASHBOARD_PANE_ID,
+      name: "Dashboard",
+      paneType: "dashboard",
+      status: "running",
+      outputLines: [],
+      scrollOffset: 0,
+    };
+    this.panes.set(EventDrivenTUI.DASHBOARD_PANE_ID, dashboardPane);
+
+    // Create questions pane
+    const questionsPane: AgentPane = {
+      id: EventDrivenTUI.QUESTIONS_PANE_ID,
+      name: "Questions",
+      paneType: "questions",
+      status: "idle",
+      outputLines: [],
+      scrollOffset: 0,
+    };
+    this.panes.set(EventDrivenTUI.QUESTIONS_PANE_ID, questionsPane);
+
+    // Insert at the front of pane order (dashboard first, then questions)
+    this.paneOrder.unshift(EventDrivenTUI.QUESTIONS_PANE_ID);
+    this.paneOrder.unshift(EventDrivenTUI.DASHBOARD_PANE_ID);
+
+    // Focus dashboard by default (index 0)
+    this.selectedIndex = 0;
   }
 
   /**
@@ -180,6 +215,7 @@ export class EventDrivenTUI {
           this.selectedQuestionIndex = Math.max(0, this.pendingQuestions.length - 1);
         }
       }
+      this.updateQuestionsPane();
       this.scheduleRender();
     });
   }
@@ -209,6 +245,7 @@ export class EventDrivenTUI {
       const tasksData = await loadTasks(this.tasksFile);
       const tasks = tasksData.tasks || [];
 
+      this.tasksList = tasks;
       this.tasksSummary = {
         total: tasks.length,
         done: tasks.filter((t) => t.status === "done" || t.status === "done_pending_merge").length,
@@ -217,9 +254,25 @@ export class EventDrivenTUI {
         pending: tasks.filter((t) => t.status === "todo" || t.status === "ready_for_agent").length,
       };
 
+      // Update dashboard pane status
+      const dashboardPane = this.panes.get(EventDrivenTUI.DASHBOARD_PANE_ID);
+      if (dashboardPane) {
+        dashboardPane.status = this.tasksSummary.inProgress > 0 ? "running" : "idle";
+      }
+
       this.scheduleRender();
     } catch {
       // Tasks file may not exist or be invalid
+    }
+  }
+
+  /**
+   * Update questions pane status.
+   */
+  private updateQuestionsPane(): void {
+    const questionsPane = this.panes.get(EventDrivenTUI.QUESTIONS_PANE_ID);
+    if (questionsPane) {
+      questionsPane.status = this.pendingQuestions.length > 0 ? "running" : "idle";
     }
   }
 
@@ -277,7 +330,11 @@ export class EventDrivenTUI {
       case "agent:output": {
         const pane = this.panes.get(event.agentName);
         if (pane) {
-          this.appendOutput(pane, event.data, false);
+          // Filter out raw JSON streaming events - only show human-readable content
+          const filteredOutput = this.filterAgentOutput(event.data);
+          if (filteredOutput) {
+            this.appendOutput(pane, filteredOutput, false);
+          }
         }
         break;
       }
@@ -447,13 +504,89 @@ export class EventDrivenTUI {
     return pane;
   }
 
-  private appendOutput(pane: AgentPane, text: string, addNewline = true): void {
+  /**
+   * Format a timestamp for log output.
+   */
+  private formatTimestamp(): string {
+    const now = new Date();
+    return chalk.dim(
+      `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`
+    );
+  }
+
+  /**
+   * Word wrap text to fit within a given width.
+   */
+  private wordWrap(text: string, maxWidth: number): string[] {
+    if (maxWidth <= 0) return [text];
+
+    const lines: string[] = [];
+    const words = text.split(/(\s+)/); // Keep whitespace as separate tokens
+    let currentLine = "";
+    let currentVisibleLen = 0;
+
+    for (const word of words) {
+      const wordVisibleLen = this.stripAnsi(word).length;
+
+      if (currentVisibleLen + wordVisibleLen <= maxWidth) {
+        currentLine += word;
+        currentVisibleLen += wordVisibleLen;
+      } else if (wordVisibleLen > maxWidth) {
+        // Word is longer than max width, need to break it
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = "";
+          currentVisibleLen = 0;
+        }
+        // Break the long word
+        let remaining = word;
+        while (this.stripAnsi(remaining).length > maxWidth) {
+          lines.push(remaining.slice(0, maxWidth));
+          remaining = remaining.slice(maxWidth);
+        }
+        currentLine = remaining;
+        currentVisibleLen = this.stripAnsi(remaining).length;
+      } else {
+        // Start new line
+        if (currentLine.trim()) {
+          lines.push(currentLine);
+        }
+        currentLine = word.trimStart();
+        currentVisibleLen = this.stripAnsi(currentLine).length;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines.length > 0 ? lines : [""];
+  }
+
+  private appendOutput(pane: AgentPane, text: string, addNewline = true, includeTimestamp = false): void {
     // Split into lines, handling ANSI properly
     const lines = text.split(/\r?\n/);
 
+    // Calculate available width for wrapping (pane width minus borders and padding)
+    const paneWidth = this.getPaneContentWidth();
+
     for (const line of lines) {
       if (addNewline || line.length > 0) {
-        pane.outputLines.push(line);
+        // Add timestamp prefix if requested
+        let prefixedLine = line;
+        if (includeTimestamp && line.trim()) {
+          prefixedLine = `${this.formatTimestamp()} ${line}`;
+        }
+
+        // Word wrap if needed
+        if (paneWidth > 20) {
+          const wrappedLines = this.wordWrap(prefixedLine, paneWidth);
+          for (const wrappedLine of wrappedLines) {
+            pane.outputLines.push(wrappedLine);
+          }
+        } else {
+          pane.outputLines.push(prefixedLine);
+        }
       }
     }
 
@@ -466,6 +599,69 @@ export class EventDrivenTUI {
     pane.scrollOffset = 0;
 
     this.scheduleRender();
+  }
+
+  /**
+   * Get the content width of a pane for word wrapping.
+   */
+  private getPaneContentWidth(): number {
+    const count = Math.max(1, this.paneOrder.length);
+    if (this.viewMode === "single") {
+      return this.cols - 4; // Account for borders
+    }
+    const tilesPerRow = Math.ceil(Math.sqrt(count));
+    const tileW = Math.floor(this.cols / tilesPerRow);
+    return tileW - 4; // Account for borders
+  }
+
+  /**
+   * Filter agent output to show only human-readable content.
+   * Filters out raw JSON streaming events from Claude API.
+   */
+  private filterAgentOutput(data: string): string {
+    // Split by lines and filter each line
+    const lines = data.split(/\r?\n/);
+    const filteredLines: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Skip empty lines
+      if (!trimmed) {
+        filteredLines.push("");
+        continue;
+      }
+
+      // Skip raw JSON streaming events from Claude API
+      if (trimmed.startsWith('{"type":')) {
+        // Try to extract text content from assistant messages
+        try {
+          const parsed = JSON.parse(trimmed);
+          // Extract text from assistant content blocks
+          if (parsed.type === "assistant" && parsed.message?.content) {
+            for (const block of parsed.message.content) {
+              if (block.type === "text" && block.text) {
+                filteredLines.push(block.text);
+              }
+            }
+          }
+          // Skip system, user, and other event types
+        } catch {
+          // If JSON parsing fails, skip the line
+        }
+        continue;
+      }
+
+      // Skip lines that look like partial JSON
+      if (trimmed.startsWith("{") && trimmed.includes('"type"')) {
+        continue;
+      }
+
+      // Keep all other output (tool results, errors, etc.)
+      filteredLines.push(line);
+    }
+
+    return filteredLines.join("\n");
   }
 
   private appendToAgent(identifier: string, text: string): void {
@@ -546,6 +742,9 @@ export class EventDrivenTUI {
       return;
     }
 
+    // Check if questions pane is selected
+    const isQuestionsPaneSelected = this.isQuestionsPaneSelected();
+
     switch (str) {
       case "v":
         // Toggle view mode
@@ -561,16 +760,12 @@ export class EventDrivenTUI {
 
       case "h":
       case "\x1b[D": // Left arrow
-        if (this.showQuestionsPanel) {
-          // Navigate questions if panel is open
-        } else {
-          this.navigate("left");
-        }
+        this.navigate("left");
         break;
 
       case "j":
       case "\x1b[B": // Down arrow
-        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+        if (isQuestionsPaneSelected && this.pendingQuestions.length > 0) {
           this.selectedQuestionIndex = Math.min(this.selectedQuestionIndex + 1, this.pendingQuestions.length - 1);
           this.scheduleRender();
         } else {
@@ -580,7 +775,7 @@ export class EventDrivenTUI {
 
       case "k":
       case "\x1b[A": // Up arrow
-        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+        if (isQuestionsPaneSelected && this.pendingQuestions.length > 0) {
           this.selectedQuestionIndex = Math.max(this.selectedQuestionIndex - 1, 0);
           this.scheduleRender();
         } else {
@@ -590,11 +785,7 @@ export class EventDrivenTUI {
 
       case "l":
       case "\x1b[C": // Right arrow
-        if (this.showQuestionsPanel) {
-          // Navigate questions if panel is open
-        } else {
-          this.navigate("right");
-        }
+        this.navigate("right");
         break;
 
       case "i":
@@ -617,16 +808,9 @@ export class EventDrivenTUI {
         this.scrollSelectedPane(this.getContentHeight());
         break;
 
-      case "?":
-        // Toggle questions panel visibility
-        this.showQuestionsPanel = !this.showQuestionsPanel;
-        this.lastRenderedOutput = ""; // Force full re-render
-        this.scheduleRender();
-        break;
-
       case "a":
-        // Enter answer mode for selected question
-        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+        // Enter answer mode for selected question (when questions pane is selected)
+        if (isQuestionsPaneSelected && this.pendingQuestions.length > 0) {
           this.answerMode = true;
           this.answerInput = "";
           this.lastRenderedOutput = ""; // Force full re-render
@@ -636,7 +820,7 @@ export class EventDrivenTUI {
 
       case "y":
         // Quick yes answer for yes/no questions
-        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+        if (isQuestionsPaneSelected && this.pendingQuestions.length > 0) {
           const q = this.pendingQuestions[this.selectedQuestionIndex];
           if (q && q.questionType === "yes_no") {
             this.submitAnswer("yes");
@@ -645,8 +829,8 @@ export class EventDrivenTUI {
         break;
 
       case "n":
-        // Quick no answer for yes/no questions (but not if it would conflict with navigation)
-        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+        // Quick no answer for yes/no questions (when questions pane selected)
+        if (isQuestionsPaneSelected && this.pendingQuestions.length > 0) {
           const q = this.pendingQuestions[this.selectedQuestionIndex];
           if (q && q.questionType === "yes_no") {
             this.submitAnswer("no");
@@ -654,6 +838,14 @@ export class EventDrivenTUI {
         }
         break;
     }
+  }
+
+  /**
+   * Check if the questions pane is currently selected.
+   */
+  private isQuestionsPaneSelected(): boolean {
+    const selectedPaneId = this.paneOrder[this.selectedIndex];
+    return selectedPaneId === EventDrivenTUI.QUESTIONS_PANE_ID;
   }
 
   /**
@@ -844,11 +1036,6 @@ export class EventDrivenTUI {
       output += this.renderTiledPanes();
     }
 
-    // Render questions panel if visible
-    if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
-      output += this.renderQuestionsPanel();
-    }
-
     // Only write if changed
     if (output !== this.lastRenderedOutput) {
       this.lastRenderedOutput = output;
@@ -898,76 +1085,6 @@ export class EventDrivenTUI {
     // Pad to full width
     const visibleLen = this.stripAnsi(header).length;
     return header + " ".repeat(Math.max(0, this.cols - visibleLen));
-  }
-
-  /**
-   * Render the questions panel at the bottom of the screen.
-   */
-  private renderQuestionsPanel(): string {
-    let output = "";
-
-    // Calculate panel size
-    const maxQuestions = Math.min(5, this.pendingQuestions.length);
-    const panelHeight = maxQuestions + 4; // Questions + header + footer + borders
-    const panelStartRow = this.rows - panelHeight;
-
-    // Draw separator line
-    output += ansi.moveTo(panelStartRow, 1);
-    output += chalk.yellow("═".repeat(this.cols));
-
-    // Header
-    output += ansi.moveTo(panelStartRow + 1, 1);
-    const headerText = chalk.bold.yellow(` Pending Questions (${this.pendingQuestions.length})`);
-    output += headerText;
-    output += " ".repeat(Math.max(0, this.cols - this.stripAnsi(headerText).length));
-
-    // Questions list
-    for (let i = 0; i < maxQuestions; i++) {
-      const q = this.pendingQuestions[i];
-      if (!q) continue;
-
-      const row = panelStartRow + 2 + i;
-      output += ansi.moveTo(row, 1);
-
-      const selected = i === this.selectedQuestionIndex;
-      const prefix = selected ? chalk.cyan("▶ ") : "  ";
-      const typeIndicator =
-        q.questionType === "yes_no"
-          ? chalk.magenta("[Y/N]")
-          : q.questionType === "choice"
-            ? chalk.blue("[choice]")
-            : chalk.gray("[open]");
-
-      // Truncate question to fit
-      const agentPart = chalk.dim(`[${q.agentName}]`);
-      const questionMaxLen = this.cols - 25;
-      let questionText = q.question.replace(/\n/g, " ");
-      if (questionText.length > questionMaxLen) {
-        questionText = questionText.slice(0, questionMaxLen - 3) + "...";
-      }
-
-      const line = `${prefix}${typeIndicator} ${agentPart} ${questionText}`;
-      output += line;
-      output += " ".repeat(Math.max(0, this.cols - this.stripAnsi(line).length));
-    }
-
-    // Footer with help text
-    output += ansi.moveTo(panelStartRow + 2 + maxQuestions, 1);
-    let footerText: string;
-    if (this.answerMode) {
-      footerText = chalk.cyan(` Answer: ${this.answerInput}█`) + chalk.dim(" (Enter to submit, Esc to cancel)");
-    } else {
-      const selectedQ = this.pendingQuestions[this.selectedQuestionIndex];
-      if (selectedQ?.questionType === "yes_no") {
-        footerText = chalk.dim(" j/k:navigate  y:yes  n:no  a:custom answer  ?:close");
-      } else {
-        footerText = chalk.dim(" j/k:navigate  a:answer  ?:close");
-      }
-    }
-    output += footerText;
-    output += " ".repeat(Math.max(0, this.cols - this.stripAnsi(footerText).length));
-
-    return output;
   }
 
   private renderEmptyState(): string {
@@ -1026,6 +1143,24 @@ export class EventDrivenTUI {
   }
 
   private renderPane(
+    pane: AgentPane,
+    region: { x: number; y: number; w: number; h: number },
+    isSelected: boolean
+  ): string {
+    // Dispatch to specialized renderers based on pane type
+    if (pane.paneType === "dashboard") {
+      return this.renderDashboardPane(pane, region, isSelected);
+    }
+    if (pane.paneType === "questions") {
+      return this.renderQuestionsPaneContent(pane, region, isSelected);
+    }
+    return this.renderAgentPane(pane, region, isSelected);
+  }
+
+  /**
+   * Render an agent pane with scrollable output.
+   */
+  private renderAgentPane(
     pane: AgentPane,
     region: { x: number; y: number; w: number; h: number },
     isSelected: boolean
@@ -1094,6 +1229,341 @@ export class EventDrivenTUI {
       output += lineContent;
 
       // Pad remaining space
+      const linePadding = contentW - this.stripAnsi(lineContent).length;
+      if (linePadding > 0) {
+        output += " ".repeat(linePadding);
+      }
+
+      output += border("│");
+    }
+
+    // Bottom border
+    output += ansi.moveTo(region.y + region.h - 1, region.x + 1);
+    output += border(`╰${"─".repeat(region.w - 2)}╯`);
+
+    return output;
+  }
+
+  /**
+   * Render the dashboard pane showing task list with progress, agents, and phases.
+   */
+  private renderDashboardPane(
+    pane: AgentPane,
+    region: { x: number; y: number; w: number; h: number },
+    isSelected: boolean
+  ): string {
+    let output = "";
+
+    const borderState: BorderState = isSelected ? "selected" : "default";
+    const border = getBorderChalk(borderState);
+
+    // Calculate progress
+    const allTasks = this.collectAllTasks(this.tasksList);
+    const total = allTasks.length;
+    const doneCount = allTasks.filter((t) => t.status === "done" || t.status === "done_pending_merge").length;
+    const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+
+    // Summary text for title with progress
+    const progressText = total > 0 ? chalk.green(`${progress}%`) : "";
+
+    // Build title
+    const nameStyled = border.bold(chalk.blue("📋 Dashboard"));
+    const titleContent = `─ ${nameStyled} ${progressText} `;
+    const titleVisibleLen = 16 + (progress > 0 ? String(progress).length + 1 : 0);
+    const remainingWidth = region.w - titleVisibleLen - 2;
+
+    // Top border
+    output += ansi.moveTo(region.y, region.x + 1);
+    output += border(`╭${titleContent}${"─".repeat(Math.max(0, remainingWidth))}╮`);
+
+    // Content area
+    const contentH = region.h - 2;
+    const contentW = region.w - 2;
+
+    // Build dashboard content lines
+    const dashLines: string[] = [];
+
+    if (this.tasksList.length === 0) {
+      dashLines.push(chalk.dim(" No tasks loaded"));
+    } else {
+      // Progress bar
+      const barWidth = Math.min(20, contentW - 15);
+      const filledCount = Math.floor((progress / 100) * barWidth);
+      const progressBar = chalk.green("█".repeat(filledCount)) + chalk.gray("░".repeat(barWidth - filledCount));
+      dashLines.push(` [${progressBar}] ${chalk.bold.green(`${progress}%`)} ${chalk.dim(`(${doneCount}/${total})`)}`);
+
+      // Status summary line
+      const summary = this.tasksSummary;
+      if (summary) {
+        dashLines.push(
+          ` ${chalk.cyan(summary.inProgress)}▶ ${chalk.yellow(summary.pending)}○ ${chalk.red(summary.blocked)}✗`
+        );
+      }
+      dashLines.push("");
+
+      // Active agents
+      const activeAgents = this.getActiveAgents();
+      if (activeAgents.size > 0) {
+        dashLines.push(chalk.bold(" Agents:"));
+        for (const [agent, tasks] of activeAgents) {
+          const taskIds = tasks.map((t) => chalk.yellow(t.id)).join(", ");
+          const line = `  ${chalk.cyan(agent)}: ${taskIds}`;
+          dashLines.push(line.length > contentW ? `${line.slice(0, contentW - 3)}...` : line);
+        }
+        dashLines.push("");
+      }
+
+      // Tasks by phase
+      const byPhase = Map.groupBy(this.tasksList, (t) => t.phase ?? 0);
+      for (const [phase, tasks] of [...byPhase.entries()].sort((a, b) => a[0] - b[0])) {
+        if (!tasks) continue;
+        dashLines.push(chalk.bold.magenta(` Phase ${phase}:`));
+
+        for (const task of tasks) {
+          const icon = this.getTaskStatusIcon(task.status);
+          const agent = task.agent_name ? chalk.dim(` (${task.agent_name})`) : "";
+          const stepsInfo =
+            task.steps && task.steps.length > 0
+              ? chalk.dim(` [${task.steps.filter((s) => s.status === "done").length}/${task.steps.length}]`)
+              : "";
+          const maxTitleLen = contentW - 10 - (task.agent_name?.length || 0) - (stepsInfo ? 8 : 0);
+          const title = task.title.length > maxTitleLen ? `${task.title.slice(0, maxTitleLen - 3)}...` : task.title;
+          dashLines.push(`  ${icon} ${title}${agent}${stepsInfo}`);
+
+          // Steps (show only if task is in progress)
+          if (task.steps && task.steps.length > 0 && (task.status === "in_progress" || task.status === "assigned")) {
+            for (const step of task.steps) {
+              const stepIcon = this.getStepStatusIcon(step.status);
+              const stepMaxLen = contentW - 16;
+              const stepInstr =
+                step.instruction.length > stepMaxLen
+                  ? `${step.instruction.slice(0, stepMaxLen - 3)}...`
+                  : step.instruction;
+              dashLines.push(`      ${stepIcon} ${chalk.dim(stepInstr)}`);
+            }
+          }
+
+          // Subtasks
+          for (const sub of task.subtasks || []) {
+            const subIcon = this.getTaskStatusIcon(sub.status);
+            const subAgent = sub.agent_name ? chalk.dim(` (${sub.agent_name})`) : "";
+            const subStepsInfo =
+              sub.steps && sub.steps.length > 0
+                ? chalk.dim(` [${sub.steps.filter((s) => s.status === "done").length}/${sub.steps.length}]`)
+                : "";
+            const subMaxLen = contentW - 13 - (sub.agent_name?.length || 0) - (subStepsInfo ? 8 : 0);
+            const subTitle = sub.title.length > subMaxLen ? `${sub.title.slice(0, subMaxLen - 3)}...` : sub.title;
+            dashLines.push(`    ${subIcon} ${subTitle}${subAgent}${subStepsInfo}`);
+
+            // Subtask steps (show only if subtask is in progress)
+            if (sub.steps && sub.steps.length > 0 && (sub.status === "in_progress" || sub.status === "assigned")) {
+              for (const step of sub.steps) {
+                const stepIcon = this.getStepStatusIcon(step.status);
+                const stepMaxLen = contentW - 19;
+                const stepInstr =
+                  step.instruction.length > stepMaxLen
+                    ? `${step.instruction.slice(0, stepMaxLen - 3)}...`
+                    : step.instruction;
+                dashLines.push(`        ${stepIcon} ${chalk.dim(stepInstr)}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Render content with scrolling
+    const startLine = Math.max(0, pane.scrollOffset);
+    const maxStartLine = Math.max(0, dashLines.length - contentH);
+    const actualStartLine = Math.min(startLine, maxStartLine);
+
+    for (let row = 0; row < contentH; row++) {
+      output += ansi.moveTo(region.y + 1 + row, region.x + 1);
+      output += border("│");
+
+      const lineIndex = actualStartLine + row;
+      let lineContent = dashLines[lineIndex] || "";
+
+      const visibleLen = this.stripAnsi(lineContent).length;
+      if (visibleLen > contentW) {
+        lineContent = lineContent.slice(0, contentW + (lineContent.length - visibleLen));
+      }
+
+      output += lineContent;
+
+      const linePadding = contentW - this.stripAnsi(lineContent).length;
+      if (linePadding > 0) {
+        output += " ".repeat(linePadding);
+      }
+
+      output += border("│");
+    }
+
+    // Bottom border
+    output += ansi.moveTo(region.y + region.h - 1, region.x + 1);
+    output += border(`╰${"─".repeat(region.w - 2)}╯`);
+
+    return output;
+  }
+
+  /**
+   * Collect all tasks including subtasks recursively.
+   */
+  private collectAllTasks(tasks: Task[]): Task[] {
+    const all: Task[] = [];
+    for (const task of tasks) {
+      all.push(task);
+      if (task.subtasks) {
+        all.push(...this.collectAllTasks(task.subtasks));
+      }
+    }
+    return all;
+  }
+
+  /**
+   * Get map of active agents to their tasks.
+   */
+  private getActiveAgents(): Map<string, Task[]> {
+    const agents = new Map<string, Task[]>();
+
+    const collectActive = (tasks: Task[]) => {
+      for (const task of tasks) {
+        if (task.agent_name && (task.status === "in_progress" || task.status === "assigned")) {
+          const existing = agents.get(task.agent_name) || [];
+          existing.push(task);
+          agents.set(task.agent_name, existing);
+        }
+        if (task.subtasks) {
+          collectActive(task.subtasks);
+        }
+      }
+    };
+
+    collectActive(this.tasksList);
+    return agents;
+  }
+
+  /**
+   * Get status icon for a task.
+   */
+  private getTaskStatusIcon(status: string): string {
+    switch (status) {
+      case "done":
+      case "done_pending_merge":
+        return chalk.green("✓");
+      case "in_progress":
+      case "assigned":
+        return chalk.cyan("▶");
+      case "blocked":
+        return chalk.red("✗");
+      case "ready_for_agent":
+        return chalk.yellow("●");
+      default:
+        return chalk.gray("○");
+    }
+  }
+
+  /**
+   * Get status icon for a step.
+   */
+  private getStepStatusIcon(status: string): string {
+    switch (status) {
+      case "done":
+        return chalk.green("·");
+      case "in_progress":
+        return chalk.cyan("›");
+      default:
+        return chalk.gray("·");
+    }
+  }
+
+  /**
+   * Render the questions pane showing pending questions.
+   */
+  private renderQuestionsPaneContent(
+    pane: AgentPane,
+    region: { x: number; y: number; w: number; h: number },
+    isSelected: boolean
+  ): string {
+    let output = "";
+
+    const hasQuestions = this.pendingQuestions.length > 0;
+    const borderState: BorderState = isSelected ? "selected" : hasQuestions ? "running" : "default";
+    const border = getBorderChalk(borderState);
+
+    // Build title
+    const countText = hasQuestions ? chalk.yellow(` (${this.pendingQuestions.length})`) : "";
+    const nameStyled = border.bold(chalk.yellow("❓ Questions"));
+    const titleContent = `─ ${nameStyled}${countText} `;
+    const titleVisibleLen = 15 + (hasQuestions ? String(this.pendingQuestions.length).length + 3 : 0);
+    const remainingWidth = region.w - titleVisibleLen - 2;
+
+    // Top border
+    output += ansi.moveTo(region.y, region.x + 1);
+    output += border(`╭${titleContent}${"─".repeat(Math.max(0, remainingWidth))}╮`);
+
+    // Content area
+    const contentH = region.h - 2;
+    const contentW = region.w - 2;
+
+    // Build question lines
+    const questionLines: string[] = [];
+
+    if (!hasQuestions) {
+      questionLines.push(chalk.dim("  No pending questions"));
+    } else {
+      for (let i = 0; i < this.pendingQuestions.length; i++) {
+        const q = this.pendingQuestions[i];
+        if (!q) continue;
+
+        const selected = isSelected && i === this.selectedQuestionIndex;
+        const prefix = selected ? chalk.cyan("▶ ") : "  ";
+        const typeIcon =
+          q.questionType === "yes_no"
+            ? chalk.magenta("[Y/N]")
+            : q.questionType === "choice"
+              ? chalk.blue("[?]")
+              : chalk.gray("[...]");
+        const agentPart = chalk.dim(`[${q.agentName}]`);
+        const questionText = q.question.replace(/\n/g, " ");
+        const maxLen = contentW - 20;
+        const truncated = questionText.length > maxLen ? `${questionText.slice(0, maxLen - 3)}...` : questionText;
+        questionLines.push(`${prefix}${typeIcon} ${agentPart} ${truncated}`);
+      }
+
+      // Add help text at bottom if selected
+      if (isSelected) {
+        questionLines.push("");
+        if (this.answerMode) {
+          questionLines.push(chalk.cyan(`  Answer: ${this.answerInput}█`));
+          questionLines.push(chalk.dim("  Enter:submit  Esc:cancel"));
+        } else {
+          const selectedQ = this.pendingQuestions[this.selectedQuestionIndex];
+          if (selectedQ?.questionType === "yes_no") {
+            questionLines.push(chalk.dim("  y:yes  n:no  a:custom  j/k:nav"));
+          } else {
+            questionLines.push(chalk.dim("  a:answer  j/k:navigate"));
+          }
+        }
+      }
+    }
+
+    // Render content
+    const startLine = Math.max(0, questionLines.length - contentH - pane.scrollOffset);
+    for (let row = 0; row < contentH; row++) {
+      output += ansi.moveTo(region.y + 1 + row, region.x + 1);
+      output += border("│");
+
+      const lineIndex = startLine + row;
+      let lineContent = questionLines[lineIndex] || "";
+
+      const visibleLen = this.stripAnsi(lineContent).length;
+      if (visibleLen > contentW) {
+        lineContent = lineContent.slice(0, contentW + (lineContent.length - visibleLen));
+      }
+
+      output += lineContent;
+
       const linePadding = contentW - this.stripAnsi(lineContent).length;
       if (linePadding > 0) {
         output += " ".repeat(linePadding);

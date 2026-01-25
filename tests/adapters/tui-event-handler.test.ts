@@ -30,6 +30,7 @@ class TestTUI {
     const pane: AgentPane = {
       id: agentName,
       name: agentName,
+      paneType: "agent",
       status: "idle",
       outputLines: [],
       scrollOffset: 0,
