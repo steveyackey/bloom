@@ -62,7 +62,7 @@ export const copilotAgent: AgentDefinition = {
   flags: {
     model: ["--model"],
     resume: ["--resume"],
-    approval_bypass: ["--allow-all-tools"],
+    approval_bypass: ["--yolo"],
   },
 
   interactive: {
