@@ -1,0 +1,165 @@
+# Demo tasks for bloom view screenshot
+# This file showcases the DAG visualization with multiple phases and statuses
+
+git:
+  push_to_remote: true
+  auto_cleanup_merged: true
+
+tasks:
+  # Phase 1: Foundation
+  - id: setup-database
+    title: Set up PostgreSQL schema
+    status: done
+    phase: 1
+    agent_name: claude-code
+    repo: backend
+    branch: feature/database
+    instructions: Create initial database schema with users and products tables
+    acceptance_criteria:
+      - Users table with auth fields
+      - Products table with inventory
+      - Migration scripts created
+
+  - id: setup-auth
+    title: Configure authentication
+    status: done
+    phase: 1
+    agent_name: claude-code
+    repo: backend
+    branch: feature/auth
+    instructions: Set up JWT-based authentication
+    acceptance_criteria:
+      - JWT token generation
+      - Refresh token flow
+      - Password hashing
+
+  - id: setup-frontend
+    title: Initialize React frontend
+    status: done
+    phase: 1
+    agent_name: copilot
+    repo: frontend
+    branch: feature/init
+    instructions: Set up Vite + React + TypeScript project
+    acceptance_criteria:
+      - Vite configured
+      - TypeScript strict mode
+      - ESLint + Prettier
+
+  # Phase 2: Core Features
+  - id: api-endpoints
+    title: Build REST API endpoints
+    status: in_progress
+    phase: 2
+    agent_name: claude-code
+    repo: backend
+    branch: feature/api
+    depends_on: [setup-database, setup-auth]
+    instructions: Create CRUD endpoints for products
+    acceptance_criteria:
+      - GET /products
+      - POST /products
+      - PUT /products/:id
+      - DELETE /products/:id
+
+  - id: auth-components
+    title: Create auth UI components
+    status: in_progress
+    phase: 2
+    agent_name: copilot
+    repo: frontend
+    branch: feature/auth-ui
+    depends_on: [setup-frontend, setup-auth]
+    instructions: Build login and registration forms
+    acceptance_criteria:
+      - Login form with validation
+      - Registration form
+      - Password reset flow
+
+  - id: shared-types
+    title: Define shared TypeScript types
+    status: done
+    phase: 2
+    agent_name: opencode
+    repo: shared
+    branch: feature/types
+    depends_on: [setup-database]
+    instructions: Create shared types for API responses
+    acceptance_criteria:
+      - User type definition
+      - Product type definition
+      - API response wrappers
+
+  # Phase 3: Integration
+  - id: api-integration
+    title: Connect frontend to API
+    status: ready_for_agent
+    phase: 3
+    agent_name: claude-code
+    repo: frontend
+    branch: feature/api-client
+    depends_on: [api-endpoints, shared-types, auth-components]
+    instructions: Implement API client with React Query
+    acceptance_criteria:
+      - API client configured
+      - React Query hooks
+      - Error handling
+
+  - id: product-catalog
+    title: Build product catalog page
+    status: todo
+    phase: 3
+    agent_name: copilot
+    repo: frontend
+    branch: feature/catalog
+    depends_on: [api-integration]
+    instructions: Create product listing with filters
+    acceptance_criteria:
+      - Product grid layout
+      - Search functionality
+      - Category filters
+
+  - id: shopping-cart
+    title: Implement shopping cart
+    status: todo
+    phase: 3
+    agent_name: claude-code
+    repo: frontend
+    branch: feature/cart
+    depends_on: [api-integration]
+    instructions: Build cart with local storage persistence
+    acceptance_criteria:
+      - Add/remove items
+      - Quantity adjustment
+      - Cart persistence
+
+  # Phase 4: Polish
+  - id: checkout-flow
+    title: Create checkout experience
+    status: blocked
+    phase: 4
+    agent_name: claude-code
+    repo: frontend
+    branch: feature/checkout
+    depends_on: [shopping-cart, product-catalog]
+    instructions: Build multi-step checkout wizard
+    acceptance_criteria:
+      - Address form
+      - Payment integration
+      - Order confirmation
+    ai_notes:
+      - Waiting for Stripe API keys
+
+  - id: e2e-tests
+    title: Write end-to-end tests
+    status: todo
+    phase: 4
+    agent_name: opencode
+    repo: frontend
+    branch: feature/e2e
+    depends_on: [checkout-flow]
+    instructions: Create Playwright tests for critical paths
+    acceptance_criteria:
+      - Login flow test
+      - Purchase flow test
+      - Error handling tests

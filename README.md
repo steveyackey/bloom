@@ -178,9 +178,10 @@ You can organize everything outside `repos/` however you like—create folders f
 5. PLAN      bloom plan                # Create implementation plan (plan.md)
 6. REFINE    bloom refine              # Refine plan if needed
 7. GENERATE  bloom generate            # Generate tasks.yaml from plan
-8. RUN       bloom run                 # Start agents (resumes if interrupted)
-9. MONITOR   Dashboard shows progress  # Use hjkl to navigate TUI
-10. REVIEW   checkpoint tasks           # Human reviews at phase boundaries
+8. VIEW      bloom view                # (Optional) Inspect DAG in browser
+9. RUN       bloom run                 # Start agents (resumes if interrupted)
+10. MONITOR  Dashboard shows progress  # Use hjkl to navigate TUI
+11. REVIEW   checkpoint tasks          # Human reviews at phase boundaries
 ```
 
 ### Research-First Workflow
@@ -276,6 +277,7 @@ bloom enter                  # Enter Claude Code in project context
 ### Monitoring
 
 ```bash
+bloom view                   # Visual DAG inspector (opens in browser)
 bloom dashboard              # Live task view (refreshes every 10s)
 bloom list                   # List all tasks by phase
 bloom list in_progress       # Filter by status
@@ -284,6 +286,23 @@ bloom next [agent]           # Show available tasks
 bloom agents                 # List agents and their tasks
 bloom validate               # Check for errors
 ```
+
+#### Visual Task Inspector
+
+`bloom view` opens a browser-based visual inspector for your tasks.yaml. Use it to:
+- Explore the task DAG without running agents
+- View task dependencies, phases, and status at a glance
+- Inspect the exact prompts agents will receive (system + user prompts)
+- Verify your task graph before executing
+
+```bash
+bloom view                   # Open on default port (3000)
+bloom view --port 8080       # Custom port
+bloom view --no-open         # Don't auto-open browser
+bloom view -f project.yaml   # Use custom tasks file
+```
+
+The view updates automatically when tasks.yaml changes (file watching enabled).
 
 ### Task Status
 
