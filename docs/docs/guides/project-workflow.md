@@ -10,7 +10,7 @@ This guide walks through the complete lifecycle of a Bloom project, from require
 ## Overview
 
 ```
-create → refine PRD → plan → refine plan → generate → validate → run
+create → refine PRD → plan → refine plan → generate → validate → view → run
 ```
 
 Each step builds on the previous, transforming high-level requirements into executable tasks.
@@ -320,6 +320,22 @@ Phase 3: Frontend
   [todo] create-login-form       Build login form component
   [todo] add-protected-routes    Add route protection
 ```
+
+### Visual Inspection
+
+For a graphical view of your task DAG, use `bloom view`:
+
+```bash
+bloom view
+```
+
+This opens a browser-based inspector where you can:
+- See the complete task graph with dependencies
+- Click tasks to view details and instructions
+- Preview the exact prompts agents will receive
+- Verify task structure before execution
+
+The view updates automatically when `tasks.yaml` changes.
 
 ## 7. Run Agents
 

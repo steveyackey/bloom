@@ -37,6 +37,7 @@ const sidebars: SidebarsConfig = {
         'commands/plan',
         'commands/generate',
         'commands/run',
+        'commands/view',
         'commands/task-management',
         'commands/questions',
       ],

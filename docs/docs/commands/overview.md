@@ -35,6 +35,7 @@ These are the commands you'll use regularly.
 
 | Command | Description |
 |---------|-------------|
+| `bloom view` | Visual DAG inspector (browser) |
 | `bloom list [status]` | List tasks, optionally filtered |
 | `bloom show <taskid>` | Show task details |
 | `bloom dashboard` | Live task monitoring |
@@ -160,6 +161,7 @@ See individual command pages for detailed usage:
 - [plan](/commands/plan) — Plan generation
 - [generate](/commands/generate) — Task generation
 - [run](/commands/run) — Agent orchestration
+- [view](/commands/view) — Visual DAG inspector
 - [enter](/commands/enter) — Open-ended Claude sessions
 - [Task Management](/commands/task-management) — Status and operations
 - [Questions](/commands/questions) — Human queue management
