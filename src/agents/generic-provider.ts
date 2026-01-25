@@ -234,6 +234,11 @@ export class GenericAgentProvider implements Agent {
               process.stdout.write(line);
             }
             outputAccumulator.value += line;
+
+            // Detect API errors in raw output (claude CLI outputs these as plain text)
+            if (line.includes("API Error:") || line.includes("invalid_request_error")) {
+              errorAccumulator.value = line;
+            }
           }
         } else if (isBatchJson) {
           // Batch JSON (goose): accumulate all output, parse at end

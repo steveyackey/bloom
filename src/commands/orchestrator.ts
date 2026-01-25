@@ -370,13 +370,16 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
 
       // Check for fatal session errors that indicate corrupted state
       // These errors mean we should NOT save/reuse this session
-      const isFatalSessionError =
-        result.error &&
-        (result.error.includes("tool_use") ||
-          result.error.includes("concurrency") ||
-          result.error.includes("must be unique") ||
-          result.error.includes("must start with") ||
-          result.error.includes("invalid_format"));
+      // Check both error field and output since some CLIs print errors as plain text
+      const errorOrOutput = `${result.error || ""} ${result.output || ""}`;
+      const hasFatalSessionPattern =
+        errorOrOutput.includes("tool_use") ||
+        errorOrOutput.includes("concurrency") ||
+        errorOrOutput.includes("must be unique") ||
+        errorOrOutput.includes("must start with") ||
+        errorOrOutput.includes("invalid_format") ||
+        errorOrOutput.includes("invalid_request_error");
+      const isFatalSessionError = !result.success && hasFatalSessionPattern;
 
       // Save session ID for future resumption (only if session is healthy)
       if (result.sessionId && taskResult.taskId && !isFatalSessionError) {
