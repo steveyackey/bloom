@@ -72,12 +72,16 @@ describe("Test Agent CLI", () => {
     expect(lines.length).toBeGreaterThan(0);
 
     // Parse first event
-    const firstEvent = JSON.parse(lines[0]);
+    const firstLine = lines[0];
+    expect(firstLine).toBeDefined();
+    const firstEvent = JSON.parse(firstLine!);
     expect(firstEvent.type).toBe("session");
     expect(firstEvent.session_id).toBeDefined();
 
     // Parse last event
-    const lastEvent = JSON.parse(lines[lines.length - 1]);
+    const lastLine = lines[lines.length - 1];
+    expect(lastLine).toBeDefined();
+    const lastEvent = JSON.parse(lastLine!);
     expect(lastEvent.type).toBe("done");
   });
 
@@ -132,7 +136,9 @@ describe("Test Agent CLI", () => {
     expect(result.exitCode).toBe(0);
 
     const lines = result.stdout.trim().split("\n");
-    const sessionEvent = JSON.parse(lines[0]);
+    const firstLine = lines[0];
+    expect(firstLine).toBeDefined();
+    const sessionEvent = JSON.parse(firstLine!);
     expect(sessionEvent.session_id).toBe(sessionId);
   });
 });
