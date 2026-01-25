@@ -77,6 +77,52 @@ export interface TaskBlockedEvent {
 }
 
 /**
+ * Event emitted when a step starts within a task
+ */
+export interface StepStartedEvent {
+  type: "step:started";
+  taskId: string;
+  stepId: string;
+  stepIndex: number;
+  totalSteps: number;
+  agentName: string;
+  resuming: boolean;
+}
+
+/**
+ * Event emitted when a step completes successfully
+ */
+export interface StepCompletedEvent {
+  type: "step:completed";
+  taskId: string;
+  stepId: string;
+  stepIndex: number;
+  totalSteps: number;
+  duration: number;
+  hasMoreSteps: boolean;
+}
+
+/**
+ * Event emitted when a step fails
+ */
+export interface StepFailedEvent {
+  type: "step:failed";
+  taskId: string;
+  stepId: string;
+  error: string;
+}
+
+/**
+ * Event emitted when all steps in a task are complete
+ */
+export interface AllStepsCompletedEvent {
+  type: "steps:all_completed";
+  taskId: string;
+  totalSteps: number;
+  totalDuration: number;
+}
+
+/**
  * Event emitted when pulling latest from remote
  */
 export interface GitPullingEvent {
@@ -333,6 +379,10 @@ export type OrchestratorEvent =
   | TaskCompletedEvent
   | TaskFailedEvent
   | TaskBlockedEvent
+  | StepStartedEvent
+  | StepCompletedEvent
+  | StepFailedEvent
+  | AllStepsCompletedEvent
   | GitPullingEvent
   | GitPulledEvent
   | WorktreeCreatingEvent

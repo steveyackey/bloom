@@ -427,8 +427,27 @@ tasks:
     acceptance_criteria:            # Definition of done
       - Criterion 1
     ai_notes: []                    # Notes added during execution
-    subtasks: []                    # Nested tasks
+    subtasks: []                    # Nested tasks (independent, parallel)
+    steps: []                       # Sequential steps (same session, shared context)
 ```
+
+### Steps vs Subtasks
+
+For sequential work where context matters, use **steps** instead of subtasks:
+
+```yaml
+- id: refactor-auth
+  title: Refactor authentication
+  steps:
+    - id: refactor-auth.1
+      instruction: Extract JWT validation into separate module
+    - id: refactor-auth.2
+      instruction: Add unit tests for extracted module
+    - id: refactor-auth.3
+      instruction: Update API documentation
+```
+
+Steps reuse the same agent session, preserving context between steps. Git operations (push/merge/PR) happen only after all steps complete. See [Task Schema Reference](https://docs.use-bloom.dev/reference/task-schema) for full details.
 
 ## Git Workflow
 

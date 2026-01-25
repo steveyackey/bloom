@@ -69,6 +69,29 @@ function handleEvent(event: OrchestratorEvent, log: Logger): void {
       log.error(`Task ${event.taskId} blocked: ${event.reason}`);
       break;
 
+    // Step lifecycle
+    case "step:started":
+      log.info(`Starting step ${event.stepId} (${event.stepIndex + 1}/${event.totalSteps})`);
+      if (event.resuming) {
+        log.debug("Resuming session for step");
+      }
+      break;
+
+    case "step:completed":
+      log.info(`Step ${event.stepId} completed (${event.duration}s)`);
+      if (event.hasMoreSteps) {
+        log.info("Continuing with next step...");
+      }
+      break;
+
+    case "step:failed":
+      log.error(`Step ${event.stepId} failed: ${event.error}`);
+      break;
+
+    case "steps:all_completed":
+      log.info(`All ${event.totalSteps} steps completed (total: ${event.totalDuration}s)`);
+      break;
+
     // Git pull operations
     case "git:pulling":
       log.info(`Pulling latest updates for ${event.repo}...`);

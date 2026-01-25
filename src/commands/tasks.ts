@@ -6,9 +6,12 @@ import chalk from "chalk";
 import { createLogger } from "../infra/logger";
 import type { Task, TaskStatus, TaskStep } from "../task-schema";
 import {
+  findStep,
   findTask,
   getAllAgents,
   getAvailableTasks,
+  getCurrentStep,
+  getNextStep,
   getStatusIcon,
   getTasksByAgent,
   getTasksByStatus,
@@ -557,43 +560,6 @@ function colorStepStatus(status: TaskStep["status"]): string {
     default:
       return status;
   }
-}
-
-/**
- * Find a step by ID across all tasks.
- * Step IDs are typically formatted as "task-id.N" (e.g., "refactor-auth.1").
- */
-function findStep(tasks: Task[], stepId: string): { task: Task; step: TaskStep; index: number } | null {
-  for (const task of tasks) {
-    if (task.steps) {
-      const index = task.steps.findIndex((s) => s.id === stepId);
-      if (index !== -1) {
-        return { task, step: task.steps[index], index };
-      }
-    }
-    // Check subtasks recursively
-    const found = findStep(task.subtasks, stepId);
-    if (found) return found;
-  }
-  return null;
-}
-
-/**
- * Get the current step for a task (first non-done step).
- */
-function getCurrentStep(task: Task): { step: TaskStep; index: number } | null {
-  if (!task.steps) return null;
-  const index = task.steps.findIndex((s) => s.status !== "done");
-  if (index === -1) return null;
-  return { step: task.steps[index], index };
-}
-
-/**
- * Get the next pending step for a task (after current).
- */
-function getNextStep(task: Task, currentIndex: number): TaskStep | null {
-  if (!task.steps || currentIndex >= task.steps.length - 1) return null;
-  return task.steps[currentIndex + 1];
 }
 
 export async function cmdStepDone(stepId: string): Promise<void> {

@@ -3,14 +3,21 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Task, TasksFile } from "../src/task-schema";
 import {
+  allStepsComplete,
+  findStep,
   findTask,
   getAllAgents,
   getAvailableTasks,
+  getCompletedSteps,
+  getCurrentStep,
+  getNextStep,
   getTasksByStatus,
+  hasSteps,
   loadTasks,
   primeTasks,
   resetStuckTasks,
   saveTasks,
+  updateStepStatus,
   updateTaskStatus,
 } from "../src/tasks";
 
@@ -244,5 +251,239 @@ describe("Task Filtering", () => {
 
     expect(done).toHaveLength(2);
     expect(done.map((t) => t.id).sort()).toEqual(["a", "c"]);
+  });
+});
+
+// =============================================================================
+// Step Helpers
+// =============================================================================
+
+describe("Step Helpers", () => {
+  function createTaskWithSteps(overrides: Partial<Task> = {}): Task {
+    return createTask({
+      steps: [
+        { id: "step-1", instruction: "Do step 1", status: "pending", acceptance_criteria: [] },
+        { id: "step-2", instruction: "Do step 2", status: "pending", acceptance_criteria: [] },
+        { id: "step-3", instruction: "Do step 3", status: "pending", acceptance_criteria: [] },
+      ],
+      ...overrides,
+    });
+  }
+
+  describe("findStep", () => {
+    test("finds step by ID in root task", () => {
+      const task = createTaskWithSteps({ id: "task-1" });
+      const result = findStep([task], "step-2");
+
+      expect(result).not.toBeNull();
+      expect(result?.step.id).toBe("step-2");
+      expect(result?.task.id).toBe("task-1");
+      expect(result?.index).toBe(1);
+    });
+
+    test("finds step in nested subtasks", () => {
+      const subtask = createTaskWithSteps({ id: "subtask-1" });
+      const parent = createTask({ id: "parent", subtasks: [subtask] });
+      const result = findStep([parent], "step-1");
+
+      expect(result).not.toBeNull();
+      expect(result?.task.id).toBe("subtask-1");
+    });
+
+    test("returns null for non-existent step", () => {
+      const task = createTaskWithSteps();
+      expect(findStep([task], "non-existent")).toBeNull();
+    });
+
+    test("returns null for task without steps", () => {
+      const task = createTask({ id: "no-steps" });
+      expect(findStep([task], "step-1")).toBeNull();
+    });
+  });
+
+  describe("getCurrentStep", () => {
+    test("returns first pending step", () => {
+      const task = createTaskWithSteps();
+      const result = getCurrentStep(task);
+
+      expect(result).not.toBeNull();
+      expect(result?.step.id).toBe("step-1");
+      expect(result?.index).toBe(0);
+    });
+
+    test("returns first non-done step when some are completed", () => {
+      const task = createTaskWithSteps();
+      task.steps![0]!.status = "done";
+      const result = getCurrentStep(task);
+
+      expect(result).not.toBeNull();
+      expect(result?.step.id).toBe("step-2");
+      expect(result?.index).toBe(1);
+    });
+
+    test("returns null when all steps are done", () => {
+      const task = createTaskWithSteps();
+      for (const s of task.steps!) {
+        s.status = "done";
+      }
+
+      expect(getCurrentStep(task)).toBeNull();
+    });
+
+    test("returns null for task without steps", () => {
+      const task = createTask();
+      expect(getCurrentStep(task)).toBeNull();
+    });
+
+    test("returns null for task with empty steps array", () => {
+      const task = createTask({ steps: [] });
+      expect(getCurrentStep(task)).toBeNull();
+    });
+  });
+
+  describe("getNextStep", () => {
+    test("returns next step after given index", () => {
+      const task = createTaskWithSteps();
+      const next = getNextStep(task, 0);
+
+      expect(next).not.toBeNull();
+      expect(next?.id).toBe("step-2");
+    });
+
+    test("returns null when at last step", () => {
+      const task = createTaskWithSteps();
+      expect(getNextStep(task, 2)).toBeNull();
+    });
+
+    test("returns null for task without steps", () => {
+      const task = createTask();
+      expect(getNextStep(task, 0)).toBeNull();
+    });
+  });
+
+  describe("hasSteps", () => {
+    test("returns true for task with steps", () => {
+      const task = createTaskWithSteps();
+      expect(hasSteps(task)).toBe(true);
+    });
+
+    test("returns false for task without steps", () => {
+      const task = createTask();
+      expect(hasSteps(task)).toBe(false);
+    });
+
+    test("returns false for task with empty steps array", () => {
+      const task = createTask({ steps: [] });
+      expect(hasSteps(task)).toBe(false);
+    });
+  });
+
+  describe("allStepsComplete", () => {
+    test("returns true when all steps are done", () => {
+      const task = createTaskWithSteps();
+      for (const s of task.steps!) {
+        s.status = "done";
+      }
+      expect(allStepsComplete(task)).toBe(true);
+    });
+
+    test("returns false when any step is not done", () => {
+      const task = createTaskWithSteps();
+      task.steps![0]!.status = "done";
+      task.steps![1]!.status = "in_progress";
+      expect(allStepsComplete(task)).toBe(false);
+    });
+
+    test("returns true for task without steps", () => {
+      const task = createTask();
+      expect(allStepsComplete(task)).toBe(true);
+    });
+
+    test("returns true for task with empty steps array", () => {
+      const task = createTask({ steps: [] });
+      expect(allStepsComplete(task)).toBe(true);
+    });
+  });
+
+  describe("getCompletedSteps", () => {
+    test("returns only completed steps", () => {
+      const task = createTaskWithSteps();
+      task.steps![0]!.status = "done";
+      task.steps![1]!.status = "done";
+
+      const completed = getCompletedSteps(task);
+
+      expect(completed).toHaveLength(2);
+      expect(completed.map((s) => s.id)).toEqual(["step-1", "step-2"]);
+    });
+
+    test("returns empty array when no steps are done", () => {
+      const task = createTaskWithSteps();
+      expect(getCompletedSteps(task)).toEqual([]);
+    });
+
+    test("returns empty array for task without steps", () => {
+      const task = createTask();
+      expect(getCompletedSteps(task)).toEqual([]);
+    });
+  });
+
+  describe("updateStepStatus", () => {
+    test("updates step status to in_progress with started_at timestamp", () => {
+      const task = createTaskWithSteps({ id: "task-1" });
+      const tasks = [task];
+
+      const result = updateStepStatus(tasks, "step-1", "in_progress");
+
+      expect(result).toBe(true);
+      expect(task.steps![0]!.status).toBe("in_progress");
+      expect(task.steps![0]!.started_at).toBeDefined();
+      expect(task.steps![0]!.completed_at).toBeUndefined();
+    });
+
+    test("updates step status to done with completed_at timestamp", () => {
+      const task = createTaskWithSteps({ id: "task-1" });
+      const step = task.steps![0]!;
+      step.status = "in_progress";
+      step.started_at = "2024-01-01T00:00:00.000Z";
+      const tasks = [task];
+
+      const result = updateStepStatus(tasks, "step-1", "done");
+
+      expect(result).toBe(true);
+      expect(step.status as string).toBe("done");
+      expect(step.completed_at).toBeDefined();
+    });
+
+    test("does not override existing started_at", () => {
+      const task = createTaskWithSteps({ id: "task-1" });
+      const originalStartTime = "2024-01-01T00:00:00.000Z";
+      task.steps![0]!.started_at = originalStartTime;
+      const tasks = [task];
+
+      updateStepStatus(tasks, "step-1", "in_progress");
+
+      expect(task.steps![0]!.started_at).toBe(originalStartTime);
+    });
+
+    test("returns false for non-existent step", () => {
+      const task = createTaskWithSteps({ id: "task-1" });
+      const tasks = [task];
+
+      const result = updateStepStatus(tasks, "non-existent", "done");
+
+      expect(result).toBe(false);
+    });
+
+    test("finds and updates step in nested subtasks", () => {
+      const subtask = createTaskWithSteps({ id: "subtask-1" });
+      const parent = createTask({ id: "parent", subtasks: [subtask] });
+      const tasks = [parent];
+
+      const result = updateStepStatus(tasks, "step-2", "done");
+
+      expect(result).toBe(true);
+      expect(subtask.steps![1]!.status).toBe("done");
+    });
   });
 });

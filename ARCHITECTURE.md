@@ -182,6 +182,7 @@ Events are defined in `src/core/orchestrator/events.ts`:
 |----------|--------|
 | **Agent Lifecycle** | `agent:started`, `agent:idle`, `agent:output`, `agent:process_started`, `agent:process_ended` |
 | **Task Lifecycle** | `task:found`, `task:started`, `task:completed`, `task:failed`, `task:blocked` |
+| **Step Lifecycle** | `step:started`, `step:completed`, `step:failed`, `steps:all_completed` |
 | **Git Operations** | `git:pulling`, `git:pulled`, `git:pushing`, `git:pushed`, `git:merging`, `git:merged`, `git:merge_conflict`, `git:cleanup` |
 | **Worktree** | `worktree:creating`, `worktree:created` |
 | **PR Operations** | `git:pr_creating`, `git:pr_created` |
@@ -235,11 +236,23 @@ This enables easy debugging (inspect files directly), git-friendly workflows (co
 
 Each agent works in its own git worktree, enabling concurrent work on different tasks without conflicts. Changes merge back to main branches through the post-task workflow.
 
-### 3. Human-in-the-Loop
+### 3. Step-Based Session Reuse
+
+Tasks can define **steps** for sequential work that benefits from shared context. Unlike subtasks (which create separate sessions), steps reuse the same agent session:
+
+1. Agent starts working on step 1 with full task context
+2. Agent marks step done via `bloom step done <step-id>` and exits
+3. Work loop resumes the **same session** with next step's prompt
+4. Agent retains all context from previous steps
+5. Git operations (push/merge/PR) happen only after all steps complete
+
+This is ideal for refactoring, migrations, and iterative work where later steps benefit from knowledge gained in earlier steps. The step execution loop is implemented in `work-loop.ts`.
+
+### 4. Human-in-the-Loop
 
 File-based queues enable asynchronous human interaction. Agents can ask questions and continue other work. Humans can interject running agents. State persists across restarts.
 
-### 4. Generic Agent Provider
+### 5. Generic Agent Provider
 
 A single provider implementation supports all agent types through schema-driven configuration. This provides consistent session management and makes it easy to add new agent backends.
 

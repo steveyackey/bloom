@@ -240,9 +240,93 @@ bloom reset task-id
 bloom reset --stuck
 ```
 
+## Steps
+
+Steps allow you to break a task into sequential instructions that **reuse the same agent session**. This is ideal for work that builds on itself where context from previous steps is valuable.
+
+### Defining Steps
+
+```yaml
+tasks:
+  - id: refactor-auth
+    title: Refactor authentication module
+    status: todo
+    repo: backend
+    worktree: feature/refactor-auth
+    steps:
+      - id: refactor-auth.1
+        instruction: |
+          Extract JWT validation from auth.ts into jwt-validator.ts
+        acceptance_criteria:
+          - jwt-validator.ts exists
+          - auth.ts imports from new module
+
+      - id: refactor-auth.2
+        instruction: |
+          Add unit tests for jwt-validator module
+        acceptance_criteria:
+          - Tests cover valid/invalid tokens
+          - All tests pass
+
+      - id: refactor-auth.3
+        instruction: Update API documentation
+```
+
+### Step Execution Flow
+
+When an agent works on a task with steps:
+
+1. **First step**: Agent starts with full task context
+2. **Agent works**: Implements the step
+3. **Mark done**: Agent runs `bloom step done step-id` and exits
+4. **Resume**: Bloom resumes the **same session** with the next step prompt
+5. **Context preserved**: Agent retains knowledge from previous steps
+6. **Repeat**: Until all steps complete
+7. **Git operations**: Push/merge/PR happens only after ALL steps complete
+
+### Step Commands
+
+```bash
+# Mark current step as done
+bloom step done step-id
+
+# Start a step manually
+bloom step start step-id
+
+# View current step for a task
+bloom step show task-id
+
+# List all steps for a task
+bloom step list task-id
+```
+
+### Step Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `id` | Yes | Step ID (typically `task-id.N`) |
+| `instruction` | Yes | What to do in this step |
+| `status` | No | `pending`, `in_progress`, `done` |
+| `acceptance_criteria` | No | When step is complete |
+| `started_at` | Auto | Timestamp when started |
+| `completed_at` | Auto | Timestamp when finished |
+
+### When to Use Steps
+
+**Use steps when:**
+- Work builds on itself (refactoring, migrations)
+- Later steps benefit from context of earlier steps
+- You want a single branch for all the work
+- Sequential execution is required
+
+**Example use cases:**
+- Refactor: extract code → add tests → update docs
+- Migration: update code → update tests → update configs
+- Feature: implement → test → document
+
 ## Subtasks
 
-Tasks can have nested subtasks:
+Subtasks are independent child tasks with their own sessions and branches.
 
 ```yaml
 tasks:
@@ -272,6 +356,38 @@ Subtasks:
 - Have their own status and dependencies
 - Can be nested multiple levels
 - Complete when all children complete
+
+## Steps vs Subtasks
+
+| Aspect | Steps | Subtasks |
+|--------|-------|----------|
+| **Session** | Same session (shared context) | Separate sessions |
+| **Branch** | Same branch | Can have own branch |
+| **Execution** | Sequential only | Can run in parallel |
+| **Context** | Agent remembers previous steps | Fresh start each subtask |
+| **Use when** | Work builds on itself | Work is independent |
+
+**Choose steps** for iterative work where context matters:
+```yaml
+# Good for steps - each builds on previous
+steps:
+  - id: task.1
+    instruction: Extract UserService from monolith
+  - id: task.2
+    instruction: Add tests for extracted service
+  - id: task.3
+    instruction: Update imports across codebase
+```
+
+**Choose subtasks** for parallel or independent work:
+```yaml
+# Good for subtasks - can work in parallel
+subtasks:
+  - id: frontend-auth
+    worktree: feature/frontend-auth
+  - id: backend-auth
+    worktree: feature/backend-auth
+```
 
 ## Validation Tasks
 

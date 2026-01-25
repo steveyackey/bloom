@@ -11,7 +11,7 @@ import { type AgentName, createAgent } from "../../agents";
 import { getDefaultAgentName, loadUserConfig } from "../../infra/config";
 import { addWorktree, getWorktreePath, listRepos, listWorktrees, pullDefaultBranch } from "../../infra/git";
 import { PromptCompiler } from "../../prompts/compiler";
-import { loadTasks, saveTasks, updateTaskStatus } from "../../tasks";
+import { allStepsComplete, findTask, getCurrentStep, loadTasks, saveTasks, updateTaskStatus } from "../../tasks";
 import type { EventHandler } from "./events";
 import {
   acquireMergeLock,
@@ -26,7 +26,13 @@ import {
   setTaskDone,
   setTaskPendingMerge,
 } from "./post-task";
-import { buildCommitResumePrompt, buildMergeConflictPrompt, getTaskForAgent, saveTaskSessionId } from "./task-prompt";
+import {
+  buildCommitResumePrompt,
+  buildMergeConflictPrompt,
+  buildNextStepPrompt,
+  getTaskForAgent,
+  saveTaskSessionId,
+} from "./task-prompt";
 
 // =============================================================================
 // Types
@@ -241,52 +247,184 @@ export async function runAgentWorkLoop(
         resuming: !!sessionIdToUse,
       });
 
-      const startTime = Date.now();
-      let result = await agent.run({
-        systemPrompt,
-        prompt: taskResult.prompt!,
-        startingDirectory: workingDir,
-        agentName,
-        taskId: taskResult.taskId,
-        sessionId: sessionIdToUse,
-        onOutput: (data) => {
-          onEvent({ type: "agent:output", agentName, data });
-        },
-        onProcessStart: (pid, command) => {
-          onEvent({ type: "agent:process_started", agentName, pid, command });
-        },
-        onProcessEnd: (pid, exitCode) => {
-          onEvent({ type: "agent:process_ended", agentName, pid, exitCode });
-        },
-      });
-      const duration = Math.round((Date.now() - startTime) / 1000);
+      // Track step state if task has steps
+      let currentStepIndex = taskResult.stepInfo?.stepIndex ?? -1;
+      let currentStepId = taskResult.stepInfo?.stepId;
+      const totalSteps = taskResult.stepInfo?.totalSteps ?? 0;
+      const taskStartTime = Date.now();
+      let stepStartTime = taskStartTime;
+      let currentSessionId = sessionIdToUse;
+      let currentPrompt = taskResult.prompt!;
 
-      // Check for fatal session errors that indicate corrupted state
-      const errorOrOutput = `${result.error || ""} ${result.output || ""}`;
-      const hasFatalSessionPattern =
-        errorOrOutput.includes("tool_use") ||
-        errorOrOutput.includes("concurrency") ||
-        errorOrOutput.includes("must be unique") ||
-        errorOrOutput.includes("must start with") ||
-        errorOrOutput.includes("invalid_format") ||
-        errorOrOutput.includes("invalid_request_error");
-      const wasResuming = !!sessionIdToUse;
-      const isFatalSessionError = !result.success && (hasFatalSessionPattern || wasResuming);
-
-      // Save session ID for future resumption (only if session is healthy)
-      if (result.sessionId && taskResult.taskId && !isFatalSessionError) {
-        await saveTaskSessionId(tasksFile, taskResult.taskId, result.sessionId);
-      } else if (isFatalSessionError && taskResult.taskId) {
+      // Emit step:started if this is a step task
+      if (currentStepId) {
         onEvent({
-          type: "session:corrupted",
-          taskId: taskResult.taskId,
-          wasResuming,
-          reason: hasFatalSessionPattern ? errorOrOutput.slice(0, 200) : "Session failed during resume",
+          type: "step:started",
+          taskId: taskResult.taskId!,
+          stepId: currentStepId,
+          stepIndex: currentStepIndex,
+          totalSteps,
+          agentName,
+          resuming: !!sessionIdToUse,
         });
-        await saveTaskSessionId(tasksFile, taskResult.taskId, undefined);
       }
 
-      if (result.success) {
+      // Step execution loop - keeps running until all steps complete or failure
+      let stepLoopComplete = false;
+      let result: Awaited<ReturnType<typeof agent.run>>;
+
+      while (!stepLoopComplete) {
+        stepStartTime = Date.now();
+        result = await agent.run({
+          systemPrompt,
+          prompt: currentPrompt,
+          startingDirectory: workingDir,
+          agentName,
+          taskId: taskResult.taskId,
+          sessionId: currentSessionId,
+          onOutput: (data) => {
+            onEvent({ type: "agent:output", agentName, data });
+          },
+          onProcessStart: (pid, command) => {
+            onEvent({ type: "agent:process_started", agentName, pid, command });
+          },
+          onProcessEnd: (pid, exitCode) => {
+            onEvent({ type: "agent:process_ended", agentName, pid, exitCode });
+          },
+        });
+
+        // Check for fatal session errors that indicate corrupted state
+        const errorOrOutput = `${result.error || ""} ${result.output || ""}`;
+        const hasFatalSessionPattern =
+          errorOrOutput.includes("tool_use") ||
+          errorOrOutput.includes("concurrency") ||
+          errorOrOutput.includes("must be unique") ||
+          errorOrOutput.includes("must start with") ||
+          errorOrOutput.includes("invalid_format") ||
+          errorOrOutput.includes("invalid_request_error");
+        const wasResuming = !!currentSessionId;
+        const isFatalSessionError = !result.success && (hasFatalSessionPattern || wasResuming);
+
+        // Save session ID for future resumption (only if session is healthy)
+        if (result.sessionId && taskResult.taskId && !isFatalSessionError) {
+          await saveTaskSessionId(tasksFile, taskResult.taskId, result.sessionId);
+          currentSessionId = result.sessionId;
+        } else if (isFatalSessionError && taskResult.taskId) {
+          onEvent({
+            type: "session:corrupted",
+            taskId: taskResult.taskId,
+            wasResuming,
+            reason: hasFatalSessionPattern ? errorOrOutput.slice(0, 200) : "Session failed during resume",
+          });
+          await saveTaskSessionId(tasksFile, taskResult.taskId, undefined);
+          currentSessionId = undefined;
+        }
+
+        // If agent failed, exit loop
+        if (!result.success) {
+          stepLoopComplete = true;
+          break;
+        }
+
+        // If task has no steps, we're done
+        if (!currentStepId) {
+          stepLoopComplete = true;
+          break;
+        }
+
+        // Task has steps - reload task to check step status
+        const freshTasksData = await loadTasks(tasksFile);
+        const freshTask = findTask(freshTasksData.tasks, taskResult.taskId!);
+
+        if (!freshTask) {
+          onEvent({
+            type: "error",
+            message: `Task ${taskResult.taskId} not found after step execution`,
+          });
+          stepLoopComplete = true;
+          break;
+        }
+
+        // Check if all steps are now complete
+        if (allStepsComplete(freshTask)) {
+          const stepDuration = Math.round((Date.now() - stepStartTime) / 1000);
+          const totalDuration = Math.round((Date.now() - taskStartTime) / 1000);
+
+          // Emit final step completion
+          onEvent({
+            type: "step:completed",
+            taskId: taskResult.taskId!,
+            stepId: currentStepId,
+            stepIndex: currentStepIndex,
+            totalSteps,
+            duration: stepDuration,
+            hasMoreSteps: false,
+          });
+
+          // Emit all steps completed
+          onEvent({
+            type: "steps:all_completed",
+            taskId: taskResult.taskId!,
+            totalSteps,
+            totalDuration,
+          });
+
+          stepLoopComplete = true;
+          break;
+        }
+
+        // Check current step status
+        const currentStepObj = getCurrentStep(freshTask);
+        if (!currentStepObj) {
+          // No pending step found but allStepsComplete was false - shouldn't happen
+          stepLoopComplete = true;
+          break;
+        }
+
+        // Did the agent complete the step we asked it to work on?
+        if (currentStepObj.step.id !== currentStepId) {
+          // Step was completed, moving to next one
+          const stepDuration = Math.round((Date.now() - stepStartTime) / 1000);
+
+          onEvent({
+            type: "step:completed",
+            taskId: taskResult.taskId!,
+            stepId: currentStepId,
+            stepIndex: currentStepIndex,
+            totalSteps,
+            duration: stepDuration,
+            hasMoreSteps: true,
+          });
+
+          // Update to next step
+          currentStepIndex = currentStepObj.index;
+          currentStepId = currentStepObj.step.id;
+
+          // Emit started for next step
+          onEvent({
+            type: "step:started",
+            taskId: taskResult.taskId!,
+            stepId: currentStepId,
+            stepIndex: currentStepIndex,
+            totalSteps,
+            agentName,
+            resuming: true,
+          });
+
+          // Build the next step prompt and continue
+          currentPrompt = buildNextStepPrompt(freshTask, currentStepIndex, taskResult.taskCli!);
+          // Session continues - loop will run agent.run again
+        } else {
+          // Agent exited without completing the step
+          // This could be expected (agent ran out of turns, user interrupted, etc.)
+          // Don't emit step:failed, just exit the loop - the step is still in_progress
+          stepLoopComplete = true;
+        }
+      }
+
+      const duration = Math.round((Date.now() - taskStartTime) / 1000);
+
+      if (result!.success) {
         onEvent({
           type: "task:completed",
           taskId: taskResult.taskId!,
@@ -302,13 +440,13 @@ export async function runAgentWorkLoop(
             // Resume agent to finish the git work
             const resumePrompt = buildCommitResumePrompt(status, taskResult.gitConfig);
 
-            result = await agent.run({
+            const commitResult = await agent.run({
               systemPrompt,
               prompt: resumePrompt,
               startingDirectory: workingDir,
               agentName,
               taskId: taskResult.taskId,
-              sessionId: result.sessionId,
+              sessionId: currentSessionId,
               onOutput: (data) => {
                 onEvent({ type: "agent:output", agentName, data });
               },
@@ -320,9 +458,14 @@ export async function runAgentWorkLoop(
               },
             });
 
+            // Update session ID for subsequent operations
+            if (commitResult.sessionId) {
+              currentSessionId = commitResult.sessionId;
+            }
+
             // Save updated session ID
-            if (result.sessionId && taskResult.taskId) {
-              await saveTaskSessionId(tasksFile, taskResult.taskId, result.sessionId);
+            if (commitResult.sessionId && taskResult.taskId) {
+              await saveTaskSessionId(tasksFile, taskResult.taskId, commitResult.sessionId);
             }
 
             // Check if uncommitted changes still exist after resume
@@ -393,7 +536,7 @@ export async function runAgentWorkLoop(
               },
               agent,
               systemPrompt,
-              result.sessionId,
+              currentSessionId,
               onEvent
             );
           }
@@ -421,7 +564,7 @@ export async function runAgentWorkLoop(
           taskId: taskResult.taskId!,
           agentName,
           duration,
-          error: result.error || "Unknown error",
+          error: result!.error || "Unknown error",
         });
       }
 
