@@ -389,9 +389,9 @@ export class GenericAgentProvider implements Agent {
     // Add base args
     args.push(...modeConfig.base_args);
 
-    // Add approval bypass for streaming mode
+    // Add approval bypass flag
     const approvalBypassFlag = this.definition.flags.approval_bypass?.[0];
-    if (mode === "streaming" && approvalBypassFlag) {
+    if (approvalBypassFlag) {
       args.push(approvalBypassFlag);
     }
 
