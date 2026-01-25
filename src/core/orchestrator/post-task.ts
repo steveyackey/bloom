@@ -18,6 +18,7 @@ import {
   releaseMergeLock,
   waitForMergeLock,
 } from "../../infra/git";
+import { createPullRequest as ghCreatePullRequest } from "../../infra/github";
 import type { GitConfig } from "../../task-schema";
 import { loadTasks, saveTasks, updateTaskStatus } from "../../tasks";
 import type { EventHandler } from "./events";
@@ -141,68 +142,32 @@ export function createPullRequest(
     targetBranch,
   });
 
-  try {
-    const ghResult = Bun.spawnSync(
-      [
-        "gh",
-        "pr",
-        "create",
-        "--title",
-        taskTitle || `Task: ${taskId}`,
-        "--body",
-        prBody || `Automated PR for task ${taskId}`,
-        "--base",
-        targetBranch,
-        "--head",
-        sourceBranch,
-      ],
-      {
-        cwd: gitInfo.worktreePath,
-        stdout: "pipe",
-        stderr: "pipe",
-      }
-    );
+  const result = ghCreatePullRequest({
+    title: taskTitle || `Task: ${taskId}`,
+    body: prBody || `Automated PR for task ${taskId}`,
+    baseBranch: targetBranch,
+    headBranch: sourceBranch,
+    cwd: gitInfo.worktreePath,
+  });
 
-    if (ghResult.exitCode === 0) {
-      const prUrl = ghResult.stdout.toString().trim();
-      onEvent({
-        type: "git:pr_created",
-        url: prUrl,
-        sourceBranch,
-        targetBranch,
-      });
-      return { success: true, url: prUrl };
-    }
-
-    const stderr = ghResult.stderr.toString().trim();
-    // Check if PR already exists
-    if (stderr.includes("already exists")) {
-      onEvent({
-        type: "git:pr_created",
-        sourceBranch,
-        targetBranch,
-        alreadyExists: true,
-      });
-      return { success: true, alreadyExists: true };
-    }
-
+  if (result.success) {
+    onEvent({
+      type: "git:pr_created",
+      url: result.url,
+      sourceBranch,
+      targetBranch,
+      alreadyExists: result.alreadyExists,
+    });
+  } else {
     onEvent({
       type: "git:pr_created",
       sourceBranch,
       targetBranch,
-      error: stderr,
+      error: result.error,
     });
-    return { success: false, error: stderr };
-  } catch (err) {
-    const error = String(err);
-    onEvent({
-      type: "git:pr_created",
-      sourceBranch,
-      targetBranch,
-      error,
-    });
-    return { success: false, error };
   }
+
+  return result;
 }
 
 // =============================================================================

@@ -12,6 +12,7 @@
 export * from "./commands/context";
 export * from "./infra/config";
 export * from "./infra/git";
+export * from "./infra/github";
 export * from "./infra/logger";
 export * from "./task-schema";
 export * from "./tasks";

@@ -2,26 +2,12 @@
 // Shared Context for CLI Commands
 // =============================================================================
 
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { findGitRoot, isInGitRepo } from "../infra/git";
 
-// Find the git root of the current working directory
-export function findGitRoot(): string | null {
-  const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  if (result.status === 0 && result.stdout) {
-    return result.stdout.trim();
-  }
-  return null;
-}
-
-// Check if we're in a git repository
-export function isInGitRepo(): boolean {
-  return findGitRoot() !== null;
-}
+// Re-export git functions for backwards compatibility
+export { findGitRoot, isInGitRepo };
 
 // Search upward from cwd to find bloom.config.yaml
 function findBloomRoot(): string | null {
