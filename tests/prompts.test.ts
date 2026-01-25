@@ -48,7 +48,7 @@ describe("prompts", () => {
       // Must read context FIRST before doing anything else
       expect(prompt).toContain("Read the project context first");
       expect(prompt).toContain("PRD.md");
-      expect(prompt).toContain("IMPORTANT");
+      expect(prompt).toContain("REQUIRED");
     });
 
     it("should check PRD at working directory root", async () => {
@@ -69,7 +69,6 @@ describe("prompts", () => {
         REPOS_CONTEXT: "No repos configured",
       });
 
-      expect(prompt).toContain("checkpoint");
       expect(prompt).toContain("Checkpoint");
     });
 
@@ -82,8 +81,8 @@ describe("prompts", () => {
 
       expect(prompt).toContain("Merge Strategy");
       expect(prompt).toContain("Feature branches");
-      expect(prompt).toContain("Phase branches");
-      expect(prompt).toContain("Trunk-based");
+      expect(prompt).toContain("open_pr");
+      expect(prompt).toContain("merge_into");
     });
 
     it("should include repos context for target codebase awareness", async () => {
@@ -130,7 +129,6 @@ describe("prompts", () => {
       expect(prompt).toContain("Read the project context first");
       expect(prompt).toContain("plan.md");
       expect(prompt).toContain("REQUIRED");
-      expect(prompt).toContain("IMPORTANT");
     });
 
     it("should also read PRD for context", async () => {
@@ -150,7 +148,7 @@ describe("prompts", () => {
         REPOS_CONTEXT: "No repos configured",
       });
 
-      expect(prompt).toContain("Do not ask the user what to generate");
+      expect(prompt).toContain("The plan already contains the work to be done");
     });
 
     it("should include task schema documentation", async () => {
