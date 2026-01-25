@@ -3,8 +3,7 @@
  *
  * These tests validate that the orchestrator correctly:
  * 1. Uses the agent specified for each task
- * 2. Gets capabilities for the correct agent (not hardcoded "claude")
- * 3. Passes agent information through the work loop
+ * 2. Passes agent information through the work loop
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -12,10 +11,9 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
-import { getAgentCapabilities } from "../../src/agents/capabilities";
 import { ClaudeAgentProvider } from "../../src/agents/claude";
-import { ClineAgentProvider } from "../../src/agents/cline";
 import { createAgent } from "../../src/agents/factory";
+import { GooseAgentProvider } from "../../src/agents/goose";
 import { OpenCodeAgentProvider } from "../../src/agents/opencode";
 
 describe("Orchestrator Agent Selection", () => {
@@ -46,20 +44,15 @@ describe("Orchestrator Agent Selection", () => {
   }
 
   describe("createAgent with agentName option", () => {
-    /**
-     * BUG #1 TEST: The orchestrator should use agentName option when creating agents.
-     * Currently, runAgentWorkLoop() calls createAgent("nonInteractive") without
-     * passing the agentName, causing it to always use the default (claude).
-     */
     test("createAgent respects agentName option for opencode", async () => {
       // Even without config, specifying agentName should override
       const agent = await createAgent("nonInteractive", { agentName: "opencode" });
       expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
     });
 
-    test("createAgent respects agentName option for cline", async () => {
-      const agent = await createAgent("nonInteractive", { agentName: "cline" });
-      expect(agent).toBeInstanceOf(ClineAgentProvider);
+    test("createAgent respects agentName option for goose", async () => {
+      const agent = await createAgent("nonInteractive", { agentName: "goose" });
+      expect(agent).toBeInstanceOf(GooseAgentProvider);
     });
 
     test("createAgent respects agentName option over config default", async () => {
@@ -75,98 +68,22 @@ describe("Orchestrator Agent Selection", () => {
       await writeConfig({
         agent: { default: "claude" },
       });
-      const agent = await createAgent("nonInteractive", { agentName: "cline" });
-      expect(agent).toBeInstanceOf(ClineAgentProvider);
-    });
-  });
-
-  describe("Agent Capabilities Lookup", () => {
-    /**
-     * These tests verify that getAgentCapabilities returns correct capabilities
-     * for each agent. The bug in orchestrator.ts hardcodes "claude" when it
-     * should use the actual agent name.
-     */
-    test("getAgentCapabilities returns different capabilities for different agents", () => {
-      const claudeCaps = getAgentCapabilities("claude");
-      const clineCaps = getAgentCapabilities("cline");
-      const opencodeCaps = getAgentCapabilities("opencode");
-
-      // Claude supports web search, Cline does not
-      expect(claudeCaps?.supportsWebSearch).toBe(true);
-      expect(clineCaps?.supportsWebSearch).toBe(false);
-
-      // Cline supports plan mode, Claude does not
-      expect(clineCaps?.supportsPlanMode).toBe(true);
-      expect(claudeCaps?.supportsPlanMode).toBe(false);
-
-      // OpenCode supports LSP, Claude does not
-      expect(opencodeCaps?.supportsLSP).toBe(true);
-      expect(claudeCaps?.supportsLSP).toBe(false);
-    });
-
-    test("orchestrator should use correct agent capabilities (not hardcoded claude)", () => {
-      // This test documents the expected behavior that orchestrator.ts violates
-      // When running tasks for "cline" agent, capabilities should be Cline's, not Claude's
-
-      const clineCapabilities = getAgentCapabilities("cline");
-
-      // If orchestrator is fixed, it should get Cline's capabilities:
-      expect(clineCapabilities).toBeDefined();
-      expect(clineCapabilities?.supportsWebSearch).toBe(false);
-      expect(clineCapabilities?.supportsPlanMode).toBe(true);
-
-      // But currently orchestrator.ts:300 does:
-      // const agentCapabilities = getAgentCapabilities("claude") || {};
-      // This is wrong - it should use the agent determined from config/task
+      const agent = await createAgent("nonInteractive", { agentName: "goose" });
+      expect(agent).toBeInstanceOf(GooseAgentProvider);
     });
   });
 
   describe("Agent Provider Identification", () => {
-    /**
-     * BUG #2 TEST: Agent instances should be identifiable by their provider.
-     * This is needed so orchestrator can determine which agent was created
-     * and use the correct capabilities.
-     */
     test("agent providers should be identifiable", async () => {
       const claudeAgent = await createAgent("nonInteractive", { agentName: "claude" });
-      const clineAgent = await createAgent("nonInteractive", { agentName: "cline" });
+      const gooseAgent = await createAgent("nonInteractive", { agentName: "goose" });
       const opencodeAgent = await createAgent("nonInteractive", { agentName: "opencode" });
 
       // We can identify by instanceof, but the Agent interface doesn't
       // expose the provider name - orchestrator has to track it separately
       expect(claudeAgent).toBeInstanceOf(ClaudeAgentProvider);
-      expect(clineAgent).toBeInstanceOf(ClineAgentProvider);
+      expect(gooseAgent).toBeInstanceOf(GooseAgentProvider);
       expect(opencodeAgent).toBeInstanceOf(OpenCodeAgentProvider);
     });
-  });
-});
-
-describe("Orchestrator Work Loop Agent Selection", () => {
-  /**
-   * These tests document the bug where runAgentWorkLoop receives an agentName
-   * parameter but doesn't use it when creating the agent or getting capabilities.
-   *
-   * The bug is at orchestrator.ts:
-   * - Line 218: createAgent("nonInteractive") ignores the agentName parameter
-   * - Line 300: getAgentCapabilities("claude") hardcodes "claude"
-   * - Line 310: Log message hardcodes "Claude"
-   */
-
-  test("documents the expected behavior for agent name parameter", () => {
-    // The runAgentWorkLoop function signature is:
-    // export async function runAgentWorkLoop(agentName: string): Promise<void>
-    //
-    // Expected behavior:
-    // 1. The agent created should respect the agentName (or be from config)
-    // 2. The capabilities should be for the actual agent being used
-    // 3. Log messages should identify the actual agent
-    //
-    // Current behavior (BUG):
-    // 1. createAgent("nonInteractive") - agentName ignored
-    // 2. getAgentCapabilities("claude") - hardcoded
-    // 3. agentLog.info(`Starting Claude session...`) - hardcoded
-
-    // This test passes because it just documents the issue
-    expect(true).toBe(true);
   });
 });

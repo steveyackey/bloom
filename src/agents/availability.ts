@@ -17,7 +17,7 @@ import { getRegisteredAgents } from "./factory";
  * Information about an agent's availability status.
  */
 export interface AgentAvailability {
-  /** Agent name (e.g., 'claude', 'cline', 'opencode') */
+  /** Agent name (e.g., 'claude', 'goose', 'opencode') */
   name: string;
   /** Whether the agent CLI is available */
   available: boolean;
@@ -38,7 +38,6 @@ export interface AgentAvailability {
  */
 const agentCliConfig: Record<string, { command: string; checkArgs: string[] }> = {
   claude: { command: "claude", checkArgs: ["--version"] },
-  cline: { command: "cline", checkArgs: ["--version"] },
   goose: { command: "goose", checkArgs: ["version"] },
   opencode: { command: "opencode", checkArgs: ["--version"] },
 };
@@ -56,11 +55,6 @@ const agentModels: Record<string, { models: string[]; default?: string }> = {
       "claude-3-5-haiku-20241022",
     ],
     default: "claude-sonnet-4-20250514",
-  },
-  cline: {
-    // Cline uses VS Code settings for model selection, these are common options
-    models: ["claude-3.5-sonnet", "gpt-4", "gpt-4-turbo", "claude-3-opus"],
-    default: "claude-3.5-sonnet",
   },
   goose: {
     // Goose uses configured providers, these are common options
@@ -112,18 +106,10 @@ async function checkCliAvailable(command: string, args: string[]): Promise<{ ava
       if (code === 0) {
         resolve({ available: true });
       } else {
-        // For Cline, check if it's a gRPC service issue
-        if (command === "cline" && (stderr.includes("gRPC") || stderr.includes("ECONNREFUSED"))) {
-          resolve({
-            available: false,
-            reason: "Cline Core service not running",
-          });
-        } else {
-          resolve({
-            available: false,
-            reason: stderr.trim() || `CLI exited with code ${code}`,
-          });
-        }
+        resolve({
+          available: false,
+          reason: stderr.trim() || `CLI exited with code ${code}`,
+        });
       }
     });
 

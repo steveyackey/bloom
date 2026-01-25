@@ -10,21 +10,12 @@ Claude is Anthropic's AI assistant, available through the Claude Code CLI. It's 
 
 ## Installation
 
+See the official [Claude Code documentation](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) for installation instructions.
+
+After installation, verify it's working:
+
 ```bash
-# Install Claude Code CLI
-npm install -g @anthropic-ai/claude-code
-
-# Set your API key
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Verify installation
 claude --version
-```
-
-Add the API key to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) for persistence:
-
-```bash
-echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
 ```
 
 ## Configuration
@@ -129,14 +120,9 @@ claude -p --resume <session_id> ...
 ```bash
 # Check if installed
 which claude
-
-# If not found, install
-npm install -g @anthropic-ai/claude-code
-
-# Verify npm global bin is in PATH
-npm config get prefix
-# Add <prefix>/bin to your PATH if needed
 ```
+
+If not found, reinstall using the [official docs](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) and ensure the binary is in your PATH.
 
 ### "Authentication failed" or "Invalid API key"
 

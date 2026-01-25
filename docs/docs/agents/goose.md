@@ -9,55 +9,14 @@ Goose is Block's open-source AI agent that runs locally and automates engineerin
 
 ## Installation
 
-### macOS
+See the official [Goose documentation](https://block.github.io/goose/) for installation instructions.
 
-**Option 1: Homebrew (Recommended)**
-```bash
-brew install block-goose-cli
-```
-
-**Option 2: Download Script**
-```bash
-curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
-```
-
-### Linux
-
-```bash
-curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
-```
-
-### Windows
-
-**Git Bash / MSYS2:**
-```bash
-curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
-```
-
-**PowerShell:**
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/block/goose/main/download_cli.ps1" -OutFile "download_cli.ps1"
-.\download_cli.ps1
-```
-
-### Verify Installation
+After installation, verify it's working and configure your LLM provider:
 
 ```bash
 goose version
-```
-
-### Initial Configuration
-
-After installation, configure your LLM provider:
-
-```bash
 goose configure
 ```
-
-This interactive wizard helps you:
-- Select your AI provider (Anthropic, OpenAI, etc.)
-- Set up API keys
-- Enable extensions
 
 ## Configuration
 
@@ -198,19 +157,7 @@ goose run -t "continue" --session-id <session_id> --output-format stream-json
 
 **Cause**: Goose not installed or not in PATH
 
-**Solution**:
-```bash
-# Reinstall
-brew install block-goose-cli
-# or
-curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash
-
-# Add to PATH if needed
-export PATH="$HOME/.local/bin:$PATH"
-
-# Verify
-which goose
-```
+**Solution**: Install Goose using the [official docs](https://block.github.io/goose/) and ensure the binary is in your PATH.
 
 ### "No provider configured"
 

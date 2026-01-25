@@ -33,3 +33,29 @@ Flow: init workspace → clone repos → create project → refine PRD → plan 
 ## TUI Colors
 
 Use `chalk` for all terminal colors. For xterm.js cell rendering, use helper methods (`isFgDefault()`, `isFgPalette()`, `isFgRGB()`) not raw color mode values.
+
+## Agent Providers
+
+When adding or modifying agent providers, refer to `ADDING_NEW_AGENTS.md` for the complete checklist and implementation guide.
+
+Key files for agent management:
+- `src/agents/` - Provider implementations
+- `src/agents/capabilities.ts` - Agent capabilities registry
+- `src/agents/factory.ts` - Agent creation factory
+- `src/agents/availability.ts` - CLI availability checking
+- `src/user-config.ts` - User configuration schemas
+- `docs/docs/agents/` - Agent documentation pages
+
+When changing agent support, update ADDING_NEW_AGENTS.md if the process changes.
+
+## Building Docs and Web
+
+When editing files in `docs/` or `web/` directories, always run `bun install` and `bun run build` in the respective directory before committing to ensure the changes compile correctly.
+
+```bash
+# For docs changes
+cd docs && bun install && bun run build
+
+# For web changes
+cd web && bun install && bun run build
+```

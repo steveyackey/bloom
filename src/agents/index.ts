@@ -5,29 +5,19 @@
 // Agent availability checking
 export type { AgentAvailability } from "./availability";
 export {
-  checkAgentAvailability,
+  checkAgentAvailability as checkAgentAvailabilityLegacy,
   checkAllAgentsAvailability,
   getAgentDefaultModel,
   getAgentModels,
 } from "./availability";
-// Agent capability registry
-export type { AgentCapabilities, AgentCapabilityName, AgentName } from "./capabilities";
-export {
-  agentCapabilities,
-  getAgentCapabilities,
-  getRegisteredAgentNames,
-  hasCapability,
-  isValidAgentName,
-} from "./capabilities";
-
+// Built-in agents
+export { BUILTIN_AGENTS, getBuiltinAgent, getBuiltinAgentNames } from "./builtin-agents";
+// Agent registry types (backward compatibility)
+export type { AgentName, BuiltinAgentName } from "./capabilities";
+export { REGISTERED_AGENTS } from "./capabilities";
 // Claude provider with session management utilities
 export type { ClaudeProviderOptions, RunningSession, StreamEvent } from "./claude";
 export { ClaudeAgentProvider, getActiveSession, interjectSession } from "./claude";
-
-// Cline provider with session management utilities
-export type { ClineMode, ClineProviderOptions, ClineRunningSession, ClineStreamEvent } from "./cline";
-export { ClineAgentProvider, getActiveClineSession, interjectClineSession } from "./cline";
-
 // Codex provider with session management and fork utilities
 export type {
   CodexApprovalPolicy,
@@ -38,7 +28,6 @@ export type {
   ForkResult,
 } from "./codex";
 export { CodexAgentProvider, forkCodexSession, getActiveCodexSession, interjectCodexSession } from "./codex";
-
 // Copilot provider with session management utilities
 export type { CopilotProviderOptions, CopilotRunningSession, CopilotStreamEvent } from "./copilot";
 export { CopilotAgentProvider, getCopilotActiveSession, interjectCopilotSession } from "./copilot";
@@ -49,14 +38,36 @@ export {
   type AgentMode,
   createAgent,
   createAgentByName,
-  getAgentCapabilities as getAgentCapabilitiesFromFactory,
   getRegisteredAgents,
   isAgentRegistered,
   listAvailableAgents,
 } from "./factory";
+// Generic provider for custom agents
+export type { GenericProviderOptions, GenericRunningSession } from "./generic-provider";
+export { GenericAgentProvider, getActiveGenericSession, interjectGenericSession } from "./generic-provider";
 // Goose provider with session management utilities
 export type { GooseProviderOptions, GooseRunningSession, GooseStreamEvent } from "./goose";
 export { GooseAgentProvider, getActiveGooseSession, interjectGooseSession } from "./goose";
+// Agent loader and registry
+export {
+  checkAgentAvailability,
+  checkAllAgentAvailability,
+  getAgentDefinition,
+  getAgentRegistry,
+  getAgentVersion,
+  getRegisteredAgentNames,
+  isBuiltinAgent,
+  isValidAgentName,
+  listAgentModels,
+  loadCustomAgents,
+  registerAgent,
+  resetAgentRegistry,
+  validateAgentDefinition,
+  validateAllAgents,
+} from "./loader";
 // OpenCode provider
 export type { OpenCodeProviderOptions } from "./opencode";
 export { OpenCodeAgentProvider } from "./opencode";
+// Agent schema and definitions
+export type { AgentDefinition, EnvConfig, ModeConfig, OutputConfig, PromptStyle } from "./schema";
+export { AgentDefinitionSchema, parseAgentDefinition, safeParseAgentDefinition } from "./schema";

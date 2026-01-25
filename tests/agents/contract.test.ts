@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type AgentName, hasCapability } from "../../src/agents/capabilities";
+import type { AgentName } from "../../src/agents/capabilities";
 import type { Agent, AgentRunOptions, AgentRunResult, AgentSession } from "../../src/agents/core";
 
 // =============================================================================
@@ -535,13 +535,22 @@ describe("Agent Contract Tests", () => {
       expect(result.error).toContain("Session not found");
     });
 
-    test("capability registry correctly reports session resume support", () => {
-      // Verify capability lookup works for session resume
-      const claudeSupportsResume = hasCapability("claude", "supportsSessionResume");
-      expect(typeof claudeSupportsResume).toBe("boolean");
+    test("session-capable agents should handle session resume", async () => {
+      // Mock agent that supports session resume
+      mockAgent = createMockAgent({
+        agentName: "claude",
+        supportsSessionResume: true,
+      });
 
-      // Most agents should support session resume
-      expect(claudeSupportsResume).toBe(true);
+      // First run - get session ID
+      const firstResult = await mockAgent.run({
+        systemPrompt: "Test",
+        prompt: "First message",
+        startingDirectory: testDir,
+      });
+
+      expect(firstResult.success).toBe(true);
+      expect(firstResult.sessionId).toBeDefined();
     });
   });
 

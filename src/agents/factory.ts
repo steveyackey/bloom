@@ -4,36 +4,14 @@
 
 import type { AgentConfig, PerAgentConfig } from "../user-config";
 import { getAgentConfig, getDefaultAgentName, loadUserConfig } from "../user-config";
-import {
-  type AgentCapabilities,
-  type AgentName,
-  getAgentCapabilities as getCapabilities,
-  isValidAgentName,
-} from "./capabilities";
 import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
-import { ClineAgentProvider, type ClineMode, type ClineProviderOptions } from "./cline";
 import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
 import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
 import type { Agent } from "./core";
+import { GenericAgentProvider } from "./generic-provider";
 import { GooseAgentProvider, type GooseProviderOptions } from "./goose";
+import { getAgentDefinition, getRegisteredAgentNames, isBuiltinAgent, isValidAgentName } from "./loader";
 import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
-
-// =============================================================================
-// Agent Registry
-// =============================================================================
-
-/**
- * Registry of all available agent providers.
- * Each agent has a provider class that implements the Agent interface.
- */
-const agentRegistry = {
-  claude: ClaudeAgentProvider,
-  cline: ClineAgentProvider,
-  codex: CodexAgentProvider,
-  copilot: CopilotAgentProvider,
-  goose: GooseAgentProvider,
-  opencode: OpenCodeAgentProvider,
-} as const;
 
 // =============================================================================
 // Type Definitions
@@ -58,7 +36,7 @@ export interface CreateAgentOptions {
 /**
  * Creates an agent by name with the specified mode settings.
  *
- * @param agentName - The name of the agent to create (claude, copilot, codex, cline, opencode)
+ * @param agentName - The name of the agent to create
  * @param isInteractive - Whether to create the agent in interactive mode
  * @param model - Optional model override
  * @returns A configured Agent instance
@@ -68,6 +46,7 @@ export interface CreateAgentOptions {
  * ```ts
  * const agent = createAgentByName("claude", true);
  * const agent = createAgentByName("opencode", false, "anthropic/claude-sonnet-4");
+ * const agent = createAgentByName("custom-agent", false); // Uses GenericAgentProvider
  * ```
  */
 export function createAgentByName(agentName: string, isInteractive: boolean, model?: string): Agent {
@@ -77,24 +56,24 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
     throw new Error(`Unknown agent '${agentName}'. Available: ${available}`);
   }
 
-  // Create the appropriate agent
-  switch (agentName) {
-    case "claude":
-      return createClaudeAgent(isInteractive, model);
-    case "cline":
-      return createClineAgent(isInteractive, model);
-    case "codex":
-      return createCodexAgent(isInteractive, model);
-    case "copilot":
-      return createCopilotAgent(isInteractive, model);
-    case "goose":
-      return createGooseAgent(isInteractive, model);
-    case "opencode":
-      return createOpenCodeAgent(isInteractive, model);
-    default:
-      // This should never happen due to isValidAgentName check above
-      throw new Error(`Unknown agent '${agentName}'. Available: ${listAvailableAgents().join(", ")}`);
+  // Use optimized built-in providers for known agents
+  if (isBuiltinAgent(agentName)) {
+    switch (agentName) {
+      case "claude":
+        return createClaudeAgent(isInteractive, model);
+      case "codex":
+        return createCodexAgent(isInteractive, model);
+      case "copilot":
+        return createCopilotAgent(isInteractive, model);
+      case "goose":
+        return createGooseAgent(isInteractive, model);
+      case "opencode":
+        return createOpenCodeAgent(isInteractive, model);
+    }
   }
+
+  // Use generic provider for custom agents
+  return createGenericAgent(agentName, isInteractive, model);
 }
 
 /**
@@ -162,8 +141,6 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
   switch (agentName) {
     case "claude":
       return createClaudeAgent(isInteractive, model, perAgentConfig);
-    case "cline":
-      return createClineAgent(isInteractive, model, perAgentConfig);
     case "codex":
       return createCodexAgent(isInteractive, model);
     case "copilot":
@@ -184,38 +161,19 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
 
 /**
  * Get the list of all available agent names.
- * This returns all agents that can be instantiated by the factory.
+ * This returns all agents that can be instantiated by the factory,
+ * including both built-in and custom agents.
  *
  * @returns Array of agent names
  *
  * @example
  * ```ts
  * const agents = listAvailableAgents();
- * // Returns: ["claude", "copilot", "codex", "cline", "opencode"]
+ * // Returns: ["claude", "copilot", "codex", "goose", "opencode", ...custom agents]
  * ```
  */
-export function listAvailableAgents(): AgentName[] {
-  return Object.keys(agentRegistry) as AgentName[];
-}
-
-/**
- * Get capabilities for a specific agent without instantiating it.
- * This is useful for determining what features an agent supports
- * before creating an instance.
- *
- * @param agentName - The name of the agent
- * @returns The agent's capabilities, or undefined if agent not found
- *
- * @example
- * ```ts
- * const caps = getAgentCapabilities("claude");
- * if (caps?.supportsSessionResume) {
- *   // Agent supports resuming sessions
- * }
- * ```
- */
-export function getAgentCapabilities(agentName: string): AgentCapabilities | undefined {
-  return getCapabilities(agentName);
+export function listAvailableAgents(): string[] {
+  return getRegisteredAgentNames();
 }
 
 /**
@@ -223,15 +181,15 @@ export function getAgentCapabilities(agentName: string): AgentCapabilities | und
  * @deprecated Use listAvailableAgents() instead for clearer semantics.
  */
 export function getRegisteredAgents(): string[] {
-  return Object.keys(agentRegistry);
+  return getRegisteredAgentNames();
 }
 
 /**
  * Check if an agent is registered.
- * @deprecated Use isValidAgentName() from capabilities module instead.
+ * @deprecated Use isValidAgentName() from loader module instead.
  */
 export function isAgentRegistered(name: string): boolean {
-  return name in agentRegistry;
+  return isValidAgentName(name);
 }
 
 // =============================================================================
@@ -255,28 +213,6 @@ function createClaudeAgent(
   };
 
   return new ClaudeAgentProvider(options);
-}
-
-/**
- * Creates a Cline agent with the specified mode and optional model.
- * Cline uses task-based session management with Plan/Act modes.
- * Applies per-agent configuration including mode and provider settings.
- */
-function createClineAgent(interactive: boolean, model?: string, perAgentConfig?: PerAgentConfig): ClineAgentProvider {
-  // Get Cline-specific config
-  const clineConfig = perAgentConfig as (PerAgentConfig & { mode?: ClineMode; provider?: string }) | undefined;
-
-  const options: ClineProviderOptions = {
-    mode: interactive ? "interactive" : "streaming",
-    // Use config mode if provided, otherwise default based on interactive mode
-    clineMode: clineConfig?.mode ?? (interactive ? "plan" : "act"),
-    // Skip approvals in non-interactive (act) mode
-    yolo: !interactive,
-    streamOutput: true,
-    model: model,
-  };
-
-  return new ClineAgentProvider(options);
 }
 
 /**
@@ -341,4 +277,22 @@ function createGooseAgent(interactive: boolean, model?: string): GooseAgentProvi
   };
 
   return new GooseAgentProvider(options);
+}
+
+/**
+ * Creates a generic agent using the schema-driven GenericAgentProvider.
+ * Used for custom agents defined in user config.
+ */
+function createGenericAgent(agentName: string, interactive: boolean, model?: string): GenericAgentProvider {
+  const definition = getAgentDefinition(agentName);
+  if (!definition) {
+    throw new Error(`Agent definition not found: ${agentName}`);
+  }
+
+  return new GenericAgentProvider({
+    definition,
+    mode: interactive ? "interactive" : "streaming",
+    streamOutput: true,
+    model,
+  });
 }

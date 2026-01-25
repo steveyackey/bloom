@@ -49,7 +49,7 @@ export type Task = {
   open_pr?: boolean;
   /** Agent group name for this task (used for parallel execution grouping) */
   agent_name?: string;
-  /** Agent provider to use for this task (claude, copilot, cline, codex, opencode). Overrides config default. */
+  /** Agent provider to use for this task (claude, copilot, codex, goose, opencode). Overrides config default. */
   agent?: string;
   instructions?: string;
   acceptance_criteria: string[];

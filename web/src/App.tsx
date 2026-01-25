@@ -113,14 +113,8 @@ function App() {
             <WorkflowStep number="4" title="Generate" description="Convert plan to executable tasks" />
             <WorkflowStep number="5" title="Run & Validate" description="QA validates at checkpoints" />
           </div>
-          <div className="workflow-code">
-            <pre><code>{`# The complete workflow
-bloom init                  # Initialize workspace
-bloom repo clone myorg/api  # Add repositories
-bloom create feature-auth   # Create project
-bloom plan                  # Generate plan with Claude
-bloom generate              # Create tasks from plan
-bloom run                   # Execute with parallel agents`}</code></pre>
+          <div className="workflow-demo">
+            <img src="/demo.svg" alt="Bloom Demo" className="demo-animation" />
           </div>
         </div>
       </section>

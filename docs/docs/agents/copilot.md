@@ -10,24 +10,11 @@ GitHub Copilot is GitHub's AI coding assistant, offering multi-model support and
 
 ## Installation
 
+See the official [GitHub Copilot CLI documentation](https://docs.github.com/copilot/concepts/agents/about-copilot-cli) for installation instructions.
+
+After installation, verify it's working:
+
 ```bash
-# Install GitHub CLI (if not already installed)
-# macOS
-brew install gh
-
-# Linux (Debian/Ubuntu)
-sudo apt install gh
-
-# Windows
-winget install GitHub.cli
-
-# Authenticate with GitHub
-gh auth login
-
-# Install Copilot extension
-gh extension install github/gh-copilot
-
-# Verify installation
 gh copilot --version
 ```
 
@@ -117,31 +104,13 @@ gh copilot --resume <session_id> "prompt"
 
 **Cause**: GitHub CLI not installed
 
-**Solution**:
-```bash
-# Install GitHub CLI for your platform
-# macOS
-brew install gh
-
-# Linux
-sudo apt install gh
-
-# Windows
-winget install GitHub.cli
-```
+**Solution**: Install GitHub CLI using the [official docs](https://docs.github.com/copilot/concepts/agents/about-copilot-cli).
 
 ### "Copilot extension not installed"
 
 **Cause**: Missing Copilot CLI extension
 
-**Solution**:
-```bash
-# Install the extension
-gh extension install github/gh-copilot
-
-# Verify
-gh copilot --version
-```
+**Solution**: Install the extension using the [official docs](https://docs.github.com/copilot/concepts/agents/about-copilot-cli).
 
 ### "Authentication required"
 
