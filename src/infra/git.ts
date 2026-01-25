@@ -103,6 +103,28 @@ function runGit(args: string[], cwd?: string): { success: boolean; output: strin
   };
 }
 
+// =============================================================================
+// Git Root Detection
+// =============================================================================
+
+/**
+ * Find the git root of the current working directory.
+ */
+export function findGitRoot(cwd?: string): string | null {
+  const result = runGit(["rev-parse", "--show-toplevel"], cwd);
+  if (result.success && result.output) {
+    return result.output.trim();
+  }
+  return null;
+}
+
+/**
+ * Check if a directory is in a git repository.
+ */
+export function isInGitRepo(cwd?: string): boolean {
+  return findGitRoot(cwd) !== null;
+}
+
 function getDefaultBranch(bareRepoPath: string): string {
   // Try to get the default branch from the remote HEAD
   const result = runGit(["symbolic-ref", "HEAD"], bareRepoPath);
