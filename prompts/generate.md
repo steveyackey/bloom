@@ -59,11 +59,20 @@ tasks:
     open_pr: true                # OPTIONAL. Open PR instead of direct merge
     agent_name: frontend         # OPTIONAL. Agent grouping (see below)
     checkpoint: true             # OPTIONAL. Pause for human review
-    instructions: |              # OPTIONAL. Detailed instructions
+    instructions: |              # OPTIONAL. Detailed instructions (used if no steps)
       Step by step instructions
     acceptance_criteria:         # OPTIONAL. Definition of done
       - First criterion
       - Second criterion
+    steps:                       # OPTIONAL. Sequential steps that reuse agent session
+      - id: task-id.1            # Step ID (typically parent.N)
+        instruction: |           # What to do in this step
+          First piece of work
+        acceptance_criteria:     # OPTIONAL. When this step is done
+          - Step-specific criterion
+      - id: task-id.2
+        instruction: |
+          Second piece of work (has context from step 1)
 ```
 
 ## Agent Naming
@@ -76,6 +85,46 @@ The `agent_name` field controls task grouping:
 
 Use the same `agent_name` for tasks that modify the same files to avoid conflicts.
 
+## Steps vs Instructions
+
+Tasks can be structured in two ways:
+
+### Single instruction (default)
+Use `instructions` field for simple, self-contained work:
+```yaml
+- id: add-login
+  instructions: |
+    Add login functionality with email/password auth.
+```
+
+### Multiple steps (session reuse)
+Use `steps` when work benefits from accumulated context:
+```yaml
+- id: refactor-auth
+  steps:
+    - id: refactor-auth.1
+      instruction: Extract JWT validation from auth.ts into jwt-validator.ts
+    - id: refactor-auth.2
+      instruction: Add unit tests for the jwt-validator module you just created
+    - id: refactor-auth.3
+      instruction: Update the API documentation to reflect the new module structure
+```
+
+**Why use steps?**
+- Steps share the same agent session - step 2 already knows what step 1 created
+- Avoids re-reading files the agent just wrote
+- Each step can commit independently, creating a cleaner git history
+- If a step fails, the agent can resume from that step with full context
+
+**When to use steps:**
+- Refactoring: extract → test → document
+- Migrations: update code → update tests → update docs
+- Iterative work: implement → test → fix issues found
+
+**When NOT to use steps:**
+- Independent work that doesn't build on previous context
+- Parallelizable work (use separate tasks with different `agent_name`)
+
 ## Rules
 
 1. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
@@ -85,7 +134,8 @@ Use the same `agent_name` for tasks that modify the same files to avoid conflict
 5. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
 6. **SMALL TASKS**: Each task should have a single, clear responsibility
 7. **PATH TO MAIN**: Every branch must have `open_pr: true` or `merge_into: main`
-8. **YAML QUOTING**: Quote strings with special characters:
+8. **STEPS FOR CONTEXT**: Use `steps` when later work needs context from earlier work
+9. **YAML QUOTING**: Quote strings with special characters:
    - Backticks: `"``bun test`` passes"`
    - Colons with space: `"foo: bar"`
    - Leading special chars: @, *, &, !, %, ?, |, >
@@ -94,7 +144,9 @@ Use the same `agent_name` for tasks that modify the same files to avoid conflict
 
 Bloom creates a worktree for each branch at `repos/{repo-name}/{branch-name}`. Branch names with slashes become hyphenated paths (`feature/foo` → `feature-foo`).
 
-## Example
+## Examples
+
+### Example 1: Simple tasks with instructions
 
 ```yaml
 git:
@@ -177,6 +229,57 @@ tasks:
       - API endpoints respond correctly
       - PR opened to main
 ```
+
+### Example 2: Task with steps (session reuse)
+
+Use steps when later work benefits from context accumulated in earlier steps:
+
+```yaml
+tasks:
+  - id: refactor-auth
+    title: Refactor authentication module
+    status: todo
+    phase: 1
+    repo: backend
+    branch: feature/auth-refactor
+    base_branch: main
+    open_pr: true
+    agent_name: auth-agent
+    # No instructions field - using steps instead
+    steps:
+      - id: refactor-auth.1
+        instruction: |
+          Extract JWT validation logic from auth.ts into a new jwt-validator.ts module.
+          - Create src/auth/jwt-validator.ts with validateToken() function
+          - Update auth.ts to import and use the new module
+          - Ensure all existing tests still pass
+        acceptance_criteria:
+          - jwt-validator.ts exists with validateToken() function
+          - auth.ts imports from jwt-validator.ts
+          - Existing tests pass
+
+      - id: refactor-auth.2
+        instruction: |
+          Add comprehensive unit tests for the jwt-validator module you just created.
+          Cover valid tokens, invalid tokens, expired tokens, and malformed tokens.
+        acceptance_criteria:
+          - jwt-validator.test.ts exists
+          - Tests cover valid/invalid/expired/malformed cases
+          - All tests pass
+
+      - id: refactor-auth.3
+        instruction: |
+          Update the API documentation to reflect the new module structure.
+          Document the public API of jwt-validator.ts.
+        acceptance_criteria:
+          - Documentation updated with new module info
+    acceptance_criteria:
+      - JWT validation extracted to separate module
+      - Full test coverage for new module
+      - Documentation updated
+```
+
+In this example, step 2 ("add tests for the module you just created") benefits from the agent already knowing what it created in step 1. Without steps, the agent would need to re-read the files to understand what to test.
 
 ## When Done
 

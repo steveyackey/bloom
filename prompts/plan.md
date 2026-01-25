@@ -55,10 +55,42 @@ For each task, specify:
 - Dependencies: What must be done first
 - Acceptance Criteria: Testable conditions for completion
 
+## Steps vs Subtasks
+
+Tasks can be broken down in two ways:
+
+### Steps (same session, same branch)
+Use **steps** when:
+- Work is conceptually one deliverable but benefits from chunked instructions
+- Later steps need context from earlier steps (e.g., "now test the code you just wrote")
+- You want sequential commits toward one PR
+- The agent would need to re-read the same files for each piece
+
+Example: "Refactor auth module" with steps:
+1. Extract JWT validation to separate file
+2. Add unit tests for the new module
+3. Update documentation
+
+Steps share the agent session, so step 2 already knows what step 1 created.
+
+### Subtasks (own session, own branch)
+Use **subtasks** when:
+- Work can be parallelized across different branches
+- Each piece is independent and doesn't need shared context
+- Different agents should handle different pieces
+
+Example: "Add new features" with subtasks:
+- Add user dashboard (frontend-agent)
+- Add analytics API (backend-agent)
+
+These run in parallel with separate sessions.
+
 ## Guidelines
 
 - Each task should have a single, clear responsibility
-- If a task has more than 5 acceptance criteria, consider splitting it
+- If a task has more than 5 acceptance criteria, consider splitting it into steps
+- Use steps for sequential work that builds on itself
+- Use subtasks for parallel work that's independent
 - Make dependencies explicit
 - Consider which tasks can run in parallel (different repos/directories)
 - Final phase must open PRs or merge all work to main
