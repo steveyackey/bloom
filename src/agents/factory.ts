@@ -2,16 +2,11 @@
 // Agent Factory - Creates agents based on user configuration
 // =============================================================================
 
-import type { AgentConfig, PerAgentConfig } from "../user-config";
+import type { AgentConfig } from "../user-config";
 import { getAgentConfig, getDefaultAgentName, loadUserConfig } from "../user-config";
-import { ClaudeAgentProvider, type ClaudeProviderOptions } from "./claude";
-import { CodexAgentProvider, type CodexProviderOptions } from "./codex";
-import { CopilotAgentProvider, type CopilotProviderOptions } from "./copilot";
 import type { Agent } from "./core";
 import { GenericAgentProvider } from "./generic-provider";
-import { GooseAgentProvider, type GooseProviderOptions } from "./goose";
-import { getAgentDefinition, getRegisteredAgentNames, isBuiltinAgent, isValidAgentName } from "./loader";
-import { OpenCodeAgentProvider, type OpenCodeProviderOptions } from "./opencode";
+import { getAgentDefinition, getRegisteredAgentNames, isValidAgentName } from "./loader";
 
 // =============================================================================
 // Type Definitions
@@ -35,6 +30,7 @@ export interface CreateAgentOptions {
 
 /**
  * Creates an agent by name with the specified mode settings.
+ * All agents are created using the GenericAgentProvider with schema-based definitions.
  *
  * @param agentName - The name of the agent to create
  * @param isInteractive - Whether to create the agent in interactive mode
@@ -46,7 +42,7 @@ export interface CreateAgentOptions {
  * ```ts
  * const agent = createAgentByName("claude", true);
  * const agent = createAgentByName("opencode", false, "anthropic/claude-sonnet-4");
- * const agent = createAgentByName("custom-agent", false); // Uses GenericAgentProvider
+ * const agent = createAgentByName("custom-agent", false);
  * ```
  */
 export function createAgentByName(agentName: string, isInteractive: boolean, model?: string): Agent {
@@ -56,23 +52,6 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
     throw new Error(`Unknown agent '${agentName}'. Available: ${available}`);
   }
 
-  // Use optimized built-in providers for known agents
-  if (isBuiltinAgent(agentName)) {
-    switch (agentName) {
-      case "claude":
-        return createClaudeAgent(isInteractive, model);
-      case "codex":
-        return createCodexAgent(isInteractive, model);
-      case "copilot":
-        return createCopilotAgent(isInteractive, model);
-      case "goose":
-        return createGooseAgent(isInteractive, model);
-      case "opencode":
-        return createOpenCodeAgent(isInteractive, model);
-    }
-  }
-
-  // Use generic provider for custom agents
   return createGenericAgent(agentName, isInteractive, model);
 }
 
@@ -102,7 +81,7 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
  * nonInteractiveAgent: { agent: 'opencode', model?: 'gpt-4' }
  * ```
  *
- * Falls back to ClaudeAgentProvider if no configuration is present.
+ * Falls back to claude if no configuration is present.
  */
 export async function createAgent(mode: AgentMode, options: CreateAgentOptions = {}): Promise<Agent> {
   const userConfig = await loadUserConfig();
@@ -137,22 +116,7 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
 
   const isInteractive = mode === "interactive";
 
-  // Create provider based on agent name
-  switch (agentName) {
-    case "claude":
-      return createClaudeAgent(isInteractive, model, perAgentConfig);
-    case "codex":
-      return createCodexAgent(isInteractive, model);
-    case "copilot":
-      return createCopilotAgent(isInteractive, model);
-    case "goose":
-      return createGooseAgent(isInteractive, model);
-    case "opencode":
-      return createOpenCodeAgent(isInteractive, model, perAgentConfig);
-    default:
-      // Unknown agent, fall back to Claude
-      return createClaudeAgent(isInteractive, model, perAgentConfig);
-  }
+  return createAgentByName(agentName, isInteractive, model);
 }
 
 // =============================================================================
@@ -169,7 +133,7 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
  * @example
  * ```ts
  * const agents = listAvailableAgents();
- * // Returns: ["claude", "copilot", "codex", "goose", "opencode", ...custom agents]
+ * // Returns: ["claude", "copilot", "codex", "goose", "opencode", "test", ...custom agents]
  * ```
  */
 export function listAvailableAgents(): string[] {
@@ -197,91 +161,8 @@ export function isAgentRegistered(name: string): boolean {
 // =============================================================================
 
 /**
- * Creates a Claude agent with the specified mode and optional model.
- * Applies per-agent configuration if provided.
- */
-function createClaudeAgent(
-  interactive: boolean,
-  model?: string,
-  _perAgentConfig?: PerAgentConfig
-): ClaudeAgentProvider {
-  const options: ClaudeProviderOptions = {
-    interactive,
-    dangerouslySkipPermissions: true,
-    streamOutput: true,
-    model: model,
-  };
-
-  return new ClaudeAgentProvider(options);
-}
-
-/**
- * Creates a Codex agent with the specified mode and optional model.
- * Codex supports session forking and sandbox control.
- */
-function createCodexAgent(interactive: boolean, model?: string): CodexAgentProvider {
-  const options: CodexProviderOptions = {
-    interactive,
-    // dangerouslyBypassApprovalsAndSandbox defaults to true (matches Claude's behavior)
-    streamOutput: true,
-    model: model,
-  };
-
-  return new CodexAgentProvider(options);
-}
-
-/**
- * Creates a Copilot agent with the specified mode and optional model.
- * Copilot supports multiple models (Claude, GPT, Gemini) and has
- * native GitHub MCP integration.
- */
-function createCopilotAgent(interactive: boolean, model?: string): CopilotAgentProvider {
-  const options: CopilotProviderOptions = {
-    interactive,
-    allowAllTools: true,
-    streamOutput: true,
-    model: model,
-  };
-
-  return new CopilotAgentProvider(options);
-}
-
-/**
- * Creates an OpenCode agent with the specified mode and optional model.
- * Applies per-agent configuration if provided.
- */
-function createOpenCodeAgent(
-  interactive: boolean,
-  model?: string,
-  _perAgentConfig?: PerAgentConfig
-): OpenCodeAgentProvider {
-  const options: OpenCodeProviderOptions = {
-    interactive,
-    autoApprove: true,
-    streamOutput: true,
-    model: model,
-  };
-
-  return new OpenCodeAgentProvider(options);
-}
-
-/**
- * Creates a Goose agent with the specified mode and optional model.
- * Goose is Block's open-source AI agent with extensible MCP support.
- */
-function createGooseAgent(interactive: boolean, model?: string): GooseAgentProvider {
-  const options: GooseProviderOptions = {
-    interactive,
-    streamOutput: true,
-    model: model,
-  };
-
-  return new GooseAgentProvider(options);
-}
-
-/**
- * Creates a generic agent using the schema-driven GenericAgentProvider.
- * Used for custom agents defined in user config.
+ * Creates an agent using the schema-driven GenericAgentProvider.
+ * All agents (built-in and custom) use this unified approach.
  */
 function createGenericAgent(agentName: string, interactive: boolean, model?: string): GenericAgentProvider {
   const definition = getAgentDefinition(agentName);

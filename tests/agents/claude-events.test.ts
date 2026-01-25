@@ -1,6 +1,33 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import chalk from "chalk";
-import type { StreamEvent } from "../../src/agents/claude";
+
+// =============================================================================
+// Type Definitions
+// =============================================================================
+// StreamEvent type for Claude CLI events (previously imported from claude.ts)
+// =============================================================================
+
+/**
+ * Stream event from Claude CLI when running with --output-format stream-json
+ */
+export interface StreamEvent {
+  type: string;
+  subtype?: string;
+  message?: unknown;
+  content?: unknown;
+  delta?: unknown;
+  tool_name?: string;
+  tool_input?: unknown;
+  error?: unknown;
+  total_cost_usd?: number;
+  cost_usd?: number;
+  duration_ms?: number;
+  session_id?: string;
+  model?: string;
+  hook_name?: string;
+  name?: string;
+  response?: string;
+}
 
 // =============================================================================
 // Test Fixtures - Real Claude CLI Event Schemas

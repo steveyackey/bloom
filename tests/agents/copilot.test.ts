@@ -1,6 +1,33 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import chalk from "chalk";
-import type { CopilotStreamEvent } from "../../src/agents/copilot";
+
+// =============================================================================
+// Type Definitions
+// =============================================================================
+// CopilotStreamEvent type for Copilot CLI events (previously imported from copilot.ts)
+// =============================================================================
+
+/**
+ * Stream event from Copilot CLI when running with streaming JSON output
+ */
+export interface CopilotStreamEvent {
+  type: string;
+  subtype?: string;
+  message?: unknown;
+  content?: unknown;
+  delta?: unknown;
+  tool_name?: string;
+  tool_input?: unknown;
+  error?: unknown;
+  total_cost_usd?: number;
+  cost_usd?: number;
+  duration_ms?: number;
+  session_id?: string;
+  model?: string;
+  hook_name?: string;
+  name?: string;
+  response?: string;
+}
 
 // =============================================================================
 // Test Fixtures - Copilot CLI Event Schemas
@@ -710,139 +737,6 @@ describe("Verbose Mode Integration", () => {
     expect(fullOutput).toContain("[hook: pre-commit]");
     expect(fullOutput).not.toContain("[hook response");
     expect(fullOutput).not.toContain("File contents");
-  });
-});
-
-// =============================================================================
-// Copilot Provider Contract Tests
-// =============================================================================
-
-describe("Copilot Provider Contract", () => {
-  describe("Agent interface compliance", () => {
-    test("CopilotAgentProvider implements Agent interface", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-      const provider = new CopilotAgentProvider();
-
-      // Must have run method
-      expect(typeof provider.run).toBe("function");
-
-      // Must have getActiveSession method (optional but implemented)
-      expect(typeof provider.getActiveSession).toBe("function");
-    });
-
-    test("CopilotAgentProvider constructor accepts options", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-
-      // Test with no options
-      const defaultProvider = new CopilotAgentProvider();
-      expect(defaultProvider).toBeDefined();
-
-      // Test with mode option
-      const interactiveProvider = new CopilotAgentProvider({ mode: "interactive" });
-      expect(interactiveProvider).toBeDefined();
-
-      // Test with streaming mode
-      const streamingProvider = new CopilotAgentProvider({ mode: "streaming" });
-      expect(streamingProvider).toBeDefined();
-
-      // Test with deprecated interactive option
-      const legacyProvider = new CopilotAgentProvider({ interactive: true });
-      expect(legacyProvider).toBeDefined();
-
-      // Test with model option
-      const modelProvider = new CopilotAgentProvider({ model: "claude" });
-      expect(modelProvider).toBeDefined();
-    });
-
-    test("CopilotAgentProvider supports multi-model selection", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-
-      // Test different models
-      const claudeProvider = new CopilotAgentProvider({ model: "claude" });
-      expect(claudeProvider).toBeDefined();
-
-      const gpt5Provider = new CopilotAgentProvider({ model: "gpt-5" });
-      expect(gpt5Provider).toBeDefined();
-
-      const geminiProvider = new CopilotAgentProvider({ model: "gemini" });
-      expect(geminiProvider).toBeDefined();
-    });
-
-    test("CopilotAgentProvider supports tool permissions", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-
-      // Test with allowAllTools
-      const allToolsProvider = new CopilotAgentProvider({ allowAllTools: true });
-      expect(allToolsProvider).toBeDefined();
-
-      // Test with specific tool permissions
-      const specificToolsProvider = new CopilotAgentProvider({
-        allowTools: ["Read", "Write"],
-        denyTools: ["Bash"],
-      });
-      expect(specificToolsProvider).toBeDefined();
-    });
-
-    test("CopilotAgentProvider supports streaming options", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-
-      const provider = new CopilotAgentProvider({
-        streamOutput: true,
-        activityTimeoutMs: 300000,
-        heartbeatIntervalMs: 5000,
-        onEvent: (_event) => {
-          /* handler */
-        },
-        onHeartbeat: (_ms) => {
-          /* handler */
-        },
-        onTimeout: () => {
-          /* handler */
-        },
-      });
-      expect(provider).toBeDefined();
-    });
-
-    test("CopilotAgentProvider supports verbose mode", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-
-      const verboseProvider = new CopilotAgentProvider({ verbose: true });
-      expect(verboseProvider).toBeDefined();
-    });
-  });
-
-  describe("Session management", () => {
-    test("getActiveSession returns undefined when no session is active", async () => {
-      const { CopilotAgentProvider } = await import("../../src/agents/copilot");
-      const provider = new CopilotAgentProvider();
-
-      expect(provider.getActiveSession()).toBeUndefined();
-    });
-
-    test("getCopilotActiveSession export is available", async () => {
-      const { getCopilotActiveSession } = await import("../../src/agents/copilot");
-
-      expect(typeof getCopilotActiveSession).toBe("function");
-      expect(getCopilotActiveSession("nonexistent")).toBeUndefined();
-    });
-
-    test("interjectCopilotSession export is available", async () => {
-      const { interjectCopilotSession } = await import("../../src/agents/copilot");
-
-      expect(typeof interjectCopilotSession).toBe("function");
-      expect(interjectCopilotSession("nonexistent")).toBeUndefined();
-    });
-  });
-
-  describe("Installation instructions", () => {
-    test("Installation instructions are defined", async () => {
-      // We can't directly test the private INSTALLATION_INSTRUCTIONS constant,
-      // but we can test that it's used in error handling by checking the module exports
-      const copilotModule = await import("../../src/agents/copilot");
-
-      // The module should export CopilotAgentProvider
-      expect(copilotModule.CopilotAgentProvider).toBeDefined();
-    });
   });
 });
 
