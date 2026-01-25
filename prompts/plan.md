@@ -54,44 +54,49 @@ For each task, specify:
 - Branch: feature/task-name (created from base branch)
 - Dependencies: What must be done first
 - Acceptance Criteria: Testable conditions for completion
+- Steps (if applicable): Sequential work items that build on each other, with their own instructions and acceptance criteria
 
 ## Steps vs Subtasks
 
 Tasks can be broken down in two ways:
 
-### Steps (same session, same branch)
-Use **steps** when:
-- Work is conceptually one deliverable but benefits from chunked instructions
-- Later steps need context from earlier steps (e.g., "now test the code you just wrote")
-- You want sequential commits toward one PR
-- The agent would need to re-read the same files for each piece
+### Steps (sequential, shared session)
+Use **steps** when later work needs context from earlier work:
+- Refactoring: extract code → test it → document it
+- Migrations: update implementation → update tests → update docs
+- Iterative work: implement → test → fix issues
 
-Example: "Refactor auth module" with steps:
-1. Extract JWT validation to separate file
-2. Add unit tests for the new module
-3. Update documentation
+**Key benefit**: Steps share the same agent session, so the agent remembers what it just did.
 
-Steps share the agent session, so step 2 already knows what step 1 created.
+Example task: "Refactor auth module"
+- Step 1: Extract JWT validation to separate file
+  - Creates jwt-validator.ts, updates auth.ts
+- Step 2: Add unit tests for the new module
+  - Agent already knows what was created in step 1
+- Step 3: Update documentation
+  - Agent knows the new module structure
 
-### Subtasks (own session, own branch)
-Use **subtasks** when:
-- Work can be parallelized across different branches
-- Each piece is independent and doesn't need shared context
-- Different agents should handle different pieces
+Each step can specify its own acceptance criteria. The agent completes one step, commits, marks it done, and exits. Bloom resumes the session with the next step instruction.
+
+### Subtasks (parallel, separate sessions)
+Use **subtasks** when work is independent and can be parallelized:
+- Different features that don't interact
+- Different repos or isolated directories
+- Work that benefits from parallel agents
 
 Example: "Add new features" with subtasks:
-- Add user dashboard (frontend-agent)
-- Add analytics API (backend-agent)
+- Add user dashboard (frontend-agent, feature/dashboard branch)
+- Add analytics API (backend-agent, feature/analytics branch)
 
-These run in parallel with separate sessions.
+These run in parallel with separate agent sessions and branches.
 
 ## Guidelines
 
 - Each task should have a single, clear responsibility
-- If a task has more than 5 acceptance criteria, consider splitting it into steps
-- Use steps for sequential work that builds on itself
-- Use subtasks for parallel work that's independent
-- Make dependencies explicit
+- **Use steps when later work needs earlier context**: If acceptance criteria include "test the code you just wrote" or "document the module you created", use steps
+- **Use subtasks for independent parallel work**: Different features, repos, or isolated directories
+- If a task has more than 5 acceptance criteria, consider breaking it into sequential steps
+- Make dependencies explicit between tasks
 - Consider which tasks can run in parallel (different repos/directories)
 - Final phase must open PRs or merge all work to main
 
