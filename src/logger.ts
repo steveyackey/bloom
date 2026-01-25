@@ -103,5 +103,3 @@ export const logger = {
   reset: createLogger("reset"),
   agent: (name: string) => createLogger(`agent:${name}`),
 };
-
-export default createLogger;
