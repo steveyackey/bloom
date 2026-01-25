@@ -20,26 +20,23 @@ src/
 │   ├── setup.ts                  # setup commands
 │   └── utility.ts                # utility commands
 │
-├── core/                         # Business logic
-│   ├── orchestrator/             # Agent orchestration system
-│   │   ├── index.ts              # Exports and startOrchestrator
-│   │   ├── work-loop.ts          # Main agent work loop
-│   │   ├── task-prompt.ts        # Task fetching and prompt building
-│   │   └── post-task.ts          # Post-task git operations (push, PR, merge)
-│   │
-│   ├── tui/                      # Multi-pane terminal UI
-│   │   ├── index.ts              # OrchestratorTUI class
-│   │   ├── types.ts              # Pane, ViewMode, config interfaces
-│   │   ├── pane.ts               # Pane lifecycle management
-│   │   ├── input.ts              # Input handling and navigation
-│   │   ├── render.ts             # Terminal rendering
-│   │   └── selectors.ts          # Agent/model selection UI
-│   │
-│   ├── project.ts                # Project creation and scaffolding
-│   ├── planning.ts               # Plan/refine/generate sessions
-│   ├── tasks.ts                  # Task file operations
-│   ├── questions.ts              # Human question queue
-│   └── interjections.ts          # Agent interjection handling
+├── core/                         # Business logic (event-driven, no I/O)
+│   └── orchestrator/             # Agent orchestration system
+│       ├── index.ts              # Public exports
+│       ├── events.ts             # Event type definitions
+│       ├── work-loop.ts          # Main agent work loop (accepts EventHandler)
+│       ├── task-prompt.ts        # Task fetching and prompt building
+│       └── post-task.ts          # Post-task git operations (push, PR, merge)
+│
+├── adapters/                     # Interface-specific implementations
+│   └── cli/                      # CLI adapter
+│       ├── index.ts              # Public exports
+│       └── event-handler.ts      # Event → console output
+│
+├── commands/                     # Command implementations
+│   ├── orchestrator.ts           # Orchestrator startup and TUI
+│   ├── tasks.ts                  # Task command handlers
+│   └── ...                       # Other command handlers
 │
 ├── infra/                        # Infrastructure adapters
 │   ├── git/                      # Git operations
@@ -58,8 +55,8 @@ src/
 │   │   ├── loader.ts             # Config load/save operations
 │   │   └── git-url.ts            # Git URL utilities
 │   │
-│   ├── terminal.ts               # PTY abstraction layer
-│   └── output.ts                 # Logging and styled output
+│   ├── logger.ts                 # Structured logging
+│   └── terminal.ts               # PTY abstraction layer
 │
 ├── agents/                       # Agent provider system
 │   ├── index.ts                  # Public exports
@@ -85,6 +82,7 @@ src/
 ├── completions/                  # CLI argument completions
 │   └── providers.ts              # Completion providers
 │
+├── orchestrator-tui.ts           # Multi-pane terminal UI
 ├── task-schema.ts                # Task data models (Zod schemas)
 └── prompts-embedded.ts           # Embedded prompt templates
 ```
@@ -228,128 +226,91 @@ project/CLAUDE.md             # Agent instructions
 
 ---
 
-## Future: Event-Based Architecture for GUI/Web Support
+## Event-Based Architecture
 
-The current architecture has direct console output in the core layer. To support GUI and web interfaces, we plan to migrate to an event-based architecture.
+The orchestrator uses an event-based architecture to decouple core logic from output rendering. This enables multiple interfaces (CLI, TUI, Web) to consume the same core logic.
 
-### Goal
+### Architecture Overview
 
-Enable multiple interfaces (CLI, TUI, Web) to consume the same core logic without modification.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Core Layer                              │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              core/orchestrator/                          │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │   │
+│  │  │  work-loop   │  │ task-prompt  │  │  post-task   │   │   │
+│  │  │    .ts       │  │    .ts       │  │    .ts       │   │   │
+│  │  └──────┬───────┘  └──────────────┘  └──────────────┘   │   │
+│  │         │                                                │   │
+│  │         │ emits OrchestratorEvent                        │   │
+│  │         ▼                                                │   │
+│  │  ┌──────────────┐                                        │   │
+│  │  │  events.ts   │  (EventHandler callback)               │   │
+│  │  └──────────────┘                                        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Adapters Layer                           │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │   adapters/cli  │  │  adapters/tui   │  │  adapters/web   │ │
+│  │                 │  │   (future)      │  │   (future)      │ │
+│  │  event-handler  │  │                 │  │                 │ │
+│  │  → console.log  │  │  → TUI render   │  │  → WebSocket    │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### Proposed Changes
+### Event Types
 
-#### 1. Event Type Definitions
+Events are defined in `src/core/orchestrator/events.ts`. Key event categories:
+
+| Category | Events |
+|----------|--------|
+| **Agent Lifecycle** | `agent:started`, `agent:idle` |
+| **Task Lifecycle** | `task:found`, `task:started`, `task:completed`, `task:failed`, `task:blocked` |
+| **Git Operations** | `git:pulling`, `git:pulled`, `git:pushing`, `git:pushed`, `git:merging`, `git:merged`, `git:merge_conflict`, `git:cleanup` |
+| **Worktree** | `worktree:creating`, `worktree:created` |
+| **PR Operations** | `git:pr_creating`, `git:pr_created` |
+| **Merge Lock** | `merge:lock_waiting`, `merge:lock_acquired`, `merge:lock_timeout` |
+| **Conflict Resolution** | `merge:conflict_resolving`, `merge:conflict_resolved` |
+| **Session** | `session:corrupted` |
+| **Generic** | `error`, `log` |
+
+### Usage
 
 ```typescript
-// core/orchestrator/events.ts
-export type OrchestratorEvent =
-  | { type: 'agent:idle'; agentName: string }
-  | { type: 'task:found'; taskId: string; title: string; agentName: string }
-  | { type: 'task:started'; taskId: string; agentName: string; workingDir: string }
-  | { type: 'task:completed'; taskId: string; agentName: string; duration: number }
-  | { type: 'task:failed'; taskId: string; agentName: string; error: string }
-  | { type: 'git:pushing'; branch: string; remote: string }
-  | { type: 'git:pushed'; branch: string; remote: string }
-  | { type: 'git:pr_created'; url: string; branch: string }
-  | { type: 'git:merging'; source: string; target: string }
-  | { type: 'git:merged'; source: string; target: string }
-  | { type: 'git:merge_conflict'; source: string; target: string }
-  | { type: 'question:asked'; questionId: string; agentName: string; question: string }
-  | { type: 'question:answered'; questionId: string; answer: string }
-  | { type: 'error'; message: string; context?: Record<string, unknown> }
-  | { type: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; message: string };
+// Core function accepts EventHandler
+import { runAgentWorkLoop } from './core/orchestrator';
 
-export type EventHandler = (event: OrchestratorEvent) => void;
+await runAgentWorkLoop(agentName, options, (event) => {
+  switch (event.type) {
+    case 'task:found':
+      console.log(`Found: ${event.taskId}`);
+      break;
+    case 'task:completed':
+      console.log(`Done: ${event.taskId} (${event.duration}s)`);
+      break;
+  }
+});
+
+// CLI adapter provides ready-to-use wrapper
+import { runAgentWorkLoopCLI } from './adapters/cli';
+
+await runAgentWorkLoopCLI(agentName, options);
 ```
 
-#### 2. Core Functions Accept Event Handler
+### Migration Status
 
-```typescript
-// core/orchestrator/work-loop.ts
-export async function runAgentWorkLoop(
-  agentName: string,
-  options: WorkLoopOptions,
-  onEvent: EventHandler  // Callback instead of direct output
-): Promise<void> {
-  // ...
-  onEvent({ type: 'task:found', taskId: task.id, title: task.title, agentName });
-  // ...
-}
-```
-
-#### 3. Adapters Subscribe to Events
-
-```typescript
-// adapters/cli/orchestrator.ts
-import { runAgentWorkLoop } from '../../core/orchestrator';
-import { out } from '../../infra/output';
-
-export async function runOrchestratorCLI(agentName: string, options: Options) {
-  await runAgentWorkLoop(agentName, options, (event) => {
-    switch (event.type) {
-      case 'task:found':
-        out.info(`Found work: ${event.taskId} - ${event.title}`);
-        break;
-      case 'task:completed':
-        out.success(`Completed ${event.taskId} in ${event.duration}ms`);
-        break;
-      case 'error':
-        out.error(event.message);
-        break;
-    }
-  });
-}
-```
-
-#### 4. Future Web Adapter
-
-```typescript
-// adapters/web/orchestrator.ts
-import { runAgentWorkLoop } from '../../core/orchestrator';
-
-export function createWebOrchestrator(ws: WebSocket) {
-  return (agentName: string, options: Options) => {
-    return runAgentWorkLoop(agentName, options, (event) => {
-      ws.send(JSON.stringify(event));
-    });
-  };
-}
-```
-
-### Proposed Directory Structure (Future)
-
-```
-src/
-├── core/                    # Pure logic - emits events, no direct I/O
-│   ├── orchestrator/
-│   │   ├── events.ts        # Event type definitions
-│   │   ├── work-loop.ts     # Takes EventHandler callback
-│   │   └── ...
-│   └── ...
-│
-├── adapters/                # Interface-specific implementations
-│   ├── cli/
-│   │   ├── commands/        # CLI command handlers
-│   │   └── handlers.ts      # Event → console output
-│   ├── tui/
-│   │   └── ...              # TUI event handlers
-│   └── web/
-│       ├── api/             # REST endpoints
-│       ├── ws.ts            # WebSocket event streaming
-│       └── handlers.ts      # Event → WebSocket
-│
-├── infra/                   # Shared infrastructure (unchanged)
-└── ...
-```
-
-### Migration Path
-
-1. **Phase 1 (Current):** File splits and layer separation (Option 4)
-2. **Phase 2:** Define event types for orchestrator
-3. **Phase 3:** Add EventHandler parameter to work loop
-4. **Phase 4:** Create CLI adapter that subscribes to events
-5. **Phase 5:** Move TUI to adapters, subscribe to events
-6. **Phase 6:** Add web adapter for GUI support
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | ✅ Complete | File splits and layer separation |
+| Phase 2 | ✅ Complete | Define event types for orchestrator |
+| Phase 3 | ✅ Complete | Add EventHandler parameter to work loop |
+| Phase 4 | ✅ Complete | Create CLI adapter that subscribes to events |
+| Phase 5 | 🔲 Future | Move TUI to adapters, subscribe to events |
+| Phase 6 | 🔲 Future | Add web adapter for GUI support |
 
 ### Benefits
 
