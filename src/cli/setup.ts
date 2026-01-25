@@ -6,7 +6,7 @@ import type { Clerc } from "clerc";
 import { BLOOM_DIR } from "../commands/context";
 import { cmdCreate } from "../commands/create";
 import { cmdInit } from "../commands/init";
-import { listRepos, syncRepos } from "../repos";
+import { listRepos, syncRepos } from "../infra/git";
 
 // =============================================================================
 // Command Registration

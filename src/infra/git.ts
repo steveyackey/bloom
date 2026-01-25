@@ -7,13 +7,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import * as YAML from "yaml";
 import { z } from "zod";
-import {
-  ensureGitProtocolConfigured,
-  expandRepoUrl,
-  extractRepoName,
-  loadUserConfig,
-  normalizeGitUrl,
-} from "./user-config";
+import { ensureGitProtocolConfigured, expandRepoUrl, extractRepoName, loadUserConfig, normalizeGitUrl } from "./config";
 
 // =============================================================================
 // Schema for bloom.config.yaml (project-level)

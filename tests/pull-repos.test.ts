@@ -8,7 +8,7 @@ import {
   pullAllDefaultBranches,
   pullDefaultBranch,
   saveReposFile,
-} from "../src/repos";
+} from "../src/infra/git";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-pull-workspace");
 const REMOTE_DIR = join(import.meta.dirname ?? ".", "test-pull-remote");

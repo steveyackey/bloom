@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { dirname, resolve } from "node:path";
+import { getWorktreePath } from "../infra/git";
 import { PromptCompiler } from "../prompts/compiler";
-import { getWorktreePath } from "../repos";
 import type { TaskGraph, TaskNode } from "./graph";
 
 /**

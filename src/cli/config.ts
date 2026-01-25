@@ -6,7 +6,6 @@ import chalk from "chalk";
 import { type Clerc, Types } from "clerc";
 import { getRegisteredAgentNames, isValidAgentName, listAgentModels } from "../agents/loader";
 import { BLOOM_DIR } from "../commands/context";
-import { listRepos } from "../repos";
 import {
   type AgentSection,
   getAgentConfig,
@@ -22,7 +21,8 @@ import {
   setDefaultInteractiveAgent,
   setDefaultNonInteractiveAgent,
   setGitProtocol,
-} from "../user-config";
+} from "../infra/config";
+import { listRepos } from "../infra/git";
 
 // =============================================================================
 // Constants

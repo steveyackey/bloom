@@ -18,7 +18,7 @@ import { runAgentWorkLoop, startOrchestrator } from "../commands/orchestrator";
 import { cmdAgents } from "../commands/tasks";
 import { getAgentNamesSync } from "../completions/providers";
 import { triggerInterject } from "../human-queue";
-import { getDefaultInteractiveAgent, getDefaultNonInteractiveAgent, loadUserConfig } from "../user-config";
+import { getDefaultInteractiveAgent, getDefaultNonInteractiveAgent, loadUserConfig } from "../infra/config";
 
 // =============================================================================
 // Command Registration

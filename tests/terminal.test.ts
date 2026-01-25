@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawnTerminal } from "../src/terminal";
+import { spawnTerminal } from "../src/infra/terminal";
 
 describe("terminal", () => {
   describe("spawnTerminal", () => {

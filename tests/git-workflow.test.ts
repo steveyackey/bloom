@@ -8,7 +8,7 @@ import {
   getWorktreePath,
   getWorktreeStatus,
   listWorktrees,
-} from "../src/repos";
+} from "../src/infra/git";
 import {
   createTask,
   createTasksFile,

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { listRepos, loadReposFile, removeRepo, saveReposFile } from "../src/repos";
-import { extractRepoInfo, extractRepoName, normalizeGitUrl } from "../src/user-config";
+import { extractRepoInfo, extractRepoName, normalizeGitUrl } from "../src/infra/config";
+import { listRepos, loadReposFile, removeRepo, saveReposFile } from "../src/infra/git";
 
 const TEST_DIR = join(import.meta.dirname, ".test-config");
 

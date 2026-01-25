@@ -15,7 +15,7 @@ import {
   removeRepo,
   removeWorktree,
   syncRepos,
-} from "../repos";
+} from "../infra/git";
 
 // =============================================================================
 // Completions Handler for Repo Names

@@ -21,7 +21,7 @@ import {
   registerViewCommands,
 } from "./cli/index";
 import { setTasksFile } from "./commands/context";
-import { type LogLevel, setLogLevel } from "./logger";
+import { type LogLevel, setLogLevel } from "./infra/logger";
 import { VERSION } from "./version";
 
 // Valid log levels for validation

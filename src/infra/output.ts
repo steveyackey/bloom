@@ -13,15 +13,15 @@ export {
   chalk,
   getBorderChalk,
   style,
-} from "../colors";
+} from "./colors";
 // Re-export logger
-export { createLogger, logger, setLogLevel } from "../logger";
+export { createLogger, logger, setLogLevel } from "./logger";
 
 // =============================================================================
 // Semantic Output Helpers
 // =============================================================================
 
-import { style } from "../colors";
+import { style } from "./colors";
 
 /**
  * Semantic output helpers for consistent CLI output.

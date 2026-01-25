@@ -5,9 +5,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type AgentName, createAgent } from "../agents";
-import { logger } from "../logger";
-import { OrchestratorTUI } from "../orchestrator-tui";
-import { PromptCompiler } from "../prompts/compiler";
+import { getDefaultAgentName, loadUserConfig } from "../infra/config";
 import {
   addWorktree,
   cleanupMergedBranches,
@@ -20,7 +18,10 @@ import {
   pushBranch,
   releaseMergeLock,
   waitForMergeLock,
-} from "../repos";
+} from "../infra/git";
+import { logger } from "../infra/logger";
+import { OrchestratorTUI } from "../orchestrator-tui";
+import { PromptCompiler } from "../prompts/compiler";
 import { createDashboardService } from "../services";
 import { type GitConfig, getTaskBranch, getTaskMergeTarget, getTaskPRTarget } from "../task-schema";
 import {
@@ -33,7 +34,6 @@ import {
   saveTasks,
   updateTaskStatus,
 } from "../tasks";
-import { getDefaultAgentName, loadUserConfig } from "../user-config";
 import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
 
 // =============================================================================

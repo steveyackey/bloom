@@ -3,7 +3,7 @@
 // =============================================================================
 
 import chalk from "chalk";
-import { createLogger } from "../logger";
+import { createLogger } from "../infra/logger";
 import type { Task, TaskStatus } from "../task-schema";
 import {
   findTask,

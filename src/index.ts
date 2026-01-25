@@ -10,8 +10,8 @@
 // =============================================================================
 
 export * from "./commands/context";
-export * from "./logger";
-export * from "./repos";
+export * from "./infra/config";
+export * from "./infra/git";
+export * from "./infra/logger";
 export * from "./task-schema";
 export * from "./tasks";
-export * from "./user-config";
