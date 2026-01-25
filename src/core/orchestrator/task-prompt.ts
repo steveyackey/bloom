@@ -4,8 +4,23 @@
 // This module handles fetching available tasks and building prompts for agents.
 
 import { getWorktreePath, listRepos } from "../../infra/git";
-import { type GitConfig, getTaskBranch, getTaskMergeTarget, getTaskPRTarget, type Task } from "../../task-schema";
-import { getAvailableTasks, loadTasks, saveTasks, updateTaskStatus } from "../../tasks";
+import {
+  type GitConfig,
+  getTaskBranch,
+  getTaskMergeTarget,
+  getTaskPRTarget,
+  type Task,
+  type TaskStep,
+} from "../../task-schema";
+import {
+  getAvailableTasks,
+  getCompletedSteps,
+  getCurrentStep,
+  hasSteps,
+  loadTasks,
+  saveTasks,
+  updateTaskStatus,
+} from "../../tasks";
 
 // =============================================================================
 // Types
@@ -22,6 +37,20 @@ export interface GitTaskInfo {
   worktreePath: string;
 }
 
+/**
+ * Information about the current step when a task has steps.
+ */
+export interface StepInfo {
+  stepId: string;
+  stepIndex: number;
+  totalSteps: number;
+  instruction: string;
+  acceptanceCriteria: string[];
+  isFirstStep: boolean;
+  /** Completed steps for context in prompt */
+  previousSteps: Array<{ id: string; instruction: string }>;
+}
+
 export interface TaskGetResult {
   available: boolean;
   taskId?: string;
@@ -35,6 +64,10 @@ export interface TaskGetResult {
   sessionId?: string;
   /** Agent provider override for this task (e.g., "claude", "copilot"). If not set, uses config default. */
   agent?: string;
+  /** Step info if task has pending steps */
+  stepInfo?: StepInfo;
+  /** True if there are more steps after the current one */
+  hasMoreSteps?: boolean;
 }
 
 // =============================================================================
@@ -87,7 +120,41 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     }
   }
 
-  const prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig);
+  // Check if task has steps
+  let stepInfo: StepInfo | undefined;
+  let hasMoreSteps = false;
+  let prompt: string;
+
+  if (hasSteps(task)) {
+    const currentStepResult = getCurrentStep(task);
+    if (currentStepResult) {
+      const { step, index } = currentStepResult;
+      const completedSteps = getCompletedSteps(task);
+      const totalSteps = task.steps!.length;
+
+      stepInfo = {
+        stepId: step.id,
+        stepIndex: index,
+        totalSteps,
+        instruction: step.instruction,
+        acceptanceCriteria: step.acceptance_criteria,
+        isFirstStep: index === 0,
+        previousSteps: completedSteps.map((s) => ({
+          id: s.id,
+          instruction: s.instruction.split("\n")[0] || s.instruction, // First line only for context
+        })),
+      };
+
+      hasMoreSteps = index < totalSteps - 1;
+      prompt = buildStepPrompt(task, step, index, totalSteps, gitInfo, taskCli, gitConfig);
+    } else {
+      // All steps are done - build regular task completion prompt
+      prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig);
+    }
+  } else {
+    // No steps - build regular task prompt
+    prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig);
+  }
 
   return {
     available: true,
@@ -100,6 +167,8 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     gitConfig,
     sessionId: task.session_id, // Resume existing session if available
     agent: task.agent, // Per-task agent provider override
+    stepInfo,
+    hasMoreSteps,
   };
 }
 
@@ -167,6 +236,103 @@ Begin working on the task now.`;
   return prompt;
 }
 
+/**
+ * Build a prompt for a specific step within a task.
+ * First step includes full task context; subsequent steps are minimal continuations.
+ */
+function buildStepPrompt(
+  task: Task,
+  step: TaskStep,
+  stepIndex: number,
+  totalSteps: number,
+  gitInfo: GitTaskInfo | null,
+  taskCli: string,
+  _gitConfig?: GitConfig
+): string {
+  const isFirstStep = stepIndex === 0;
+  const isLastStep = stepIndex === totalSteps - 1;
+  const completedSteps = getCompletedSteps(task);
+
+  let prompt = "";
+
+  if (isFirstStep) {
+    // First step: include full task context
+    prompt += `# Task: ${task.title}\n\n`;
+    prompt += `## Task ID: ${task.id}\n\n`;
+    prompt += `This task has ${totalSteps} steps. You'll work on one step at a time.\n\n`;
+
+    if (task.acceptance_criteria.length > 0) {
+      prompt += `## Overall Task Acceptance Criteria\n`;
+      prompt += `${task.acceptance_criteria.map((c) => `- ${c}`).join("\n")}\n\n`;
+    }
+
+    if (task.ai_notes.length > 0) {
+      prompt += `## Previous Notes\n${task.ai_notes.map((n) => `- ${n}`).join("\n")}\n\n`;
+    }
+  } else {
+    // Subsequent steps: minimal context, reference previous work
+    prompt += `# Continuing Task: ${task.title}\n\n`;
+    prompt += `## Progress: Step ${stepIndex + 1} of ${totalSteps}\n\n`;
+
+    if (completedSteps.length > 0) {
+      prompt += `## Completed Steps\n`;
+      for (const completed of completedSteps) {
+        prompt += `- ✓ **${completed.id}**: ${completed.instruction.split("\n")[0]}\n`;
+      }
+      prompt += "\n";
+    }
+  }
+
+  // Current step instruction
+  prompt += `## Current Step: ${step.id} (${stepIndex + 1}/${totalSteps})\n\n`;
+  prompt += `### Instruction\n${step.instruction}\n\n`;
+
+  if (step.acceptance_criteria.length > 0) {
+    prompt += `### Step Acceptance Criteria\n`;
+    prompt += `${step.acceptance_criteria.map((c) => `- ${c}`).join("\n")}\n\n`;
+  }
+
+  // Git workflow (only on first step to avoid repetition)
+  if (isFirstStep && gitInfo) {
+    prompt += `## Git Workflow\n`;
+    prompt += `- **Working branch**: \`${gitInfo.branch}\`\n`;
+    prompt += `- **Base branch**: \`${gitInfo.baseBranch}\`\n`;
+
+    if (gitInfo.openPR && gitInfo.prBase) {
+      prompt += `- **PR target**: \`${gitInfo.prBase}\` (created after ALL steps complete)\n\n`;
+    } else if (gitInfo.mergeInto) {
+      prompt += `- **Merge target**: \`${gitInfo.mergeInto}\` (merged after ALL steps complete)\n\n`;
+    }
+
+    prompt += `**Do NOT switch branches** - stay on \`${gitInfo.branch}\`.\n\n`;
+  }
+
+  // Instructions for completing the step
+  prompt += `## When This Step Is Complete\n\n`;
+  prompt += `1. Commit your changes for this step\n`;
+  prompt += `2. Mark the step as done:\n`;
+  prompt += `   \`\`\`bash\n`;
+  prompt += `   ${taskCli} step done ${step.id}\n`;
+  prompt += `   \`\`\`\n`;
+  prompt += `3. Exit immediately after marking the step done\n\n`;
+
+  if (isLastStep) {
+    prompt += `**This is the final step.** After completing it, the task will be ready for git operations (push/merge/PR).\n\n`;
+  } else {
+    prompt += `After you exit, Bloom will resume your session with the next step. Your context will be preserved.\n\n`;
+  }
+
+  prompt += `## Important\n`;
+  prompt += `- Only work on THIS step's instruction\n`;
+  prompt += `- Commit after completing the step\n`;
+  prompt += `- Run \`${taskCli} step done ${step.id}\` then EXIT\n`;
+  prompt += `- Do NOT mark the overall task as done until all steps are complete\n\n`;
+
+  prompt += `Begin working on step ${step.id} now.`;
+
+  return prompt;
+}
+
 // =============================================================================
 // Session Management
 // =============================================================================
@@ -212,6 +378,69 @@ ${status.untrackedFiles.length > 0 ? `- Untracked files: ${status.untrackedFiles
 ${status.stagedFiles.length > 0 ? `- Staged files: ${status.stagedFiles.join(", ")}` : ""}
 
 Please commit all changes and ${gitConfig?.push_to_remote ? "push to remote" : "ensure work is saved"}.`;
+}
+
+/**
+ * Build a continuation prompt for the next step in a task.
+ * This is used when resuming the agent session with the next step.
+ */
+export function buildNextStepPrompt(task: Task, stepIndex: number, taskCli: string): string {
+  if (!task.steps || stepIndex >= task.steps.length) {
+    throw new Error(`Invalid step index ${stepIndex} for task ${task.id}`);
+  }
+
+  const step = task.steps[stepIndex];
+  if (!step) {
+    throw new Error(`Step at index ${stepIndex} not found for task ${task.id}`);
+  }
+  const totalSteps = task.steps.length;
+  const isLastStep = stepIndex === totalSteps - 1;
+  const completedSteps = task.steps.slice(0, stepIndex).filter((s) => s.status === "done");
+
+  let prompt = `# Continuing Task: ${task.title}\n\n`;
+  prompt += `## Progress: Step ${stepIndex + 1} of ${totalSteps}\n\n`;
+
+  if (completedSteps.length > 0) {
+    prompt += `## Completed Steps\n`;
+    for (const completed of completedSteps) {
+      prompt += `- ✓ **${completed.id}**: ${completed.instruction.split("\n")[0] || completed.instruction}\n`;
+    }
+    prompt += "\n";
+  }
+
+  // Current step instruction
+  prompt += `## Current Step: ${step.id} (${stepIndex + 1}/${totalSteps})\n\n`;
+  prompt += `### Instruction\n${step.instruction}\n\n`;
+
+  if (step.acceptance_criteria.length > 0) {
+    prompt += `### Step Acceptance Criteria\n`;
+    prompt += `${step.acceptance_criteria.map((c) => `- ${c}`).join("\n")}\n\n`;
+  }
+
+  // Instructions for completing the step
+  prompt += `## When This Step Is Complete\n\n`;
+  prompt += `1. Commit your changes for this step\n`;
+  prompt += `2. Mark the step as done:\n`;
+  prompt += `   \`\`\`bash\n`;
+  prompt += `   ${taskCli} step done ${step.id}\n`;
+  prompt += `   \`\`\`\n`;
+  prompt += `3. Exit immediately after marking the step done\n\n`;
+
+  if (isLastStep) {
+    prompt += `**This is the final step.** After completing it, the task will be ready for git operations (push/merge/PR).\n\n`;
+  } else {
+    prompt += `After you exit, Bloom will resume your session with the next step. Your context will be preserved.\n\n`;
+  }
+
+  prompt += `## Important\n`;
+  prompt += `- Only work on THIS step's instruction\n`;
+  prompt += `- Commit after completing the step\n`;
+  prompt += `- Run \`${taskCli} step done ${step.id}\` then EXIT\n`;
+  prompt += `- Do NOT mark the overall task as done until all steps are complete\n\n`;
+
+  prompt += `Begin working on step ${step.id} now.`;
+
+  return prompt;
 }
 
 /**

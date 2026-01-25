@@ -184,7 +184,7 @@ validation_task_id: test-user-service
 
 #### subtasks
 
-Nested child tasks.
+Nested child tasks with their own branches and sessions.
 
 ```yaml
 subtasks:
@@ -202,6 +202,80 @@ subtasks:
 
 - **Type:** `Task[]`
 - **Behavior:** Parent completes when all subtasks complete
+- **Use case:** Parallelizable work that doesn't need shared context
+
+#### steps
+
+Lightweight sequential instructions that reuse the same agent session.
+
+```yaml
+steps:
+  - id: refactor-auth.1
+    instruction: |
+      Extract JWT validation from auth.ts into jwt-validator.ts
+    acceptance_criteria:
+      - jwt-validator.ts exists
+      - auth.ts imports from new module
+
+  - id: refactor-auth.2
+    instruction: |
+      Add unit tests for jwt-validator module
+    acceptance_criteria:
+      - Tests cover valid/invalid tokens
+
+  - id: refactor-auth.3
+    instruction: Update API documentation
+```
+
+- **Type:** `TaskStep[]`
+- **Behavior:** Each step runs in the same session; agent marks step done and exits, Bloom resumes with next step
+- **Use case:** Sequential work where later steps benefit from context of earlier steps
+
+**Step Properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `id` | `string` | Yes | Step ID (typically `task-id.N`) |
+| `instruction` | `string` | Yes | What to do in this step |
+| `status` | `enum` | No | `pending`, `in_progress`, `done` |
+| `acceptance_criteria` | `string[]` | No | When this step is complete |
+| `started_at` | `string` | Auto | ISO timestamp when started |
+| `completed_at` | `string` | Auto | ISO timestamp when finished |
+
+#### started_at / completed_at
+
+Timing fields for metrics (set automatically).
+
+```yaml
+started_at: "2024-01-15T10:30:00.000Z"
+completed_at: "2024-01-15T11:45:00.000Z"
+```
+
+- **Type:** `string` (ISO 8601)
+- **Set by:** Bloom CLI (do not set manually)
+- **Purpose:** Duration tracking, performance metrics
+
+## Steps vs Subtasks
+
+Tasks can be broken down in two ways:
+
+| Aspect | Steps | Subtasks |
+|--------|-------|----------|
+| **Session** | Same session (shared context) | Separate sessions |
+| **Branch** | Same branch | Can have own branch |
+| **Execution** | Sequential only | Can run in parallel |
+| **Context** | Agent remembers previous steps | Fresh start each subtask |
+| **Use when** | Work builds on itself | Work is independent |
+
+**Use steps for:**
+- Refactoring: extract code → add tests → update docs
+- Migrations: update code → update tests → update configs
+- Iterative work: implement → test → fix issues
+
+**Use subtasks for:**
+- Parallel features: frontend + backend
+- Independent modules: auth service + email service
+- Different agents: UI work + API work
 
 ## Status Transitions
 

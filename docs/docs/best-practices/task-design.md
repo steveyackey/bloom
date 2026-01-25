@@ -345,6 +345,90 @@ tasks:
   depends_on: [api-auth]
 ```
 
+## Steps for Sequential Work
+
+When work builds on itself and context from earlier work is valuable, use **steps** instead of separate tasks. Steps reuse the same agent session, preserving context.
+
+### When to Use Steps
+
+| Use Steps | Use Subtasks |
+|-----------|--------------|
+| Work builds on itself | Work is independent |
+| Same branch | Different branches |
+| Sequential required | Can parallelize |
+| Context is valuable | Fresh start is fine |
+
+### Step Pattern: Refactoring
+
+```yaml
+- id: refactor-auth
+  title: Refactor authentication module
+  steps:
+    - id: refactor-auth.1
+      instruction: |
+        Extract JWT validation into jwt-validator.ts
+      acceptance_criteria:
+        - Module exports validateToken function
+        - auth.ts imports from new module
+
+    - id: refactor-auth.2
+      instruction: |
+        Add unit tests for jwt-validator
+      acceptance_criteria:
+        - Tests cover valid tokens
+        - Tests cover invalid/expired tokens
+
+    - id: refactor-auth.3
+      instruction: Update API documentation
+```
+
+Benefits:
+- Agent remembers what was extracted in step 1 when writing tests in step 2
+- Documentation in step 3 can reference implementation details
+- Single branch for entire refactor
+
+### Step Pattern: Migration
+
+```yaml
+- id: migrate-to-prisma
+  title: Migrate from TypeORM to Prisma
+  steps:
+    - id: migrate-to-prisma.1
+      instruction: Set up Prisma schema matching existing models
+    - id: migrate-to-prisma.2
+      instruction: Update service layer to use Prisma client
+    - id: migrate-to-prisma.3
+      instruction: Remove TypeORM dependencies and update tests
+```
+
+### Step Pattern: Feature Implementation
+
+```yaml
+- id: add-user-export
+  title: Add user data export feature
+  steps:
+    - id: add-user-export.1
+      instruction: |
+        Implement exportUserData service method
+        Return user data in structured format
+    - id: add-user-export.2
+      instruction: |
+        Add CSV formatter for export data
+    - id: add-user-export.3
+      instruction: |
+        Create /api/users/:id/export endpoint
+    - id: add-user-export.4
+      instruction: |
+        Add integration tests for export feature
+```
+
+### Step Naming Convention
+
+Use task ID with incrementing suffix:
+- `task-id.1`, `task-id.2`, `task-id.3`
+
+This makes it clear which task a step belongs to.
+
 ## Common Patterns
 
 ### Create + Test Pattern
@@ -372,11 +456,15 @@ tasks:
 
 ### Refactor Pattern
 
-```yaml
-- id: add-feature
-  instructions: Add new feature to existing code.
+Using steps for better context preservation:
 
-- id: refactor-for-feature
-  depends_on: [add-feature]
-  instructions: Clean up code affected by new feature.
+```yaml
+- id: refactor-module
+  steps:
+    - id: refactor-module.1
+      instruction: Extract reusable logic
+    - id: refactor-module.2
+      instruction: Add tests for extracted code
+    - id: refactor-module.3
+      instruction: Update consumers of old API
 ```

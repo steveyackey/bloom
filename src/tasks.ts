@@ -5,7 +5,7 @@
 import { existsSync } from "node:fs";
 import YAML from "yaml";
 import { askQuestion } from "./human-queue";
-import { type Task, type TaskStatus, type TasksFile, validateTasksFile } from "./task-schema";
+import { type Task, type TaskStatus, type TaskStep, type TasksFile, validateTasksFile } from "./task-schema";
 
 // =============================================================================
 // File I/O
@@ -43,6 +43,16 @@ export function updateTaskStatus(tasks: Task[], taskId: string, status: TaskStat
     if (task.id === taskId) {
       task.status = status;
       if (agentName) task.agent_name = agentName;
+
+      // Record timestamps for timing metrics
+      const now = new Date().toISOString();
+      if (status === "in_progress" && !task.started_at) {
+        task.started_at = now;
+      }
+      if (status === "done" || status === "done_pending_merge") {
+        task.completed_at = now;
+      }
+
       return true;
     }
     if (updateTaskStatus(task.subtasks, taskId, status, agentName)) return true;
@@ -273,4 +283,102 @@ export function resetStuckTasks(tasks: TasksFile, logger: { info: (msg: string) 
 
   reset(tasks.tasks);
   return resetCount;
+}
+
+// =============================================================================
+// Step Helpers
+// =============================================================================
+
+export interface StepSearchResult {
+  task: Task;
+  step: TaskStep;
+  index: number;
+}
+
+/**
+ * Find a step by ID across all tasks.
+ * Step IDs are typically formatted as "task-id.N" (e.g., "refactor-auth.1").
+ */
+export function findStep(tasks: Task[], stepId: string): StepSearchResult | null {
+  for (const task of tasks) {
+    if (task.steps) {
+      const index = task.steps.findIndex((s) => s.id === stepId);
+      if (index !== -1) {
+        const step = task.steps[index];
+        if (step) {
+          return { task, step, index };
+        }
+      }
+    }
+    // Check subtasks recursively
+    const found = findStep(task.subtasks, stepId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Get the current (first non-done) step for a task.
+ * Returns null if task has no steps or all steps are done.
+ */
+export function getCurrentStep(task: Task): { step: TaskStep; index: number } | null {
+  if (!task.steps || task.steps.length === 0) return null;
+  const index = task.steps.findIndex((s) => s.status !== "done");
+  if (index === -1) return null;
+  const step = task.steps[index];
+  if (!step) return null;
+  return { step, index };
+}
+
+/**
+ * Get the next pending step after the given index.
+ * Returns null if there are no more steps.
+ */
+export function getNextStep(task: Task, currentIndex: number): TaskStep | null {
+  if (!task.steps || currentIndex >= task.steps.length - 1) return null;
+  return task.steps[currentIndex + 1] ?? null;
+}
+
+/**
+ * Check if a task has steps and any are still pending.
+ */
+export function hasSteps(task: Task): boolean {
+  return !!task.steps && task.steps.length > 0;
+}
+
+/**
+ * Check if all steps in a task are complete.
+ */
+export function allStepsComplete(task: Task): boolean {
+  if (!task.steps || task.steps.length === 0) return true;
+  return task.steps.every((s) => s.status === "done");
+}
+
+/**
+ * Get completed steps for a task (for context in prompts).
+ */
+export function getCompletedSteps(task: Task): TaskStep[] {
+  if (!task.steps) return [];
+  return task.steps.filter((s) => s.status === "done");
+}
+
+/**
+ * Update a step's status with proper timestamp handling.
+ */
+export function updateStepStatus(tasks: Task[], stepId: string, status: TaskStep["status"]): boolean {
+  const found = findStep(tasks, stepId);
+  if (!found) return false;
+
+  const { step } = found;
+  step.status = status;
+
+  const now = new Date().toISOString();
+  if (status === "in_progress" && !step.started_at) {
+    step.started_at = now;
+  }
+  if (status === "done") {
+    step.completed_at = now;
+  }
+
+  return true;
 }

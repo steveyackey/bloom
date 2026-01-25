@@ -16,6 +16,43 @@ export const TaskStatusSchema = z.enum([
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
 // =============================================================================
+// Task Step (lightweight continuation within a task)
+// =============================================================================
+
+/**
+ * A TaskStep is a lightweight instruction within a task that reuses the same
+ * agent session. Unlike subtasks (which have their own branches and sessions),
+ * steps are sequential continuations that share context.
+ *
+ * Use steps when:
+ * - Work is conceptually one deliverable but benefits from chunked instructions
+ * - The agent needs accumulated context from previous steps
+ * - You want sequential commits on the same branch
+ *
+ * Use subtasks when:
+ * - Work can be parallelized across different branches
+ * - Each piece is independent and doesn't need shared context
+ */
+export const TaskStepStatusSchema = z.enum(["pending", "in_progress", "done"]);
+export type TaskStepStatus = z.infer<typeof TaskStepStatusSchema>;
+
+export const TaskStepSchema = z.object({
+  /** Step identifier, typically parent-task-id.1, parent-task-id.2, etc. */
+  id: z.string().min(1),
+  /** The instruction for this step - what the agent should do next */
+  instruction: z.string().min(1),
+  /** Step status - simpler than full task status */
+  status: TaskStepStatusSchema.default("pending"),
+  /** Optional acceptance criteria for this specific step */
+  acceptance_criteria: z.array(z.string()).default([]),
+  /** ISO timestamp when step started */
+  started_at: z.string().optional(),
+  /** ISO timestamp when step completed */
+  completed_at: z.string().optional(),
+});
+export type TaskStep = z.infer<typeof TaskStepSchema>;
+
+// =============================================================================
 // Git Configuration (top-level)
 // =============================================================================
 
@@ -54,13 +91,27 @@ export type Task = {
   instructions?: string;
   acceptance_criteria: string[];
   ai_notes: string[];
+  /**
+   * Lightweight steps that reuse the same agent session.
+   * Steps execute sequentially, sharing context from previous steps.
+   * Use for chunked work on the same branch that benefits from accumulated context.
+   */
+  steps?: TaskStep[];
+  /**
+   * Full subtasks with their own branches and sessions.
+   * Use for parallelizable work that doesn't need shared context.
+   */
   subtasks: Task[];
   /** Points to a validation task that verifies this task's work (e.g. run tests, lint) */
   validation_task_id?: string;
   /** If true, this task requires human approval before downstream tasks can proceed */
   checkpoint?: boolean;
-  /** Claude session ID for resuming interrupted work */
+  /** Claude session ID for resuming interrupted work (shared across all steps) */
   session_id?: string;
+  /** ISO timestamp when task started (first moved to in_progress) */
+  started_at?: string;
+  /** ISO timestamp when task completed (moved to done) */
+  completed_at?: string;
 };
 
 export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
@@ -80,10 +131,13 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     instructions: z.string().optional(),
     acceptance_criteria: z.array(z.string()).default([]),
     ai_notes: z.array(z.string()).default([]),
+    steps: z.array(TaskStepSchema).optional(),
     subtasks: z.array(TaskSchema).default([]),
     validation_task_id: z.string().optional(),
     checkpoint: z.boolean().optional(),
     session_id: z.string().optional(),
+    started_at: z.string().optional(),
+    completed_at: z.string().optional(),
   })
 );
 

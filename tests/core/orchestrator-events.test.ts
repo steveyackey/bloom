@@ -14,6 +14,7 @@ import type {
   AgentProcessEndedEvent,
   AgentProcessStartedEvent,
   AgentStartedEvent,
+  AllStepsCompletedEvent,
   CommitRetryEvent,
   ErrorEvent,
   EventHandler,
@@ -35,6 +36,9 @@ import type {
   MergeLockWaitingEvent,
   OrchestratorEvent,
   SessionCorruptedEvent,
+  StepCompletedEvent,
+  StepFailedEvent,
+  StepStartedEvent,
   TaskBlockedEvent,
   TaskCompletedEvent,
   TaskFailedEvent,
@@ -214,6 +218,98 @@ describe("Orchestrator Events", () => {
 
         expect(event.type).toBe("task:blocked");
         expect(event.reason).toContain("Max commit retries");
+      });
+    });
+
+    describe("Step Lifecycle Events", () => {
+      test("step:started event has step details", () => {
+        const event: StepStartedEvent = {
+          type: "step:started",
+          taskId: "task-1",
+          stepId: "step-1",
+          stepIndex: 0,
+          totalSteps: 3,
+          agentName: "test-agent",
+          resuming: false,
+        };
+
+        expect(event.type).toBe("step:started");
+        expect(event.taskId).toBe("task-1");
+        expect(event.stepId).toBe("step-1");
+        expect(event.stepIndex).toBe(0);
+        expect(event.totalSteps).toBe(3);
+        expect(event.resuming).toBe(false);
+      });
+
+      test("step:started event indicates session resumption", () => {
+        const event: StepStartedEvent = {
+          type: "step:started",
+          taskId: "task-1",
+          stepId: "step-2",
+          stepIndex: 1,
+          totalSteps: 3,
+          agentName: "test-agent",
+          resuming: true,
+        };
+
+        expect(event.resuming).toBe(true);
+        expect(event.stepIndex).toBe(1);
+      });
+
+      test("step:completed event has duration and more steps flag", () => {
+        const event: StepCompletedEvent = {
+          type: "step:completed",
+          taskId: "task-1",
+          stepId: "step-1",
+          stepIndex: 0,
+          totalSteps: 3,
+          duration: 120,
+          hasMoreSteps: true,
+        };
+
+        expect(event.type).toBe("step:completed");
+        expect(event.duration).toBe(120);
+        expect(event.hasMoreSteps).toBe(true);
+      });
+
+      test("step:completed event indicates final step", () => {
+        const event: StepCompletedEvent = {
+          type: "step:completed",
+          taskId: "task-1",
+          stepId: "step-3",
+          stepIndex: 2,
+          totalSteps: 3,
+          duration: 60,
+          hasMoreSteps: false,
+        };
+
+        expect(event.hasMoreSteps).toBe(false);
+        expect(event.stepIndex).toBe(2);
+      });
+
+      test("step:failed event has error details", () => {
+        const event: StepFailedEvent = {
+          type: "step:failed",
+          taskId: "task-1",
+          stepId: "step-2",
+          error: "Build failed with exit code 1",
+        };
+
+        expect(event.type).toBe("step:failed");
+        expect(event.error).toBe("Build failed with exit code 1");
+      });
+
+      test("steps:all_completed event has total duration", () => {
+        const event: AllStepsCompletedEvent = {
+          type: "steps:all_completed",
+          taskId: "task-1",
+          totalSteps: 3,
+          totalDuration: 300,
+        };
+
+        expect(event.type).toBe("steps:all_completed");
+        expect(event.totalSteps).toBe(3);
+        expect(event.totalDuration).toBe(300);
       });
     });
 
@@ -657,6 +753,94 @@ describe("Orchestrator Events", () => {
       expect(events.indexOf("merge:lock_acquired")).toBeLessThan(events.indexOf("git:merging"));
       expect(events.indexOf("git:merging")).toBeLessThan(events.indexOf("git:merged"));
       expect(events.indexOf("git:merged")).toBeLessThan(events.indexOf("git:pushing"));
+    });
+
+    test("step workflow follows expected order", () => {
+      const events: string[] = [];
+      const handler: EventHandler = (event) => events.push(event.type);
+
+      // Simulate a task with 3 steps
+      handler({
+        type: "task:started",
+        taskId: "t1",
+        agentName: "test",
+        workingDir: "/tmp",
+        provider: "claude",
+        resuming: false,
+      });
+
+      // Step 1
+      handler({
+        type: "step:started",
+        taskId: "t1",
+        stepId: "s1",
+        stepIndex: 0,
+        totalSteps: 3,
+        agentName: "test",
+        resuming: false,
+      });
+      handler({ type: "agent:output", agentName: "test", data: "Working on step 1...\n" });
+      handler({
+        type: "step:completed",
+        taskId: "t1",
+        stepId: "s1",
+        stepIndex: 0,
+        totalSteps: 3,
+        duration: 60,
+        hasMoreSteps: true,
+      });
+
+      // Step 2
+      handler({
+        type: "step:started",
+        taskId: "t1",
+        stepId: "s2",
+        stepIndex: 1,
+        totalSteps: 3,
+        agentName: "test",
+        resuming: true,
+      });
+      handler({ type: "agent:output", agentName: "test", data: "Working on step 2...\n" });
+      handler({
+        type: "step:completed",
+        taskId: "t1",
+        stepId: "s2",
+        stepIndex: 1,
+        totalSteps: 3,
+        duration: 45,
+        hasMoreSteps: true,
+      });
+
+      // Step 3
+      handler({
+        type: "step:started",
+        taskId: "t1",
+        stepId: "s3",
+        stepIndex: 2,
+        totalSteps: 3,
+        agentName: "test",
+        resuming: true,
+      });
+      handler({ type: "agent:output", agentName: "test", data: "Working on step 3...\n" });
+      handler({
+        type: "step:completed",
+        taskId: "t1",
+        stepId: "s3",
+        stepIndex: 2,
+        totalSteps: 3,
+        duration: 30,
+        hasMoreSteps: false,
+      });
+
+      // All steps done
+      handler({ type: "steps:all_completed", taskId: "t1", totalSteps: 3, totalDuration: 135 });
+      handler({ type: "task:completed", taskId: "t1", agentName: "test", duration: 140 });
+
+      // Verify ordering
+      expect(events.indexOf("task:started")).toBeLessThan(events.indexOf("step:started"));
+      expect(events.filter((e) => e === "step:started")).toHaveLength(3);
+      expect(events.filter((e) => e === "step:completed")).toHaveLength(3);
+      expect(events.indexOf("steps:all_completed")).toBeLessThan(events.indexOf("task:completed"));
     });
   });
 });
