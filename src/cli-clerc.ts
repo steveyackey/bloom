@@ -18,6 +18,7 @@ import {
   registerSetupCommands,
   registerTaskCommands,
   registerUtilityCommands,
+  registerViewCommands,
 } from "./commands/cli";
 import { setTasksFile } from "./commands/context";
 import { type LogLevel, setLogLevel } from "./logger";
@@ -128,5 +129,6 @@ registerRepoCommands(cli);
 registerSetupCommands(cli);
 registerTaskCommands(cli);
 registerUtilityCommands(cli);
+registerViewCommands(cli);
 
 cli.parse();

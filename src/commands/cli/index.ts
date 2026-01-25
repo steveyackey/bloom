@@ -12,3 +12,4 @@ export { registerRepoCommands } from "./repo";
 export { registerSetupCommands } from "./setup";
 export { registerTaskCommands } from "./tasks";
 export { registerUtilityCommands } from "./utility";
+export { registerViewCommands } from "./view";
