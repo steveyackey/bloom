@@ -23,13 +23,16 @@ opencode --version
 
 ```yaml
 # ~/.bloom/config.yaml
-interactiveAgent:
-  agent: opencode
-  model: anthropic/claude-sonnet-4
+agent:
+  defaultInteractive: opencode
+  defaultNonInteractive: opencode
 
-nonInteractiveAgent:
-  agent: opencode
-  model: anthropic/claude-sonnet-4
+  opencode:
+    defaultModel: anthropic/claude-sonnet-4  # REQUIRED for streaming mode
+    models:
+      - anthropic/claude-sonnet-4
+      - openai/gpt-4o
+      - github-copilot/claude-sonnet-4
 ```
 
 ### Model Selection (Required)
@@ -37,16 +40,38 @@ nonInteractiveAgent:
 OpenCode requires explicit model specification in non-interactive mode. Use the `provider/model` format:
 
 ```yaml
-nonInteractiveAgent:
-  agent: opencode
-  model: anthropic/claude-sonnet-4  # REQUIRED
+agent:
+  defaultNonInteractive: opencode
+  opencode:
+    defaultModel: anthropic/claude-sonnet-4  # REQUIRED
+```
+
+### Configuration Commands
+
+```bash
+# Set opencode as default
+bloom config set-interactive opencode
+bloom config set-noninteractive opencode
+
+# Set default model (required for streaming mode)
+bloom config set-model opencode anthropic/claude-sonnet-4
+
+# Discover available models from opencode CLI
+bloom config models opencode --discover
+
+# Discover and save to config
+bloom config models opencode -d -s
 ```
 
 #### Available Models
 
-To see available models for your configured providers, run:
+To see available models for your configured providers:
 
 ```bash
+# Via bloom
+bloom config models opencode --discover
+
+# Or directly via opencode
 opencode models
 ```
 
@@ -158,9 +183,16 @@ OpenCode requires explicit model selection in non-interactive mode:
 
 ```yaml
 # ~/.bloom/config.yaml
-nonInteractiveAgent:
-  agent: opencode
-  model: anthropic/claude-sonnet-4  # Add this
+agent:
+  defaultNonInteractive: opencode
+  opencode:
+    defaultModel: anthropic/claude-sonnet-4  # Add this
+```
+
+Or via command line:
+
+```bash
+bloom config set-model opencode anthropic/claude-sonnet-4
 ```
 
 ### "Invalid model format"

@@ -25,32 +25,66 @@ Bloom trusts each agent to know its own capabilities. Agents inject their own sy
 Agent configuration is stored in `~/.bloom/config.yaml`:
 
 ```yaml
-# Git protocol preference (ssh or https)
 gitProtocol: ssh
 
-# Agent for interactive commands (bloom enter, bloom refine)
-interactiveAgent:
-  agent: claude
-  model: opus  # Optional: model variant
+agent:
+  # Default agents for each mode
+  defaultInteractive: claude      # For bloom enter, bloom refine
+  defaultNonInteractive: claude   # For bloom run (autonomous tasks)
 
-# Agent for autonomous execution (bloom run)
-nonInteractiveAgent:
-  agent: opencode
-  model: anthropic/claude-sonnet-4
+  # Per-agent model configuration
+  claude:
+    defaultModel: sonnet
+    models:
+      - sonnet
+      - haiku
+      - opus
+
+  opencode:
+    defaultModel: github-copilot/claude-sonnet-4
+    models:
+      - github-copilot/claude-sonnet-4
+      - openai/gpt-4o
+
+  copilot:
+    defaultModel: claude-sonnet-4.5
+    models:
+      - claude-sonnet-4.5
+      - gpt-5.2-codex
+      - gemini-3-pro-preview
 ```
 
 ### Configuration Options
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `interactiveAgent.agent` | string | `claude` | Agent for interactive sessions |
-| `interactiveAgent.model` | string | (agent default) | Model to use |
-| `nonInteractiveAgent.agent` | string | `claude` | Agent for autonomous tasks |
-| `nonInteractiveAgent.model` | string | (agent default) | Model to use |
+| `agent.defaultInteractive` | string | `claude` | Agent for interactive sessions |
+| `agent.defaultNonInteractive` | string | `claude` | Agent for autonomous tasks |
+| `agent.[name].defaultModel` | string | (agent default) | Default model for this agent |
+| `agent.[name].models` | string[] | `[]` | Available models for switching |
 
 ### Agent Names
 
 Valid agent names: `claude`, `copilot`, `codex`, `goose`, `opencode`
+
+### Configuration Commands
+
+```bash
+# View current configuration
+bloom config
+
+# Set default agents
+bloom config set-interactive claude
+bloom config set-noninteractive opencode
+
+# Set model for an agent
+bloom config set-model claude opus
+
+# Discover and manage models
+bloom config models                       # Show configured models
+bloom config models copilot --discover    # Discover from CLI
+bloom config models opencode -d -s        # Discover and save
+```
 
 ## Choosing an Agent
 

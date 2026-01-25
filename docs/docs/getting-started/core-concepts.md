@@ -263,14 +263,36 @@ repos:
 Global settings in `~/.bloom/config.yaml`:
 
 ```yaml
-git_protocol: ssh  # or https
+gitProtocol: ssh  # or https
+
+agent:
+  defaultInteractive: claude      # For bloom enter, bloom refine
+  defaultNonInteractive: claude   # For bloom run (autonomous tasks)
+
+  claude:
+    defaultModel: sonnet
+    models:
+      - sonnet
+      - haiku
+      - opus
 ```
 
 Manage with:
 
 ```bash
+# View configuration
 bloom config
+
+# Git protocol
 bloom config set-protocol ssh
+
+# Agent defaults
+bloom config set-interactive claude
+bloom config set-noninteractive opencode
+
+# Model configuration
+bloom config set-model claude opus
+bloom config models claude --discover --save
 ```
 
 ## Summary

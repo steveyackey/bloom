@@ -24,27 +24,48 @@ gh copilot --version
 
 ```yaml
 # ~/.bloom/config.yaml
-interactiveAgent:
-  agent: copilot
-
-nonInteractiveAgent:
-  agent: copilot
+agent:
+  defaultInteractive: copilot
+  defaultNonInteractive: copilot
 ```
 
 ### Model Selection
 
-Copilot supports multiple AI models:
+Copilot supports multiple AI models. Configure via the agent section:
 
 ```yaml
-interactiveAgent:
-  agent: copilot
-  model: claude-3.5-sonnet  # Use Claude via Copilot
+# ~/.bloom/config.yaml
+agent:
+  defaultInteractive: copilot
+  defaultNonInteractive: copilot
+
+  copilot:
+    defaultModel: claude-sonnet-4.5
+    models:
+      - claude-sonnet-4.5
+      - claude-opus-4.5
+      - gpt-5.2-codex
+      - gemini-3-pro-preview
 ```
 
-Available models (depending on your subscription):
-- `gpt-4o` - OpenAI GPT-4o
-- `claude-3.5-sonnet` - Anthropic Claude
-- `gemini-1.5-pro` - Google Gemini
+### Configuration Commands
+
+```bash
+# Set copilot as default
+bloom config set-interactive copilot
+bloom config set-noninteractive copilot
+
+# Set default model
+bloom config set-model copilot claude-sonnet-4.5
+
+# Discover available models from copilot CLI
+bloom config models copilot --discover
+
+# Discover and save to config
+bloom config models copilot -d -s
+```
+
+Available models depend on your subscription and are discoverable via `bloom config models copilot --discover`.
 
 ## Capabilities
 

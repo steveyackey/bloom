@@ -24,19 +24,36 @@ codex --version
 
 ```yaml
 # ~/.bloom/config.yaml
-interactiveAgent:
-  agent: codex
-
-nonInteractiveAgent:
-  agent: codex
+agent:
+  defaultInteractive: codex
+  defaultNonInteractive: codex
 ```
 
 ### Model Selection
 
 ```yaml
-nonInteractiveAgent:
-  agent: codex
-  model: gpt-4o  # Specify OpenAI model
+# ~/.bloom/config.yaml
+agent:
+  defaultInteractive: codex
+  defaultNonInteractive: codex
+
+  codex:
+    defaultModel: gpt-4o
+    models:
+      - gpt-4o
+      - gpt-4o-mini
+      - o3
+```
+
+### Configuration Commands
+
+```bash
+# Set codex as default
+bloom config set-interactive codex
+bloom config set-noninteractive codex
+
+# Set default model
+bloom config set-model codex gpt-4o
 ```
 
 ## Capabilities

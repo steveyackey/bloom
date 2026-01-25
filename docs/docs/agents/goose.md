@@ -24,21 +24,34 @@ goose configure
 
 ```yaml
 # ~/.bloom/config.yaml
-interactiveAgent:
-  agent: goose
-
-nonInteractiveAgent:
-  agent: goose
+agent:
+  defaultInteractive: goose
+  defaultNonInteractive: goose
 ```
 
 ### Model Selection
 
-Goose uses the model configured via `goose configure`. You can also specify models in your Bloom config:
+Goose uses the model configured via `goose configure`. You can also specify a default model in your Bloom config:
 
 ```yaml
-nonInteractiveAgent:
-  agent: goose
-  model: claude-3.5-sonnet  # Optional: override default model
+# ~/.bloom/config.yaml
+agent:
+  defaultInteractive: goose
+  defaultNonInteractive: goose
+
+  goose:
+    defaultModel: claude-3.5-sonnet  # Optional: override default model
+```
+
+### Configuration Commands
+
+```bash
+# Set goose as default
+bloom config set-interactive goose
+bloom config set-noninteractive goose
+
+# Set default model (optional, goose uses its own config by default)
+bloom config set-model goose claude-3.5-sonnet
 ```
 
 ## Capabilities

@@ -70,25 +70,98 @@ bloom repo sync
 Global user settings. Created on first use.
 
 ```yaml
-git_protocol: ssh
+gitProtocol: ssh
+
+agent:
+  defaultInteractive: claude
+  defaultNonInteractive: claude
+
+  claude:
+    defaultModel: sonnet
+    models:
+      - sonnet
+      - haiku
+      - opus
+
+  opencode:
+    defaultModel: github-copilot/claude-sonnet-4
+    models:
+      - github-copilot/claude-sonnet-4
+      - openai/gpt-4o
 ```
 
 ### Properties
 
-#### git_protocol
+#### gitProtocol
 
 Preferred protocol for repository URLs.
 
 ```yaml
-git_protocol: ssh    # git@github.com:org/repo.git
-git_protocol: https  # https://github.com/org/repo.git
+gitProtocol: ssh    # git@github.com:org/repo.git
+gitProtocol: https  # https://github.com/org/repo.git
 ```
 
 - **Type:** `enum`
 - **Values:** `ssh`, `https`
 - **Default:** `ssh` (prompted during `bloom init`)
 
-### Management
+#### agent
+
+Agent configuration section containing defaults and per-agent settings.
+
+##### agent.defaultInteractive
+
+Default agent for interactive commands (`bloom enter`, `bloom refine`).
+
+- **Type:** `string`
+- **Values:** `claude`, `copilot`, `codex`, `goose`, `opencode`
+- **Default:** `claude`
+
+##### agent.defaultNonInteractive
+
+Default agent for autonomous task execution (`bloom run`).
+
+- **Type:** `string`
+- **Values:** `claude`, `copilot`, `codex`, `goose`, `opencode`
+- **Default:** `claude`
+
+##### agent.[agentName].defaultModel
+
+Default model for a specific agent.
+
+```yaml
+agent:
+  claude:
+    defaultModel: opus
+  opencode:
+    defaultModel: github-copilot/claude-sonnet-4
+```
+
+- **Type:** `string`
+- **Default:** Agent-specific default
+
+##### agent.[agentName].models
+
+List of available models for a specific agent. Used for model switching in the TUI.
+
+```yaml
+agent:
+  claude:
+    models:
+      - sonnet
+      - haiku
+      - opus
+  copilot:
+    models:
+      - claude-sonnet-4.5
+      - gpt-5.2-codex
+      - gemini-3-pro-preview
+```
+
+- **Type:** `string[]`
+- **Default:** `[]` (empty, can be populated via `--discover`)
+
+### Management Commands
 
 View current config:
 
@@ -96,12 +169,45 @@ View current config:
 bloom config
 ```
 
-Change protocol:
+#### Git Protocol
 
 ```bash
 bloom config set-protocol ssh
 bloom config set-protocol https
 ```
+
+#### Agent Defaults
+
+```bash
+# Set default interactive agent (bloom enter, bloom refine)
+bloom config set-interactive claude
+bloom config set-interactive goose
+
+# Set default non-interactive agent (bloom run)
+bloom config set-noninteractive claude
+bloom config set-noninteractive opencode
+```
+
+#### Model Configuration
+
+```bash
+# Set default model for an agent
+bloom config set-model claude opus
+bloom config set-model opencode github-copilot/claude-sonnet-4
+
+# View configured models
+bloom config models                       # All agents
+bloom config models claude                # Specific agent
+
+# Discover models from agent CLI
+bloom config models copilot --discover    # Show available models
+bloom config models opencode -d -s        # Discover and save to config
+```
+
+Model discovery works for agents that support it:
+- **claude**: Static list (sonnet, haiku, opus)
+- **copilot**: Parsed from `copilot help config`
+- **opencode**: From `opencode models` command
 
 ## Project Files
 

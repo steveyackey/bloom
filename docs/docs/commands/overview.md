@@ -60,6 +60,12 @@ These are the commands you'll use regularly.
 |---------|-------------|
 | `bloom config` | View user configuration |
 | `bloom config set-protocol` | Set git protocol preference |
+| `bloom config set-interactive` | Set default interactive agent |
+| `bloom config set-noninteractive` | Set default non-interactive agent |
+| `bloom config set-model` | Set default model for an agent |
+| `bloom config models` | View and discover available models |
+| `bloom agent check` | Check which agent CLIs are installed |
+| `bloom agent validate` | Validate an agent works correctly |
 | `bloom version` | Show version |
 | `bloom help` | Show help |
 

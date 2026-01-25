@@ -539,20 +539,50 @@ Bloom supports multiple AI agents, allowing you to choose the best tool for your
 Configure agents in `~/.bloom/config.yaml`:
 
 ```yaml
-# Default: Claude for both modes
 gitProtocol: ssh
 
-# Optional: Use different agents for different contexts
-interactiveAgent:
-  agent: claude          # For bloom enter, bloom refine
-  model: opus            # Optional model selection
+agent:
+  # Default agents for each mode
+  defaultInteractive: claude      # For bloom enter, bloom refine
+  defaultNonInteractive: claude   # For bloom run (autonomous tasks)
 
-nonInteractiveAgent:
-  agent: opencode        # For bloom run (autonomous tasks)
-  model: anthropic/claude-sonnet-4
+  # Per-agent model configuration
+  claude:
+    defaultModel: sonnet
+    models:
+      - sonnet
+      - haiku
+      - opus
+
+  opencode:
+    defaultModel: github-copilot/claude-sonnet-4
+    models:
+      - github-copilot/claude-sonnet-4
+      - openai/gpt-4o
 ```
 
 **Available agents**: `claude`, `copilot`, `codex`, `goose`, `opencode`
+
+### Agent Configuration Commands
+
+```bash
+# View current configuration
+bloom config
+
+# Set default agents
+bloom config set-interactive claude
+bloom config set-noninteractive opencode
+
+# Set model for an agent
+bloom config set-model claude opus
+bloom config set-model opencode github-copilot/claude-sonnet-4
+
+# View and discover models
+bloom config models                       # Show all configured models
+bloom config models claude                # Show models for claude
+bloom config models copilot --discover    # Discover available models from CLI
+bloom config models opencode -d -s        # Discover and save to config
+```
 
 ### Agent-Specific Setup
 

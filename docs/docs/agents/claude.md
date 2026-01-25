@@ -26,27 +26,47 @@ Claude is the default agent, so no configuration is required for basic usage. To
 
 ```yaml
 # ~/.bloom/config.yaml
-interactiveAgent:
-  agent: claude
-
-nonInteractiveAgent:
-  agent: claude
+agent:
+  defaultInteractive: claude
+  defaultNonInteractive: claude
 ```
 
 ### Model Selection
 
-Claude supports model selection via the `model` field:
+Claude supports model selection via the agent config:
 
 ```yaml
-interactiveAgent:
-  agent: claude
-  model: opus  # Use Claude Opus for interactive work
+# ~/.bloom/config.yaml
+agent:
+  defaultInteractive: claude
+  defaultNonInteractive: claude
+
+  claude:
+    defaultModel: opus    # Use Claude Opus by default
+    models:               # Available models for switching
+      - sonnet
+      - haiku
+      - opus
 ```
 
-Available models depend on your API access. Common options:
+Available models depend on your API access:
 - `sonnet` - Claude Sonnet (default, balanced)
 - `opus` - Claude Opus (most capable)
 - `haiku` - Claude Haiku (fastest)
+
+### Configuration Commands
+
+```bash
+# Set claude as default
+bloom config set-interactive claude
+bloom config set-noninteractive claude
+
+# Set default model
+bloom config set-model claude opus
+
+# Discover and save available models
+bloom config models claude --discover --save
+```
 
 ## Capabilities
 
