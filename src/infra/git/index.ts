@@ -1,55 +1,51 @@
 // =============================================================================
-// Git Infrastructure - Public API
+// Git Infrastructure - Re-exports from repos.ts
 // =============================================================================
+// This module provides the public API for git operations.
+// The implementation lives in repos.ts at the src root for now.
 
-// Clone and create
-export { type CloneResult, type CreateRepoResult, cloneRepo, createRepo } from "./clone";
-// Config and paths
+export type {
+  CloneResult,
+  ConfigFile,
+  CreateRepoResult,
+  GitStatusResult,
+  MergeLock,
+  PullAllResult,
+  PullResult,
+  RepoEntry,
+  RepoInfo,
+  ReposFile,
+  SyncResult,
+} from "../../repos";
+
 export {
+  acquireMergeLock,
+  addWorktree,
   branchExists,
-  type ConfigFile,
+  cleanupMergedBranches,
+  cloneRepo,
+  createRepo,
+  deleteLocalBranch,
   findRepo,
   getBareRepoPath,
-  getDefaultBranch,
+  getCurrentBranch,
+  getMergedBranches,
   getReposDir,
   getReposFilePath,
   getWorktreePath,
-  getWorktreesDir,
-  loadReposFile,
-  type RepoEntry,
-  type ReposFile,
-  runGit,
-  saveReposFile,
-} from "./config";
-// Merge lock
-export {
-  acquireMergeLock,
-  type MergeLock,
-  releaseMergeLock,
-  waitForMergeLock,
-} from "./merge-lock";
-// Status and branch operations
-export {
-  cleanupMergedBranches,
-  deleteLocalBranch,
-  type GitStatusResult,
-  getCurrentBranch,
-  getMergedBranches,
   getWorktreeStatus,
-  mergeBranch,
-  pushBranch,
-} from "./status";
-// Sync, pull, remove, list
-export {
+  getWorktreesDir,
   listRepos,
-  type PullAllResult,
-  type PullResult,
+  listWorktrees,
+  loadReposFile,
+  mergeBranch,
   pullAllDefaultBranches,
   pullDefaultBranch,
-  type RepoInfo,
+  pushBranch,
+  releaseMergeLock,
   removeRepo,
-  type SyncResult,
+  removeWorktree,
+  saveReposFile,
   syncRepos,
-} from "./sync";
-// Worktree management
-export { addWorktree, listWorktrees, removeWorktree } from "./worktree";
+  waitForMergeLock,
+} from "../../repos";
