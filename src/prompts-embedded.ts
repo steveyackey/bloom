@@ -829,5 +829,4 @@ After writing the PRD, let the user know:
 
 Be encouraging and acknowledge the work they've already done gathering research!
 `,
-
 };

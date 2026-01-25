@@ -29,6 +29,5 @@ Thumbs.db
 bin/
 out/
 
-# Project specific
-repos/*
-!repos/.gitkeep
+# Runtime artifacts
+.questions/
