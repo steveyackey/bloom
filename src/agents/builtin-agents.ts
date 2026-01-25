@@ -150,14 +150,14 @@ export const gooseAgent: AgentDefinition = {
 
   interactive: {
     subcommand: "run",
-    base_args: ["-s"], // -s continues interactively after processing prompt
+    base_args: ["-s", "--with-builtin", "developer"], // -s continues interactively after processing prompt
     prompt: { flag: "-t" },
     prepend_system_prompt: false, // goose has --system flag
   },
 
   streaming: {
     subcommand: "run",
-    base_args: ["--output-format", "json"],
+    base_args: ["--output-format", "json", "--with-builtin", "developer"],
     prompt: { flag: "-t" },
     prepend_system_prompt: false, // goose has --system flag
   },
