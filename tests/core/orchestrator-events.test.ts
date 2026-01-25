@@ -323,7 +323,7 @@ describe("Orchestrator Events", () => {
 
         expect(event.deleted).toEqual(["feature/a", "feature/b"]);
         expect(event.failed).toHaveLength(1);
-        expect(event.failed[0].branch).toBe("feature/c");
+        expect(event.failed[0]?.branch).toBe("feature/c");
       });
     });
 
@@ -551,9 +551,9 @@ describe("Orchestrator Events", () => {
       handler({ type: "task:completed", taskId: "t1", agentName: "test", duration: 10 });
 
       expect(receivedEvents).toHaveLength(3);
-      expect(receivedEvents[0].type).toBe("agent:started");
-      expect(receivedEvents[1].type).toBe("task:found");
-      expect(receivedEvents[2].type).toBe("task:completed");
+      expect(receivedEvents[0]?.type).toBe("agent:started");
+      expect(receivedEvents[1]?.type).toBe("task:found");
+      expect(receivedEvents[2]?.type).toBe("task:completed");
     });
 
     test("event handler can discriminate events by type", () => {

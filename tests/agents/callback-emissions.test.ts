@@ -225,10 +225,10 @@ describe("Agent Callback Interface", () => {
       onProcessEnd(12345, 0);
 
       expect(events).toHaveLength(4);
-      expect(events[0].type).toBe("agent:process_started");
-      expect(events[1].type).toBe("agent:output");
-      expect(events[2].type).toBe("agent:output");
-      expect(events[3].type).toBe("agent:process_ended");
+      expect(events[0]?.type).toBe("agent:process_started");
+      expect(events[1]?.type).toBe("agent:output");
+      expect(events[2]?.type).toBe("agent:output");
+      expect(events[3]?.type).toBe("agent:process_ended");
     });
 
     test("callbacks can be used for stats tracking", () => {
@@ -326,7 +326,7 @@ describe("Agent Callback Interface", () => {
 
       const onProcessStart = (_pid: number, command: string) => {
         // Extract just the command name
-        commandName = command.split(" ")[0];
+        commandName = command.split(" ")[0] ?? "";
       };
 
       onProcessStart(12345, "/usr/local/bin/claude --print");
