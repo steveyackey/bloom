@@ -2,7 +2,7 @@
 // Agent Factory - Creates agents based on user configuration
 // =============================================================================
 
-import { getAgentConfig, getDefaultAgentName, getDefaultModel, loadUserConfig } from "../user-config";
+import { getDefaultAgentName, getDefaultModel, loadUserConfig } from "../user-config";
 import type { Agent } from "./core";
 import { GenericAgentProvider } from "./generic-provider";
 import { getAgentDefinition, getRegisteredAgentNames, isValidAgentName } from "./loader";

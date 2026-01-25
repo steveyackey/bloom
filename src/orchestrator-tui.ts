@@ -18,7 +18,6 @@ import {
   getDefaultInteractiveAgent,
   getDefaultModel,
   loadUserConfig,
-  saveUserConfig,
   setAgentDefaultModel,
   setDefaultInteractiveAgent,
   type UserConfig,
