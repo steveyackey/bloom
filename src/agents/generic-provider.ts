@@ -147,6 +147,9 @@ export class GenericAgentProvider implements Agent {
     return new Promise((resolve) => {
       const args = this.buildArgs(options, "streaming");
 
+      // Log the command being run for debugging
+      logger.debug(`Running: ${this.definition.command} ${args.join(" ")}`);
+
       const proc = spawn(this.definition.command, args, {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],

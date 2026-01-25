@@ -351,6 +351,9 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
       });
 
       agentLog.info(`Starting ${taskProvider} session in: ${workingDir}`);
+      if (taskResult.sessionId) {
+        agentLog.debug(`Resuming session: ${taskResult.sessionId}`);
+      }
 
       // Only use session ID if the task's agent matches the provider
       // Session IDs are provider-specific (Claude IDs won't work with OpenCode, etc.)
@@ -379,14 +382,19 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
         errorOrOutput.includes("must start with") ||
         errorOrOutput.includes("invalid_format") ||
         errorOrOutput.includes("invalid_request_error");
-      const isFatalSessionError = !result.success && hasFatalSessionPattern;
+      // If we were resuming a session and it failed, assume session is corrupted
+      const wasResuming = !!sessionIdToUse;
+      const isFatalSessionError = !result.success && (hasFatalSessionPattern || wasResuming);
 
       // Save session ID for future resumption (only if session is healthy)
       if (result.sessionId && taskResult.taskId && !isFatalSessionError) {
         await saveTaskSessionId(taskResult.taskId, result.sessionId);
       } else if (isFatalSessionError && taskResult.taskId) {
         // Clear corrupted session ID so next attempt starts fresh
-        agentLog.warn("Session appears corrupted, clearing session ID for fresh start");
+        agentLog.warn(`Session appears corrupted (was resuming: ${wasResuming}), clearing session ID for fresh start`);
+        if (hasFatalSessionPattern) {
+          agentLog.warn(`Detected fatal pattern in output: ${errorOrOutput.slice(0, 200)}`);
+        }
         await saveTaskSessionId(taskResult.taskId, undefined);
       }
 
