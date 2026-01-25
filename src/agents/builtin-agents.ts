@@ -214,7 +214,7 @@ export const opencodeAgent: AgentDefinition = {
   },
 
   output: {
-    format: "json",
+    format: "stream-json",
     session_id_field: "sessionID",
     session_id_field_alt: "session_id",
   },

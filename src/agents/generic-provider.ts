@@ -445,6 +445,13 @@ export class GenericAgentProvider implements Agent {
   ): void {
     const type = event.type as string | undefined;
 
+    // Handle OpenCode's nested part structure
+    const part = event.part as Record<string, unknown> | undefined;
+    if (part) {
+      this.renderOpenCodePart(type, part, outputAccumulator, errorAccumulator);
+      return;
+    }
+
     switch (type) {
       case "assistant":
       case "message": {
@@ -547,8 +554,99 @@ export class GenericAgentProvider implements Agent {
     }
   }
 
+  /**
+   * Render OpenCode's nested part structure.
+   * OpenCode events have type at top level (step_finish, step_start, tool_use)
+   * and details in the part object.
+   */
+  private renderOpenCodePart(
+    _eventType: string | undefined,
+    part: Record<string, unknown>,
+    outputAccumulator: { value: string },
+    errorAccumulator: { value: string }
+  ): void {
+    const partType = part.type as string | undefined;
+
+    switch (partType) {
+      case "text": {
+        // Text content from assistant
+        const text = part.text as string | undefined;
+        if (text) {
+          process.stdout.write(text);
+          outputAccumulator.value += text;
+        }
+        break;
+      }
+
+      case "tool": {
+        // Tool usage - display tool name and title if available
+        const toolName = part.tool as string | undefined;
+        const state = part.state as { title?: string; status?: string } | undefined;
+        const title = state?.title;
+        const displayName = title || toolName || "unknown";
+        process.stdout.write(`\n${chalk.cyan(`[tool: ${displayName}]`)}\n`);
+        break;
+      }
+
+      case "step-start": {
+        // Step started - optionally show indicator
+        // Keeping quiet to avoid noise
+        break;
+      }
+
+      case "step-finish": {
+        // Step finished - show token/cost info
+        const cost = part.cost as number | undefined;
+        const tokens = part.tokens as
+          | {
+              input?: number;
+              output?: number;
+              reasoning?: number;
+              cache?: { read?: number; write?: number };
+            }
+          | undefined;
+
+        if (tokens) {
+          const totalTokens = (tokens.input || 0) + (tokens.output || 0) + (tokens.reasoning || 0);
+          if (totalTokens > 0) {
+            process.stdout.write(`${chalk.dim(`[tokens: ${totalTokens}]`)} `);
+          }
+        }
+        if (cost !== undefined && cost > 0) {
+          process.stdout.write(`[cost: $${cost.toFixed(4)}]\n`);
+        }
+        break;
+      }
+
+      case "error": {
+        const errorMessage = (part.error as string) || (part.message as string) || "unknown error";
+        process.stdout.write(`\n${chalk.red(`[ERROR: ${errorMessage}]`)}\n`);
+        errorAccumulator.value = errorMessage;
+        break;
+      }
+
+      default: {
+        // Handle other part types - check for text content
+        if (part.text && typeof part.text === "string") {
+          process.stdout.write(part.text);
+          outputAccumulator.value += part.text;
+        }
+      }
+    }
+  }
+
   private extractText(event: Record<string, unknown>, outputAccumulator: { value: string }): void {
     const type = event.type as string | undefined;
+
+    // Handle OpenCode's nested part structure
+    const part = event.part as Record<string, unknown> | undefined;
+    if (part) {
+      const partType = part.type as string | undefined;
+      if (partType === "text" && typeof part.text === "string") {
+        outputAccumulator.value += part.text;
+      }
+      return;
+    }
 
     switch (type) {
       case "assistant":
