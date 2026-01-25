@@ -18,7 +18,7 @@ import {
   setAgentModels,
   setDefaultInteractiveAgent,
   setDefaultNonInteractiveAgent,
-} from "../src/user-config";
+} from "../src/infra/config";
 
 describe("user-config Git URL functions", () => {
   describe("isShorthandUrl", () => {

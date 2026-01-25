@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createLogger, getLogLevel, type LogLevel, logger, setLogLevel } from "../src/logger";
+import { createLogger, getLogLevel, type LogLevel, logger, setLogLevel } from "../src/infra/logger";
 
 describe("logger", () => {
   let originalConsoleLog: typeof console.log;

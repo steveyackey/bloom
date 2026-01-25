@@ -4,7 +4,8 @@
 
 import chalk from "chalk";
 import type { Clerc } from "clerc";
-import { getRepoNamesSync } from "../../completions/providers";
+import { BLOOM_DIR } from "../commands/context";
+import { getRepoNamesSync } from "../completions/providers";
 import {
   addWorktree,
   cloneRepo,
@@ -14,8 +15,7 @@ import {
   removeRepo,
   removeWorktree,
   syncRepos,
-} from "../../repos";
-import { BLOOM_DIR } from "../context";
+} from "../infra/git";
 
 // =============================================================================
 // Completions Handler for Repo Names

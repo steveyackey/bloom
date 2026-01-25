@@ -4,10 +4,10 @@
 
 import type { Clerc } from "clerc";
 
-import { cmdEnter } from "../enter";
-import { cmdGenerate } from "../generate";
-import { cmdPlan } from "../plan-command";
-import { cmdRefine } from "../refine";
+import { cmdEnter } from "../commands/enter";
+import { cmdGenerate } from "../commands/generate";
+import { cmdPlan } from "../commands/plan-command";
+import { cmdRefine } from "../commands/refine";
 
 // =============================================================================
 // Command Registration

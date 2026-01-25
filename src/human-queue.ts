@@ -5,7 +5,7 @@
 import { existsSync, type FSWatcher, mkdirSync, readdirSync, unlinkSync, watch } from "node:fs";
 import { dirname, join } from "node:path";
 import { getTasksFile } from "./commands/context";
-import { createLogger } from "./logger";
+import { createLogger } from "./infra/logger";
 
 const logger = createLogger("human-queue");
 

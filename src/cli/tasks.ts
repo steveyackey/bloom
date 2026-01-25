@@ -3,10 +3,7 @@
 // =============================================================================
 
 import type { Clerc } from "clerc";
-
-import { getAgentNamesSync, getTaskIdsSync, getTaskStatuses } from "../../completions/providers";
-import type { TaskStatus } from "../../task-schema";
-import { getTasksFile } from "../context";
+import { getTasksFile } from "../commands/context";
 import {
   cmdAssign,
   cmdDashboard,
@@ -17,7 +14,9 @@ import {
   cmdSetStatus,
   cmdShow,
   cmdValidate,
-} from "../tasks";
+} from "../commands/tasks";
+import { getAgentNamesSync, getTaskIdsSync, getTaskStatuses } from "../completions/providers";
+import type { TaskStatus } from "../task-schema";
 
 // =============================================================================
 // Completion Handlers

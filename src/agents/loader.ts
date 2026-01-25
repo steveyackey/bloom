@@ -5,7 +5,7 @@
  * Provides a unified registry of all available agents.
  */
 
-import { createLogger } from "../logger";
+import { createLogger } from "../infra/logger";
 import { BUILTIN_AGENTS } from "./builtin-agents";
 import type { AgentDefinition } from "./schema";
 import { AgentDefinitionSchema } from "./schema";

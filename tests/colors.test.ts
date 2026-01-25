@@ -8,7 +8,7 @@ import {
   getBorderChalk,
   getBorderColor,
   style,
-} from "../src/colors";
+} from "../src/infra/colors";
 
 describe("colors", () => {
   describe("CSI constant", () => {

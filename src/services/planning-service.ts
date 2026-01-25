@@ -8,8 +8,8 @@ import { join } from "node:path";
 import chalk from "chalk";
 import { createAgent } from "../agents";
 import { findGitRoot } from "../commands/context";
+import { listRepos } from "../infra/git";
 import { loadPrompt } from "../prompts";
-import { listRepos } from "../repos";
 
 // =============================================================================
 // RefineFile Interface

@@ -5,10 +5,10 @@
 import chalk from "chalk";
 import { type Clerc, Types } from "clerc";
 
-import { getRegisteredAgentNames, isValidAgentName } from "../../agents/capabilities";
-import { type CompileOptions, PromptCompiler } from "../../prompts/compiler";
-import { findTask, loadTasks } from "../../tasks";
-import { getTasksFile } from "../context";
+import { getRegisteredAgentNames, isValidAgentName } from "../agents/capabilities";
+import { getTasksFile } from "../commands/context";
+import { type CompileOptions, PromptCompiler } from "../prompts/compiler";
+import { findTask, loadTasks } from "../tasks";
 
 // =============================================================================
 // Constants

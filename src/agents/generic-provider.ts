@@ -7,7 +7,7 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import chalk from "chalk";
-import { createLogger } from "../logger";
+import { createLogger } from "../infra/logger";
 import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
 import type { AgentDefinition, PromptStyle } from "./schema";
 

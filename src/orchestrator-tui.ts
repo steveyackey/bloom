@@ -10,10 +10,8 @@ import {
   interjectGenericSession,
   listAvailableAgents,
 } from "./agents";
-import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
 import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
-import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
-import { getProcessStatsBatch, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
+import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./infra/colors";
 import {
   getDefaultInteractiveAgent,
   getDefaultModel,
@@ -21,7 +19,9 @@ import {
   setAgentDefaultModel,
   setDefaultInteractiveAgent,
   type UserConfig,
-} from "./user-config";
+} from "./infra/config";
+import { getProcessStatsBatch, type ProcessStats, spawnTerminal, type TerminalProcess } from "./infra/terminal";
+import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 
 // =============================================================================
 // Types

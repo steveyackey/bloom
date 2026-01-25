@@ -3,7 +3,7 @@
 // =============================================================================
 
 import type { Clerc } from "clerc";
-import { cmdView } from "../view";
+import { cmdView } from "../commands/view";
 
 export function registerViewCommands(cli: Clerc): Clerc {
   return cli
