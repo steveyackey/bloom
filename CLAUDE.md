@@ -34,12 +34,27 @@ Flow: init workspace → clone repos → create project → refine PRD → plan 
 
 CLI commands are organized by top-level command name in `src/cli/`. Each file is named after the command it implements:
 
-| File | Commands |
-|------|----------|
-| `agent.ts` | `bloom agent list`, `bloom agent check`, etc. |
-| `repo.ts` | `bloom repo clone`, `bloom repo sync`, etc. |
-| `run.ts` | `bloom run` |
-| `task.ts` | `bloom list`, `bloom show`, `bloom done`, etc. |
+| File | Commands | Flags |
+|------|----------|-------|
+| `agent.ts` | `agent list`, `agents`, `agent interject <name>`, `agent check`, `agent validate [name]` | `--streaming/-s` |
+| `config.ts` | `config` (alias: `cfg`), `config set-protocol`, `config set-interactive`, `config set-noninteractive`, `config set-model`, `config models` | `--discover/-d`, `--save/-s` |
+| `create.ts` | `create [name...]` | |
+| `enter.ts` | `enter` | `--agent/-a` |
+| `generate.ts` | `generate` | `--agent/-a` |
+| `init.ts` | `init` | |
+| `interject.ts` | `interject`, `interject list`, `interject resume <id>`, `interject dismiss <id>` | |
+| `plan.ts` | `plan` | `--agent/-a` |
+| `prompt.ts` | `prompt compile <agent>` | `--task/-t`, `--prompt/-p` |
+| `questions.ts` | `questions` (alias: `qs`), `questions-dashboard` (alias: `qd`), `ask`, `answer`, `wait-answer`, `clear-answered` | `--all/-a`, `--task/-t`, `--type`, `--choices/-c`, `--on-yes`, `--on-no`, `--add-note` |
+| `refine.ts` | `refine` | `--agent/-a` |
+| `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
+| `run.ts` | `run` | `--agent/-a` |
+| `setup.ts` | `setup` | |
+| `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset` | `--stuck/-s` |
+| `update.ts` | `update` | |
+| `view.ts` | `view` (alias: `v`) | `--port`, `--open` |
+
+**Global flags** (all commands): `--file/-f`, `--logLevel/-l`, `--verbose/-v`, `--quiet/-q`
 
 **Adding a new top-level command:**
 1. Create `src/cli/<command>.ts`
