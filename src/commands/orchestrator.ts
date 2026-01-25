@@ -222,9 +222,15 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
   agentLog.info(`Starting work loop (polling every ${POLL_INTERVAL_MS / 1000}s)...`);
 
   // Load user config to determine default agent provider
+  // CLI --agent flag (via BLOOM_AGENT_OVERRIDE env) takes precedence over config
   const userConfig = await loadUserConfig();
-  const defaultProvider = getDefaultAgentName(userConfig) as AgentName;
-  agentLog.debug(`Default agent provider: ${defaultProvider}`);
+  const envOverride = process.env.BLOOM_AGENT_OVERRIDE;
+  const defaultProvider = (envOverride || getDefaultAgentName(userConfig)) as AgentName;
+  if (envOverride) {
+    agentLog.info(`Agent provider override: ${defaultProvider}`);
+  } else {
+    agentLog.debug(`Default agent provider: ${defaultProvider}`);
+  }
 
   // Cache agents by provider to avoid recreating them
   const agentCache = new Map<string, Awaited<ReturnType<typeof createAgent>>>();
@@ -416,6 +422,47 @@ Please commit all changes and ${taskResult.gitConfig?.push_to_remote ? "push to 
             // Save updated session ID
             if (result.sessionId && taskResult.taskId) {
               await saveTaskSessionId(taskResult.taskId, result.sessionId);
+            }
+
+            // Check if uncommitted changes still exist after resume
+            const postResumeStatus = getWorktreeStatus(taskResult.gitInfo.worktreePath);
+            if (!postResumeStatus.clean) {
+              const taskId = taskResult.taskId!;
+              const retries = (commitRetryCount.get(taskId) || 0) + 1;
+              commitRetryCount.set(taskId, retries);
+
+              agentLog.warn(`Agent failed to commit changes (attempt ${retries}/${MAX_COMMIT_RETRIES})`);
+              agentLog.warn(`Remaining uncommitted changes:`);
+              if (postResumeStatus.modifiedFiles.length > 0) {
+                agentLog.warn(`  Modified: ${postResumeStatus.modifiedFiles.join(", ")}`);
+              }
+              if (postResumeStatus.untrackedFiles.length > 0) {
+                agentLog.warn(`  Untracked: ${postResumeStatus.untrackedFiles.join(", ")}`);
+              }
+              if (postResumeStatus.stagedFiles.length > 0) {
+                agentLog.warn(`  Staged: ${postResumeStatus.stagedFiles.join(", ")}`);
+              }
+
+              if (retries >= MAX_COMMIT_RETRIES) {
+                // Max retries reached - mark task as blocked
+                agentLog.error(`Max commit retries (${MAX_COMMIT_RETRIES}) reached. Marking task as blocked.`);
+                const blockedTasksFile = await loadTasks(getTasksFile());
+                updateTaskStatus(blockedTasksFile.tasks, taskId, "blocked");
+                await saveTasks(getTasksFile(), blockedTasksFile);
+                commitRetryCount.delete(taskId); // Clean up
+              } else {
+                // Clear session ID to force a fresh session on next attempt
+                agentLog.info(`Clearing session to retry with fresh session...`);
+                await saveTaskSessionId(taskId, undefined);
+              }
+
+              // Skip remaining git operations for this task
+              continue;
+            } else {
+              // Commit succeeded - clear retry counter
+              if (taskResult.taskId) {
+                commitRetryCount.delete(taskResult.taskId);
+              }
             }
           }
 
@@ -697,7 +744,7 @@ ${taskResult.gitConfig?.push_to_remote ? `6. Push the result: \`git push origin 
 // Orchestrator
 // =============================================================================
 
-export async function startOrchestrator(): Promise<void> {
+export async function startOrchestrator(agentOverride?: string): Promise<void> {
   logger.orchestrator.info("Checking repos...");
   const repos = await listRepos(BLOOM_DIR);
   if (repos.length === 0) {
@@ -786,15 +833,18 @@ export async function startOrchestrator(): Promise<void> {
     agents = new Set();
   }
 
-  await startTUI(agents);
+  await startTUI(agents, agentOverride);
 }
 
-async function startTUI(agents: Set<string>): Promise<void> {
+async function startTUI(agents: Set<string>, agentOverride?: string): Promise<void> {
   const agentConfigs: AgentConfig[] = [];
   // Always pass the tasks file explicitly since subprocesses run in BLOOM_DIR,
   // not the original pwd where the user ran `bloom run`
   // Note: Global flags must come AFTER the command name for Clerc CLI parsing
   const tasksFile = getTasksFile();
+
+  // If an agent override was specified via --agent flag, pass it to subprocesses
+  const agentEnv = agentOverride ? { BLOOM_AGENT_OVERRIDE: agentOverride } : undefined;
 
   // Dashboard pane (runs in-process - no subprocess needed)
   agentConfigs.push({
@@ -811,6 +861,7 @@ async function startTUI(agents: Set<string>): Promise<void> {
       name: agentName,
       command: ["bloom", "agent", "run", agentName, "-f", tasksFile],
       cwd: BLOOM_DIR,
+      env: agentEnv,
     });
   }
 
@@ -819,6 +870,7 @@ async function startTUI(agents: Set<string>): Promise<void> {
     name: FLOATING_AGENT,
     command: ["bloom", "agent", "run", FLOATING_AGENT, "-f", tasksFile],
     cwd: BLOOM_DIR,
+    env: agentEnv,
   });
 
   logger.orchestrator.info("Starting TUI...");

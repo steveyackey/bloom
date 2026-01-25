@@ -57,7 +57,12 @@ export async function buildReposContext(bloomDir: string): Promise<string> {
 /**
  * Runs a planning session with the AI.
  */
-export async function runPlanSession(workingDir: string, planFile: string, bloomDir: string): Promise<void> {
+export async function runPlanSession(
+  workingDir: string,
+  planFile: string,
+  bloomDir: string,
+  agentName?: string
+): Promise<void> {
   const gitRoot = findGitRoot() || workingDir;
 
   // Build repos context
@@ -73,7 +78,7 @@ export async function runPlanSession(workingDir: string, planFile: string, bloom
     bloomDir
   );
 
-  const agent = await createAgent("interactive");
+  const agent = await createAgent("interactive", { agentName });
 
   console.log(`${chalk.bold("Planning session")} - plan will be written to: ${chalk.cyan(planFile)}\n`);
 
@@ -94,7 +99,12 @@ export async function runPlanSession(workingDir: string, planFile: string, bloom
 /**
  * Runs a task generation session.
  */
-export async function runGenerateSession(workingDir: string, tasksFile: string, bloomDir: string): Promise<void> {
+export async function runGenerateSession(
+  workingDir: string,
+  tasksFile: string,
+  bloomDir: string,
+  agentName?: string
+): Promise<void> {
   // Build repos context
   const reposContext = await buildReposContext(bloomDir);
 
@@ -108,7 +118,7 @@ export async function runGenerateSession(workingDir: string, tasksFile: string, 
     bloomDir
   );
 
-  const agent = await createAgent("interactive");
+  const agent = await createAgent("interactive", { agentName });
 
   console.log(`${chalk.bold("Generate session")} - tasks will be written to: ${chalk.cyan(tasksFile)}\n`);
 
@@ -131,7 +141,12 @@ IMPORTANT: After writing tasks.yaml, you MUST validate it by running \`bloom val
 /**
  * Runs a refinement session for PRD or plan.
  */
-export async function runRefineSession(workingDir: string, selectedFile: RefineFile, bloomDir: string): Promise<void> {
+export async function runRefineSession(
+  workingDir: string,
+  selectedFile: RefineFile,
+  bloomDir: string,
+  agentName?: string
+): Promise<void> {
   // bloomDir is accepted for API consistency but not used directly in this function
   // (the refine session doesn't need repos context - it works on local project files)
   void bloomDir;
@@ -194,7 +209,7 @@ When helping the user:
 
 Focus on making documents clear, complete, and actionable.`;
 
-  const agent = await createAgent("interactive");
+  const agent = await createAgent("interactive", { agentName });
 
   console.log(`${chalk.bold("Refining:")} ${chalk.cyan(selectedFile.name)}\n`);
 

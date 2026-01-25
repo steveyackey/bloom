@@ -70,7 +70,7 @@ async function selectFileToRefine(workingDir: string): Promise<RefineFile | null
 // Command Handler
 // =============================================================================
 
-export async function cmdRefine(): Promise<void> {
+export async function cmdRefine(agentName?: string): Promise<void> {
   const workingDir = process.cwd();
 
   // Ask user which file to refine
@@ -91,7 +91,7 @@ export async function cmdRefine(): Promise<void> {
   console.log(chalk.dim("Pulling latest updates from default branches...\n"));
   await pullAndLogResults(BLOOM_DIR);
 
-  await runRefineSession(workingDir, selectedFile, BLOOM_DIR);
+  await runRefineSession(workingDir, selectedFile, BLOOM_DIR, agentName);
 
   console.log(chalk.dim(`\n---`));
   console.log(chalk.green("Refine session complete."));

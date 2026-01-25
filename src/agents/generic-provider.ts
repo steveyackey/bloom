@@ -197,12 +197,18 @@ export class GenericAgentProvider implements Agent {
         }
       }, this.heartbeatIntervalMs);
 
-      // Parse output
+      // Parse output based on format
+      // For "json" format (like goose), accumulate and parse at end
+      // For "stream-json" format (like claude), parse line by line
+      const format = this.definition.output.format;
+      const isBatchJson = format === "json";
+      let batchJsonBuffer = "";
+
       const processLine = (line: string) => {
         if (!line.trim()) return;
 
-        const format = this.definition.output.format;
-        if (format === "stream-json" || format === "json") {
+        if (format === "stream-json") {
+          // Stream JSON: each line is a complete JSON event
           try {
             const event = JSON.parse(line) as Record<string, unknown>;
             lastActivity = Date.now();
@@ -229,12 +235,56 @@ export class GenericAgentProvider implements Agent {
             }
             outputAccumulator.value += line;
           }
+        } else if (isBatchJson) {
+          // Batch JSON (goose): accumulate all output, parse at end
+          batchJsonBuffer += `${line}\n`;
+          lastActivity = Date.now();
+          session.lastActivity = lastActivity;
+          // Show progress indicator while waiting for batch output
+          if (this.streamOutput && line.trim().length > 0) {
+            // Only show brief status updates, not raw JSON
+            if (line.includes('"role"') && line.includes('"assistant"')) {
+              process.stdout.write(chalk.dim("[goose: processing...]\n"));
+            }
+          }
         } else {
           // Plain text
           if (this.streamOutput) {
             process.stdout.write(line);
           }
           outputAccumulator.value += line;
+        }
+      };
+
+      // Process batch JSON output at end of process
+      const processBatchJsonOutput = () => {
+        if (!batchJsonBuffer.trim()) return;
+
+        try {
+          const data = JSON.parse(batchJsonBuffer) as Record<string, unknown>;
+          lastActivity = Date.now();
+          session.lastActivity = lastActivity;
+
+          // Extract session ID
+          const sid = this.extractSessionId(data);
+          if (sid) {
+            sessionId = sid;
+            session.sessionId = sessionId;
+          }
+
+          this.onEvent?.(data);
+
+          if (this.streamOutput) {
+            this.renderBatchOutput(data, outputAccumulator, errorAccumulator);
+          } else {
+            this.extractBatchText(data, outputAccumulator);
+          }
+        } catch {
+          // Failed to parse as batch JSON, output raw
+          if (this.streamOutput) {
+            process.stdout.write(batchJsonBuffer);
+          }
+          outputAccumulator.value += batchJsonBuffer;
         }
       };
 
@@ -275,6 +325,11 @@ export class GenericAgentProvider implements Agent {
 
         if (buffer.trim()) {
           processLine(buffer);
+        }
+
+        // For batch JSON format, parse the complete output now
+        if (isBatchJson) {
+          processBatchJsonOutput();
         }
 
         const exitCode = code ?? 0;
@@ -522,6 +577,93 @@ export class GenericAgentProvider implements Agent {
           outputAccumulator.value += text;
         }
         break;
+      }
+    }
+  }
+
+  /**
+   * Render batch JSON output (goose format).
+   * Goose outputs a single JSON object with messages array at the end.
+   */
+  private renderBatchOutput(
+    data: Record<string, unknown>,
+    outputAccumulator: { value: string },
+    errorAccumulator: { value: string }
+  ): void {
+    // Handle goose-style output: { messages: [...], metadata: {...} }
+    const messages = data.messages as Array<{
+      role?: string;
+      content?: Array<{ type: string; text?: string }> | string;
+    }>;
+
+    if (Array.isArray(messages)) {
+      for (const msg of messages) {
+        if (msg.role === "assistant") {
+          // Render assistant messages
+          if (typeof msg.content === "string") {
+            process.stdout.write(msg.content);
+            outputAccumulator.value += msg.content;
+          } else if (Array.isArray(msg.content)) {
+            for (const block of msg.content) {
+              if (block.type === "text" && block.text) {
+                process.stdout.write(block.text);
+                outputAccumulator.value += block.text;
+              } else if (block.type === "tool_use" || block.type === "tool_call") {
+                const toolName = (block as Record<string, unknown>).name || "unknown";
+                process.stdout.write(`\n${chalk.cyan(`[tool: ${toolName}]`)}\n`);
+              } else if (block.type === "tool_result" || block.type === "tool_response") {
+                process.stdout.write(`${chalk.dim("[result]")}\n`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Handle metadata
+    const metadata = data.metadata as { total_tokens?: number; status?: string } | undefined;
+    if (metadata) {
+      if (metadata.total_tokens) {
+        process.stdout.write(`\n${chalk.dim(`[tokens: ${metadata.total_tokens}]`)}\n`);
+      }
+      if (metadata.status && metadata.status !== "completed") {
+        process.stdout.write(`${chalk.yellow(`[status: ${metadata.status}]`)}\n`);
+        if (metadata.status === "error" || metadata.status === "failed") {
+          errorAccumulator.value = `Agent ended with status: ${metadata.status}`;
+        }
+      }
+    }
+
+    // Check for error field
+    if (data.error) {
+      const errorMsg = typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+      process.stdout.write(`\n${chalk.red(`[ERROR: ${errorMsg}]`)}\n`);
+      errorAccumulator.value = errorMsg;
+    }
+  }
+
+  /**
+   * Extract text from batch JSON output (goose format).
+   */
+  private extractBatchText(data: Record<string, unknown>, outputAccumulator: { value: string }): void {
+    const messages = data.messages as Array<{
+      role?: string;
+      content?: Array<{ type: string; text?: string }> | string;
+    }>;
+
+    if (Array.isArray(messages)) {
+      for (const msg of messages) {
+        if (msg.role === "assistant") {
+          if (typeof msg.content === "string") {
+            outputAccumulator.value += msg.content;
+          } else if (Array.isArray(msg.content)) {
+            for (const block of msg.content) {
+              if (block.type === "text" && block.text) {
+                outputAccumulator.value += block.text;
+              }
+            }
+          }
+        }
       }
     }
   }

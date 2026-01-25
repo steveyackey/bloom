@@ -30,10 +30,18 @@ import { cmdAgents } from "../tasks";
 export function registerAgentCommands(cli: Clerc): Clerc {
   return cli
     .command("run", "Start the orchestrator with all agents", {
+      flags: {
+        agent: {
+          type: String,
+          short: "a",
+          description: "Override the default agent for task execution",
+        },
+      },
       help: { group: "workflow" },
     })
-    .on("run", async () => {
-      await startOrchestrator();
+    .on("run", async (ctx) => {
+      const agent = ctx.flags.agent as string | undefined;
+      await startOrchestrator(agent);
     })
     .command("agent run", "Run a specific agent's work loop", {
       parameters: [

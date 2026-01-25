@@ -13,7 +13,7 @@ import { BLOOM_DIR } from "./context";
 // Command Handler
 // =============================================================================
 
-export async function cmdGenerate(): Promise<void> {
+export async function cmdGenerate(agentName?: string): Promise<void> {
   const workingDir = process.cwd();
   const planFile = join(workingDir, "plan.md");
   const tasksFile = join(workingDir, "tasks.yaml");
@@ -28,7 +28,7 @@ export async function cmdGenerate(): Promise<void> {
   console.log(chalk.dim("Pulling latest updates from default branches...\n"));
   await pullAndLogResults(BLOOM_DIR);
 
-  await runGenerateSession(workingDir, tasksFile, BLOOM_DIR);
+  await runGenerateSession(workingDir, tasksFile, BLOOM_DIR, agentName);
 
   console.log(chalk.dim(`\n---`));
   console.log(`${chalk.green("Tasks generated to:")} ${chalk.cyan(tasksFile)}`);

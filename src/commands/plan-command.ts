@@ -16,7 +16,7 @@ export { buildReposContext, runPlanSession } from "../services/planning-service"
 // Command Handler
 // =============================================================================
 
-export async function cmdPlan(): Promise<void> {
+export async function cmdPlan(agentName?: string): Promise<void> {
   const workingDir = process.cwd();
   const planFile = join(workingDir, "plan.md");
   const prdPath = join(workingDir, "PRD.md");
@@ -31,7 +31,7 @@ export async function cmdPlan(): Promise<void> {
   console.log(chalk.dim("Pulling latest updates from default branches...\n"));
   await pullAndLogResults(BLOOM_DIR);
 
-  await runPlanSession(workingDir, planFile, BLOOM_DIR);
+  await runPlanSession(workingDir, planFile, BLOOM_DIR, agentName);
 
   console.log(chalk.dim(`\n---`));
   console.log(`${chalk.green("Plan saved to:")} ${chalk.cyan(planFile)}`);

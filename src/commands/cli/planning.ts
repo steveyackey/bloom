@@ -23,29 +23,46 @@ import { cmdRefine } from "../refine";
  * - enter: Open Claude Code session in project context
  */
 export function registerPlanningCommands(cli: Clerc): Clerc {
+  // Common agent flag definition
+  const agentFlag = {
+    agent: {
+      type: String,
+      short: "a",
+      description: "Override the default agent for this command",
+    },
+  };
+
   return cli
     .command("plan", "Generate implementation plan from PRD", {
+      flags: agentFlag,
       help: { group: "workflow" },
     })
-    .on("plan", async () => {
-      await cmdPlan();
+    .on("plan", async (ctx) => {
+      const agent = ctx.flags.agent as string | undefined;
+      await cmdPlan(agent);
     })
     .command("refine", "Interactively refine project documents", {
+      flags: agentFlag,
       help: { group: "workflow" },
     })
-    .on("refine", async () => {
-      await cmdRefine();
+    .on("refine", async (ctx) => {
+      const agent = ctx.flags.agent as string | undefined;
+      await cmdRefine(agent);
     })
     .command("generate", "Generate tasks.yaml from implementation plan", {
+      flags: agentFlag,
       help: { group: "workflow" },
     })
-    .on("generate", async () => {
-      await cmdGenerate();
+    .on("generate", async (ctx) => {
+      const agent = ctx.flags.agent as string | undefined;
+      await cmdGenerate(agent);
     })
     .command("enter", "Open Claude Code session in project context", {
+      flags: agentFlag,
       help: { group: "system" },
     })
-    .on("enter", async () => {
-      await cmdEnter();
+    .on("enter", async (ctx) => {
+      const agent = ctx.flags.agent as string | undefined;
+      await cmdEnter(agent);
     });
 }

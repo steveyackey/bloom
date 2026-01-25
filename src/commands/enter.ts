@@ -12,7 +12,7 @@ import { findGitRoot } from "./context";
 // Run Enter Session
 // =============================================================================
 
-export async function runEnterSession(workingDir: string): Promise<void> {
+export async function runEnterSession(workingDir: string, agentName?: string): Promise<void> {
   const gitRoot = findGitRoot() || workingDir;
 
   const systemPrompt = `You are working in a Bloom project.
@@ -24,7 +24,7 @@ This is an open-ended session - help the user with whatever they need.
 
 You have access to the entire git repository for context, but you're starting in the project directory.`;
 
-  const agent = await createAgent("interactive");
+  const agent = await createAgent("interactive", { agentName });
 
   await agent.run({
     systemPrompt,
@@ -37,7 +37,7 @@ You have access to the entire git repository for context, but you're starting in
 // Command Handler
 // =============================================================================
 
-export async function cmdEnter(): Promise<void> {
+export async function cmdEnter(agentName?: string): Promise<void> {
   const workingDir = process.cwd();
 
   // Show what files exist in the project
@@ -45,7 +45,8 @@ export async function cmdEnter(): Promise<void> {
   const hasPlan = existsSync(join(workingDir, "plan.md"));
   const hasTasks = existsSync(join(workingDir, "tasks.yaml"));
 
-  console.log(`${chalk.bold.cyan("Entering Claude Code in:")} ${chalk.dim(workingDir)}\n`);
+  const agentDisplay = agentName ? ` (using ${agentName})` : "";
+  console.log(`${chalk.bold.cyan("Entering session in:")} ${chalk.dim(workingDir)}${chalk.cyan(agentDisplay)}\n`);
 
   if (hasPrd || hasPlan || hasTasks) {
     console.log(chalk.bold("Project files:"));
@@ -55,5 +56,5 @@ export async function cmdEnter(): Promise<void> {
     console.log("");
   }
 
-  await runEnterSession(workingDir);
+  await runEnterSession(workingDir, agentName);
 }
