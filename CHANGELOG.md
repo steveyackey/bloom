@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.3.0](https://github.com/steveyackey/bloom/compare/bloom-v0.2.8...bloom-v0.3.0) (2026-01-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* Config format changed from legacy interactiveAgent/nonInteractiveAgent to new agent.defaultInteractive/defaultNonInteractive structure
+
+### Features
+
+* add --agent flag and improve goose JSON output parsing ([a80e4eb](https://github.com/steveyackey/bloom/commit/a80e4ebc5e3ca1f372d7d5b7e82dff04f39d60a4))
+* add agent check and validate commands ([7e2ee38](https://github.com/steveyackey/bloom/commit/7e2ee387bf0f9135a93cc601023ff09f1fb17a2d))
+* add bloom view command for visual DAG inspector ([281e84c](https://github.com/steveyackey/bloom/commit/281e84cd9878f26844b39aa1e371908444a734c8))
+* add demo script and e2e tests for test agent ([7c21abd](https://github.com/steveyackey/bloom/commit/7c21abd8779a9a6ccf1659282ae80c012797e09d))
+* add Goose agent provider support ([ced1438](https://github.com/steveyackey/bloom/commit/ced1438f0617fc322ef1f6736c0bc63d6571e911))
+* add Goose to docs navigation sidebar ([1b2c1c5](https://github.com/steveyackey/bloom/commit/1b2c1c570e04c0afc1b04ad4d6bb67d328536b6d))
+* add model discovery for copilot and static models for claude ([9114d2b](https://github.com/steveyackey/bloom/commit/9114d2bdbdcd0963a46543649887ed1a05deb86e))
+* add test agent for e2e testing without LLM ([3c352b2](https://github.com/steveyackey/bloom/commit/3c352b2573e5245235449c4f00aa526983f5ced8))
+* add YAML schema-based agent definition system ([ca64799](https://github.com/steveyackey/bloom/commit/ca6479940fb88403b43938f2041767f9ba7726c9))
+* refactor agent config with separate interactive/non-interactive defaults ([361fa5e](https://github.com/steveyackey/bloom/commit/361fa5eb12688b890712f32c586aed539f6c9443))
+* remove Cline agent support and add ADDING_NEW_AGENTS guide ([e8b4f19](https://github.com/steveyackey/bloom/commit/e8b4f19564c25061aee546256a38b447f433a42a))
+* set GOOSE_MODE=auto for goose autonomous execution ([9b0157d](https://github.com/steveyackey/bloom/commit/9b0157d87b4860225d2704b5d21d2794b3d80550))
+* **view:** show working directory in prompt preview ([6463c9f](https://github.com/steveyackey/bloom/commit/6463c9fc43bef174fc3d537c3f9f5d17a0138861))
+* **view:** show working directory in prompt preview ([ce75d11](https://github.com/steveyackey/bloom/commit/ce75d117490e88bae1ae5fea6e8f092ccb8d29bc))
+
+
+### Bug Fixes
+
+* always pass --with-builtin developer to goose ([54f9216](https://github.com/steveyackey/bloom/commit/54f921640aa97685edd14a21ee3b6c7805edc0ff))
+* detect API errors in plain text output for session recovery ([b99bade](https://github.com/steveyackey/bloom/commit/b99bade3dc8af758f03e73135a4a4eb9ef253b8b))
+* handle goose toolResponse camelCase content blocks ([90d7fa9](https://github.com/steveyackey/bloom/commit/90d7fa91cd470264bc0005428fd6bdb4c44a3a8a))
+* more aggressive session clearing on resume failures ([05376f3](https://github.com/steveyackey/bloom/commit/05376f37d6f7013a0d6c3870fcfcad93f0c5b963))
+* prevent infinite loop when agent fails to commit changes ([b8f9a6e](https://github.com/steveyackey/bloom/commit/b8f9a6e7054091745b222e4feecd2e5dcb8469fa))
+* resolve TypeScript errors in e2e tests ([1b53c5b](https://github.com/steveyackey/bloom/commit/1b53c5bda3a4310cca4c20dbfa28acc20c7734e1))
+* update OpenCode JSON parsing for stream-json format ([504b925](https://github.com/steveyackey/bloom/commit/504b9256b17b65d27035f7f540476ea7e83da208))
+* use --yolo flag for copilot approval bypass ([456f067](https://github.com/steveyackey/bloom/commit/456f067f4461291dc7926d3a4547cf8f45936886))
+* use correct help group syntax for view command ([1ea5482](https://github.com/steveyackey/bloom/commit/1ea5482b9e667d785f50b04c688e392536fbddac))
+
+
+### Documentation
+
+* add agent validation steps to ADDING_NEW_AGENTS.md ([5e5e4ce](https://github.com/steveyackey/bloom/commit/5e5e4ce51829802c47cfb2728e92c4318f3454fb))
+* add animated demo to README, docs, and landing page ([837cf15](https://github.com/steveyackey/bloom/commit/837cf15e1b57e1b964893c212790eecece4a77ce))
+* add bloom view command documentation ([689c34b](https://github.com/steveyackey/bloom/commit/689c34b0235818cb0881096a8e7132452b1885e3))
+* add sample tasks and view preview for screenshots ([ed9c37f](https://github.com/steveyackey/bloom/commit/ed9c37f576febcdfd65bd92b918f904558bdfb64))
+* clarify how capabilities are used in ADDING_NEW_AGENTS guide ([3af03a3](https://github.com/steveyackey/bloom/commit/3af03a3a628f6514a2aa09b09053532324701752))
+* clarify non-interactive and approval bypass as required for agents ([2eef420](https://github.com/steveyackey/bloom/commit/2eef4201e09b064cebb0963706deb968b8d09ece))
+* show real install in demo, remove unused VHS file ([81dd270](https://github.com/steveyackey/bloom/commit/81dd270692b44ff021d2f593e41f5e88462c78d9))
+* update all documentation for new agent config system ([a7de2e5](https://github.com/steveyackey/bloom/commit/a7de2e533c0a1b1767411e4092a76a62953ec913))
+* update Copilot CLI documentation link ([58a2fdc](https://github.com/steveyackey/bloom/commit/58a2fdc248caf7edb4fcd4c5f7a183ac369e0b34))
+* update demo with full Bloom workflow ([51de8aa](https://github.com/steveyackey/bloom/commit/51de8aa9b2e9782ad3ecaf5c1b4d99c9a2a17b89))
+
 ## [0.2.8](https://github.com/steveyackey/bloom/compare/bloom-v0.2.7...bloom-v0.2.8) (2026-01-24)
 
 
