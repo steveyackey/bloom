@@ -1,184 +1,12 @@
 // =============================================================================
-// Terminal/PTY Abstraction Layer
+// Process Stats Utilities
 // =============================================================================
-// Uses Bun.spawn with terminal option on non-Windows (faster, built-in)
-// Uses bun-pty on Windows as a fallback
-//
-// Build with: --feature WINDOWS for Windows builds
+// Provides utilities for getting CPU and memory statistics of processes.
 
 import { feature } from "bun:bundle";
 
 // =============================================================================
-// Interface
-// =============================================================================
-
-export interface TerminalProcess {
-  /** Write data to the terminal stdin */
-  write(data: string): void;
-  /** Resize the terminal */
-  resize(cols: number, rows: number): void;
-  /** Kill the process */
-  kill(signal?: string): void;
-  /** Promise that resolves with exit code when process exits */
-  readonly exited: Promise<number>;
-  /** Process ID (if available) */
-  readonly pid?: number;
-}
-
-export interface TerminalSpawnOptions {
-  cwd: string;
-  env?: Record<string, string>;
-  cols: number;
-  rows: number;
-  /** Called when data is received from the terminal */
-  onData: (data: string) => void;
-  /** Called when process exits */
-  onExit?: (code: number) => void;
-}
-
-// =============================================================================
-// Bun.spawn Terminal Backend (non-Windows)
-// =============================================================================
-
-function spawnWithBunTerminal(command: string[], options: TerminalSpawnOptions): TerminalProcess {
-  // NOTE: Do NOT set stdin: "pipe" when using terminal mode.
-  // The terminal mode creates a PTY that handles all I/O (stdin, stdout, stderr).
-  // Setting stdin: "pipe" separately can interfere with the PTY's output capture,
-  // causing writes to process.stdout in the subprocess to not appear in the
-  // terminal.data callback.
-  const proc = Bun.spawn(command, {
-    cwd: options.cwd,
-    env: { ...process.env, ...options.env } as Record<string, string>,
-    terminal: {
-      cols: options.cols,
-      rows: options.rows,
-      name: "xterm-256color",
-      data: (_term, data) => {
-        const text = new TextDecoder().decode(data);
-        options.onData(text);
-      },
-    },
-  });
-
-  const exitedPromise = proc.exited.then((code) => {
-    options.onExit?.(code);
-    return code;
-  });
-
-  return {
-    write(data: string) {
-      proc.terminal?.write(data);
-    },
-    resize(cols: number, rows: number) {
-      try {
-        proc.terminal?.resize(cols, rows);
-      } catch {
-        // Ignore resize errors (process may have exited)
-      }
-    },
-    kill(signal?: string) {
-      proc.kill(signal ? (signal as NodeJS.Signals) : undefined);
-    },
-    get exited() {
-      return exitedPromise;
-    },
-    get pid() {
-      return proc.pid;
-    },
-  };
-}
-
-// =============================================================================
-// bun-pty Backend (Windows) - only included when building with --feature WINDOWS
-// =============================================================================
-
-let spawnWithBunPty: ((command: string[], options: TerminalSpawnOptions) => Promise<TerminalProcess>) | null = null;
-
-if (feature("WINDOWS")) {
-  // This entire block is eliminated at compile time for non-Windows builds
-  const pty = require("bun-pty");
-
-  spawnWithBunPty = async (command: string[], options: TerminalSpawnOptions): Promise<TerminalProcess> => {
-    const [cmd, ...args] = command;
-    if (!cmd) {
-      throw new Error("Command is required");
-    }
-
-    // Filter out undefined values from env
-    const env: Record<string, string> = {};
-    for (const [key, value] of Object.entries({ ...process.env, ...options.env })) {
-      if (value !== undefined) {
-        env[key] = value;
-      }
-    }
-
-    const proc = pty.spawn(cmd, args, {
-      name: "xterm-256color",
-      cols: options.cols,
-      rows: options.rows,
-      cwd: options.cwd,
-      env,
-    });
-
-    // Set up data handler
-    const dataDisposable = proc.onData((data: string) => {
-      options.onData(data);
-    });
-
-    // Create exit promise
-    const exitedPromise = new Promise<number>((resolve) => {
-      proc.onExit((exitCode: number) => {
-        dataDisposable.dispose();
-        options.onExit?.(exitCode);
-        resolve(exitCode);
-      });
-    });
-
-    return {
-      write(data: string) {
-        proc.write(data);
-      },
-      resize(cols: number, rows: number) {
-        try {
-          proc.resize(cols, rows);
-        } catch {
-          // Ignore resize errors
-        }
-      },
-      kill(signal?: string) {
-        proc.kill(signal);
-      },
-      get exited() {
-        return exitedPromise;
-      },
-      get pid() {
-        return proc.pid;
-      },
-    };
-  };
-}
-
-// =============================================================================
-// Public API
-// =============================================================================
-
-/**
- * Spawn a command in a pseudo-terminal.
- * Uses Bun.spawn with terminal option on non-Windows (faster, smaller).
- * Uses bun-pty on Windows (requires building with --feature WINDOWS).
- */
-export async function spawnTerminal(command: string[], options: TerminalSpawnOptions): Promise<TerminalProcess> {
-  if (feature("WINDOWS")) {
-    if (!spawnWithBunPty) {
-      throw new Error("Windows support not compiled in. Build with --feature WINDOWS");
-    }
-    return spawnWithBunPty(command, options);
-  }
-  return spawnWithBunTerminal(command, options);
-}
-
-// =============================================================================
-// Process Stats
+// Types
 // =============================================================================
 
 export interface ProcessStats {
@@ -187,6 +15,10 @@ export interface ProcessStats {
   /** Memory usage in MB */
   memory: number;
 }
+
+// =============================================================================
+// Implementation
+// =============================================================================
 
 // Windows CPU delta tracking - stores previous CPU time and timestamp per PID
 const windowsCpuHistory = new Map<number, { cpuTime: number; timestamp: number }>();

@@ -10,8 +10,14 @@ Start the multi-agent orchestrator.
 ## Usage
 
 ```bash
-bloom run
+bloom run [--agent <provider>]
 ```
+
+## Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--agent` | `-a` | Override the default agent provider (e.g., `claude`, `copilot`, `codex`, `goose`, `opencode`, `test`) |
 
 ## Description
 
@@ -147,6 +153,16 @@ bloom run
 ```bash
 cd my-project
 bloom run
+```
+
+### Use a Different Agent
+
+```bash
+# Use Copilot instead of the default agent
+bloom run --agent copilot
+
+# Use the test agent for development/CI
+bloom run --agent test
 ```
 
 ### Monitor in Another Terminal

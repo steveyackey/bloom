@@ -127,7 +127,6 @@ These are called automatically by other commands or the orchestrator. Listed for
 
 | Command | Purpose |
 |---------|---------|
-| `bloom agent run <name>` | Run single agent (debugging) |
 | `bloom agent list` | List agent configs |
 | `bloom todo <taskid>` | Reset status to todo |
 | `bloom clear-answered` | Clean up question queue |

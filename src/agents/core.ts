@@ -45,6 +45,12 @@ export interface AgentRunOptions {
   taskId?: string;
   /** Session ID to resume a previous session */
   sessionId?: string;
+  /** Callback for streaming output from the agent process */
+  onOutput?: (data: string) => void;
+  /** Callback when the agent subprocess starts */
+  onProcessStart?: (pid: number, command: string) => void;
+  /** Callback when the agent subprocess ends */
+  onProcessEnd?: (pid: number, exitCode: number | null) => void;
 }
 
 /**

@@ -20,11 +20,8 @@ This enables:
 ### Via Bloom
 
 ```bash
-# Run with test agent
+# Run orchestrator TUI with test agent
 bloom run --agent test
-
-# Interactive mode
-bloom interactive --agent test
 ```
 
 ### Direct CLI Usage
