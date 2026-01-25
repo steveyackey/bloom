@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.3](https://github.com/steveyackey/bloom/compare/bloom-v0.3.2...bloom-v0.3.3) (2026-01-25)
+
+
+### Features
+
+* add steps display to bloom view and TUI dashboard ([3c6de69](https://github.com/steveyackey/bloom/commit/3c6de697569e1768dd85cd38a8cf42a5b2288464))
+
+
+### Bug Fixes
+
+* improve session handling and add TUI questions/dashboard ([62811f9](https://github.com/steveyackey/bloom/commit/62811f930fcf780af8a391aeec5ec0849e4710c7))
+
 ## [0.3.2](https://github.com/steveyackey/bloom/compare/bloom-v0.3.1...bloom-v0.3.2) (2026-01-25)
 
 
