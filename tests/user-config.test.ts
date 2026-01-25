@@ -3,14 +3,21 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  AgentConfigSchema,
   expandRepoUrl,
   extractRepoInfo,
   extractRepoName,
+  getConfiguredModels,
+  getDefaultInteractiveAgent,
+  getDefaultModel,
+  getDefaultNonInteractiveAgent,
   isShorthandUrl,
   loadUserConfig,
   normalizeGitUrl,
   saveUserConfig,
+  setAgentDefaultModel,
+  setAgentModels,
+  setDefaultInteractiveAgent,
+  setDefaultNonInteractiveAgent,
 } from "../src/user-config";
 
 describe("user-config Git URL functions", () => {
@@ -227,59 +234,44 @@ describe("user-config file operations", () => {
     test("returns defaults when no config file exists", async () => {
       const config = await loadUserConfig();
       expect(config.gitProtocol).toBe("ssh");
-      expect(config.interactiveAgent).toBeUndefined();
-      expect(config.nonInteractiveAgent).toBeUndefined();
+      expect(getDefaultInteractiveAgent(config)).toBe("claude");
+      expect(getDefaultNonInteractiveAgent(config)).toBe("claude");
     });
 
-    test("loads valid full config with both agents", async () => {
+    test("loads valid config with agent section", async () => {
       await saveUserConfig({
         gitProtocol: "https",
-        interactiveAgent: { agent: "claude", model: "opus" },
-        nonInteractiveAgent: { agent: "openai", model: "gpt-4" },
+        agent: {
+          defaultInteractive: "goose",
+          defaultNonInteractive: "claude",
+          claude: {
+            defaultModel: "claude-sonnet-4",
+            models: ["claude-sonnet-4", "claude-opus-4"],
+          },
+        },
       });
 
       const config = await loadUserConfig();
       expect(config.gitProtocol).toBe("https");
-      expect(config.interactiveAgent).toEqual({ agent: "claude", model: "opus" });
-      expect(config.nonInteractiveAgent).toEqual({ agent: "openai", model: "gpt-4" });
+      expect(getDefaultInteractiveAgent(config)).toBe("goose");
+      expect(getDefaultNonInteractiveAgent(config)).toBe("claude");
+      expect(getDefaultModel(config, "claude")).toBe("claude-sonnet-4");
+      expect(getConfiguredModels(config, "claude")).toEqual(["claude-sonnet-4", "claude-opus-4"]);
     });
 
-    test("loads config with only interactiveAgent specified", async () => {
+    test("loads config with only defaultInteractive specified", async () => {
       await saveUserConfig({
         gitProtocol: "ssh",
-        interactiveAgent: { agent: "custom-agent" },
+        agent: {
+          defaultInteractive: "goose",
+          defaultNonInteractive: "claude",
+        },
       });
 
       const config = await loadUserConfig();
       expect(config.gitProtocol).toBe("ssh");
-      expect(config.interactiveAgent).toEqual({ agent: "custom-agent" });
-      expect(config.nonInteractiveAgent).toBeUndefined();
-    });
-
-    test("loads config with only nonInteractiveAgent specified", async () => {
-      await saveUserConfig({
-        gitProtocol: "ssh",
-        nonInteractiveAgent: { agent: "batch-agent", model: "fast" },
-      });
-
-      const config = await loadUserConfig();
-      expect(config.gitProtocol).toBe("ssh");
-      expect(config.interactiveAgent).toBeUndefined();
-      expect(config.nonInteractiveAgent).toEqual({ agent: "batch-agent", model: "fast" });
-    });
-
-    test("loads config without model specified (uses agent only)", async () => {
-      await saveUserConfig({
-        gitProtocol: "ssh",
-        interactiveAgent: { agent: "my-agent" },
-        nonInteractiveAgent: { agent: "other-agent" },
-      });
-
-      const config = await loadUserConfig();
-      expect(config.interactiveAgent?.agent).toBe("my-agent");
-      expect(config.interactiveAgent?.model).toBeUndefined();
-      expect(config.nonInteractiveAgent?.agent).toBe("other-agent");
-      expect(config.nonInteractiveAgent?.model).toBeUndefined();
+      expect(getDefaultInteractiveAgent(config)).toBe("goose");
+      expect(getDefaultNonInteractiveAgent(config)).toBe("claude");
     });
 
     test("returns defaults when config file has invalid YAML", async () => {
@@ -288,77 +280,91 @@ describe("user-config file operations", () => {
 
       const config = await loadUserConfig();
       expect(config.gitProtocol).toBe("ssh");
-      expect(config.interactiveAgent).toBeUndefined();
-      expect(config.nonInteractiveAgent).toBeUndefined();
-    });
-
-    test("handles config with extra unknown fields gracefully", async () => {
-      // Write config with extra fields that should be stripped
-      const yaml = `gitProtocol: https
-interactiveAgent:
-  agent: claude
-  model: sonnet
-unknownField: should-be-ignored
-`;
-      await Bun.write(join(testHomeDir, "config.yaml"), yaml);
-
-      const config = await loadUserConfig();
-      expect(config.gitProtocol).toBe("https");
-      expect(config.interactiveAgent?.agent).toBe("claude");
-      // Unknown fields should be stripped by Zod
-      expect((config as Record<string, unknown>).unknownField).toBeUndefined();
+      expect(getDefaultInteractiveAgent(config)).toBe("claude");
     });
   });
 
-  describe("AgentConfigSchema validation", () => {
-    test("parses valid agent config with agent and model", () => {
-      const result = AgentConfigSchema.safeParse({ agent: "claude", model: "opus" });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.agent).toBe("claude");
-        expect(result.data.model).toBe("opus");
-      }
+  describe("agent config setters", () => {
+    test("setDefaultInteractiveAgent creates agent section if missing", async () => {
+      await setDefaultInteractiveAgent("goose");
+      const config = await loadUserConfig();
+      expect(getDefaultInteractiveAgent(config)).toBe("goose");
     });
 
-    test("applies default agent value when agent is missing", () => {
-      const result = AgentConfigSchema.safeParse({});
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.agent).toBe("claude");
-        expect(result.data.model).toBeUndefined();
-      }
+    test("setDefaultNonInteractiveAgent creates agent section if missing", async () => {
+      await setDefaultNonInteractiveAgent("opencode");
+      const config = await loadUserConfig();
+      expect(getDefaultNonInteractiveAgent(config)).toBe("opencode");
     });
 
-    test("accepts any string as agent name", () => {
-      const validNames = ["claude", "openai", "custom-agent", "my_agent_123", ""];
-      for (const name of validNames) {
-        const result = AgentConfigSchema.safeParse({ agent: name });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.agent).toBe(name);
-        }
-      }
+    test("setAgentDefaultModel creates agent config if missing", async () => {
+      await setAgentDefaultModel("claude", "claude-opus-4");
+      const config = await loadUserConfig();
+      expect(getDefaultModel(config, "claude")).toBe("claude-opus-4");
+      expect(getConfiguredModels(config, "claude")).toContain("claude-opus-4");
     });
 
-    test("rejects non-string agent values", () => {
-      const invalidValues = [123, true, null, [], {}];
-      for (const value of invalidValues) {
-        const result = AgentConfigSchema.safeParse({ agent: value });
-        expect(result.success).toBe(false);
-      }
+    test("setAgentDefaultModel adds model to existing list", async () => {
+      await saveUserConfig({
+        gitProtocol: "ssh",
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "claude",
+          claude: {
+            defaultModel: "claude-sonnet-4",
+            models: ["claude-sonnet-4"],
+          },
+        },
+      });
+
+      await setAgentDefaultModel("claude", "claude-opus-4");
+      const config = await loadUserConfig();
+      expect(getDefaultModel(config, "claude")).toBe("claude-opus-4");
+      expect(getConfiguredModels(config, "claude")).toContain("claude-sonnet-4");
+      expect(getConfiguredModels(config, "claude")).toContain("claude-opus-4");
     });
 
-    test("accepts optional model as string", () => {
-      const result = AgentConfigSchema.safeParse({ agent: "claude", model: "sonnet-3.5" });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.model).toBe("sonnet-3.5");
-      }
+    test("setAgentModels replaces model list", async () => {
+      await setAgentModels("claude", ["model-a", "model-b", "model-c"]);
+      const config = await loadUserConfig();
+      expect(getConfiguredModels(config, "claude")).toEqual(["model-a", "model-b", "model-c"]);
+      expect(getDefaultModel(config, "claude")).toBe("model-a");
     });
 
-    test("rejects non-string model values", () => {
-      const result = AgentConfigSchema.safeParse({ agent: "claude", model: 123 });
-      expect(result.success).toBe(false);
+    test("setAgentModels preserves default if still in list", async () => {
+      await saveUserConfig({
+        gitProtocol: "ssh",
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "claude",
+          claude: {
+            defaultModel: "model-b",
+            models: ["model-a", "model-b"],
+          },
+        },
+      });
+
+      await setAgentModels("claude", ["model-b", "model-c", "model-d"]);
+      const config = await loadUserConfig();
+      expect(getDefaultModel(config, "claude")).toBe("model-b");
+    });
+
+    test("setAgentModels changes default if not in new list", async () => {
+      await saveUserConfig({
+        gitProtocol: "ssh",
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "claude",
+          claude: {
+            defaultModel: "old-model",
+            models: ["old-model"],
+          },
+        },
+      });
+
+      await setAgentModels("claude", ["new-model-a", "new-model-b"]);
+      const config = await loadUserConfig();
+      expect(getDefaultModel(config, "claude")).toBe("new-model-a");
     });
   });
 });

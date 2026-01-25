@@ -62,9 +62,9 @@ describe("Orchestrator Agent Selection", () => {
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("createAgent agentName option takes precedence over config agent.default", async () => {
+    test("createAgent agentName option takes precedence over config defaults", async () => {
       await writeConfig({
-        agent: { default: "claude" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("nonInteractive", { agentName: "goose" });
       expect(agent).toBeInstanceOf(GenericAgentProvider);

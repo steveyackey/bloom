@@ -63,34 +63,33 @@ describe("agent factory", () => {
   });
 
   describe("interactive mode selection", () => {
-    test("respects interactiveAgent config for claude", async () => {
+    test("respects defaultInteractive config for claude", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "claude" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("respects interactiveAgent config for opencode", async () => {
+    test("respects defaultInteractive config for opencode", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "opencode" },
+        agent: { defaultInteractive: "opencode", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("respects interactiveAgent config for goose", async () => {
+    test("respects defaultInteractive config for goose", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "goose" },
+        agent: { defaultInteractive: "goose", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("uses interactiveAgent config only for interactive mode", async () => {
+    test("uses defaultInteractive config only for interactive mode", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "opencode" },
-        nonInteractiveAgent: { agent: "claude" },
+        agent: { defaultInteractive: "opencode", defaultNonInteractive: "claude" },
       });
       const interactiveAgent = await createAgent("interactive");
       expect(interactiveAgent).toBeInstanceOf(GenericAgentProvider);
@@ -98,34 +97,33 @@ describe("agent factory", () => {
   });
 
   describe("nonInteractive mode selection", () => {
-    test("respects nonInteractiveAgent config for claude", async () => {
+    test("respects defaultNonInteractive config for claude", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "claude" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("respects nonInteractiveAgent config for opencode", async () => {
+    test("respects defaultNonInteractive config for opencode", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "opencode" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "opencode" },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("respects nonInteractiveAgent config for goose", async () => {
+    test("respects defaultNonInteractive config for goose", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "goose" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "goose" },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("uses nonInteractiveAgent config only for nonInteractive mode", async () => {
+    test("uses defaultNonInteractive config only for nonInteractive mode", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "claude" },
-        nonInteractiveAgent: { agent: "opencode" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "opencode" },
       });
       const nonInteractiveAgent = await createAgent("nonInteractive");
       expect(nonInteractiveAgent).toBeInstanceOf(GenericAgentProvider);
@@ -133,10 +131,14 @@ describe("agent factory", () => {
   });
 
   describe("model passthrough", () => {
-    test("passes model to GenericAgentProvider", async () => {
+    test("passes model to GenericAgentProvider via per-agent config", async () => {
       const customModel = "custom-model-123";
       await writeConfig({
-        nonInteractiveAgent: { agent: "opencode", model: customModel },
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "opencode",
+          opencode: { defaultModel: customModel },
+        },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
@@ -146,16 +148,19 @@ describe("agent factory", () => {
 
     test("creates agent when model is provided for claude", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "claude", model: "opus" },
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "claude",
+          claude: { defaultModel: "opus" },
+        },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
-      // GenericAgentProvider doesn't currently use model, but should not error
     });
 
     test("creates agent when model is undefined", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "opencode" },
+        agent: { defaultInteractive: "opencode", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
@@ -165,47 +170,51 @@ describe("agent factory", () => {
   describe("unknown agent name validation", () => {
     test("throws error for unknown agent name", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "unknown-agent" },
+        agent: { defaultInteractive: "unknown-agent", defaultNonInteractive: "claude" },
       });
       await expect(createAgent("interactive")).rejects.toThrow("Unknown agent");
     });
 
     test("throws error for nonInteractive unknown agent", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "nonexistent-provider" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "nonexistent-provider" },
       });
       await expect(createAgent("nonInteractive")).rejects.toThrow("Unknown agent");
     });
 
     test("throws error for empty agent name", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "" },
+        agent: { defaultInteractive: "", defaultNonInteractive: "claude" },
       });
       await expect(createAgent("interactive")).rejects.toThrow("Unknown agent");
     });
   });
 
   describe("codex agent selection", () => {
-    test("respects interactiveAgent config for codex", async () => {
+    test("respects defaultInteractive config for codex", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "codex" },
+        agent: { defaultInteractive: "codex", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("respects nonInteractiveAgent config for codex", async () => {
+    test("respects defaultNonInteractive config for codex", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "codex" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "codex" },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("passes model to GenericAgentProvider", async () => {
+    test("passes model to GenericAgentProvider via per-agent config", async () => {
       const customModel = "gpt-4o";
       await writeConfig({
-        nonInteractiveAgent: { agent: "codex", model: customModel },
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "codex",
+          codex: { defaultModel: customModel },
+        },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
@@ -213,25 +222,29 @@ describe("agent factory", () => {
   });
 
   describe("copilot mode selection", () => {
-    test("respects interactiveAgent config for copilot", async () => {
+    test("respects defaultInteractive config for copilot", async () => {
       await writeConfig({
-        interactiveAgent: { agent: "copilot" },
+        agent: { defaultInteractive: "copilot", defaultNonInteractive: "claude" },
       });
       const agent = await createAgent("interactive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("respects nonInteractiveAgent config for copilot", async () => {
+    test("respects defaultNonInteractive config for copilot", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "copilot" },
+        agent: { defaultInteractive: "claude", defaultNonInteractive: "copilot" },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("passes model to GenericAgentProvider", async () => {
+    test("passes model to GenericAgentProvider via per-agent config", async () => {
       await writeConfig({
-        nonInteractiveAgent: { agent: "copilot", model: "claude" },
+        agent: {
+          defaultInteractive: "claude",
+          defaultNonInteractive: "copilot",
+          copilot: { defaultModel: "claude" },
+        },
       });
       const agent = await createAgent("nonInteractive");
       expect(agent).toBeInstanceOf(GenericAgentProvider);

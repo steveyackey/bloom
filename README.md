@@ -262,12 +262,31 @@ bloom agents                 # List agents and their assigned tasks
 ### Configuration
 
 ```bash
-bloom config                 # Show user config (~/.bloom/config.yaml)
-bloom config set-protocol <ssh|https>  # Change git URL preference (SSH or HTTPS)
-bloom config set-default <agent>       # Change default agent (claude, goose, etc.)
+bloom config                              # Show user config
+bloom config set-protocol <ssh|https>     # Set git URL preference
+bloom config set-interactive <agent>      # Set default interactive agent
+bloom config set-noninteractive <agent>   # Set default non-interactive agent
+bloom config set-model <agent> <model>    # Set default model for an agent
+bloom config models                       # Show configured models
+bloom config models <agent> --discover    # Discover models from agent CLI
+bloom config models <agent> -d -s         # Discover and save models to config
 ```
 
-Git protocol preference is set during `bloom init` and stored in `~/.bloom/config.yaml`. This determines how repository URLs are normalized when cloning.
+Config file (`~/.bloom/config.yaml`):
+```yaml
+gitProtocol: ssh
+agent:
+  defaultInteractive: claude
+  defaultNonInteractive: claude
+  claude:
+    defaultModel: claude-sonnet-4-20250514
+    models:
+      - claude-sonnet-4-20250514
+      - claude-opus-4-20250514
+  opencode:
+    defaultModel: github-copilot/claude-sonnet-4
+    models: [...]  # Populated via --discover --save
+```
 
 ### Orchestrator
 

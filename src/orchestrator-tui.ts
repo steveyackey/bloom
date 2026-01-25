@@ -14,7 +14,15 @@ import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBord
 import { consumeTrigger, createInterjection, watchTriggers } from "./human-queue";
 import { type Task, type TasksFile, validateTasksFile } from "./task-schema";
 import { getProcessStatsBatch, type ProcessStats, spawnTerminal, type TerminalProcess } from "./terminal";
-import { loadUserConfig, saveUserConfig, type UserConfig } from "./user-config";
+import {
+  getDefaultInteractiveAgent,
+  getDefaultModel,
+  loadUserConfig,
+  saveUserConfig,
+  setAgentDefaultModel,
+  setDefaultInteractiveAgent,
+  type UserConfig,
+} from "./user-config";
 
 // =============================================================================
 // Types
@@ -217,8 +225,8 @@ export class OrchestratorTUI {
     this.userConfig = await loadUserConfig();
 
     // Set current agent from config
-    this.currentAgent = this.userConfig.interactiveAgent?.agent ?? "claude";
-    this.currentModel = this.userConfig.interactiveAgent?.model ?? getAgentDefaultModel(this.currentAgent);
+    this.currentAgent = getDefaultInteractiveAgent(this.userConfig);
+    this.currentModel = getDefaultModel(this.userConfig, this.currentAgent) ?? getAgentDefaultModel(this.currentAgent);
 
     // Check agent availability
     this.agentAvailability = await checkAllAgentsAvailability();
@@ -294,16 +302,11 @@ export class OrchestratorTUI {
 
       // Update current agent
       this.currentAgent = selectedAgent;
-      this.currentModel = getAgentDefaultModel(selectedAgent);
+      this.currentModel = getDefaultModel(this.userConfig!, selectedAgent) ?? getAgentDefaultModel(selectedAgent);
 
       // Save to user config
-      if (this.userConfig) {
-        this.userConfig.interactiveAgent = {
-          agent: selectedAgent,
-          model: this.currentModel,
-        };
-        await saveUserConfig(this.userConfig);
-      }
+      await setDefaultInteractiveAgent(selectedAgent);
+      this.userConfig = await loadUserConfig();
 
       // Now show model selector
       await this.showModelSelector();
@@ -341,13 +344,8 @@ export class OrchestratorTUI {
       this.currentModel = selectedModel;
 
       // Save to user config
-      if (this.userConfig) {
-        this.userConfig.interactiveAgent = {
-          agent: this.currentAgent,
-          model: selectedModel,
-        };
-        await saveUserConfig(this.userConfig);
-      }
+      await setAgentDefaultModel(this.currentAgent, selectedModel);
+      this.userConfig = await loadUserConfig();
 
       console.log(chalk.green(`\nAgent: ${this.currentAgent}, Model: ${this.currentModel}`));
       console.log(chalk.dim("Press any key to continue..."));

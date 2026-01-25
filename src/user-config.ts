@@ -16,17 +16,6 @@ import { createLogger } from "./logger";
 
 const configLogger = createLogger("user-config");
 
-/**
- * Schema for basic agent configuration (legacy).
- * Defines which agent to use and optionally which model variant.
- */
-export const AgentConfigSchema = z.object({
-  agent: z.string().default("claude"),
-  model: z.string().optional(),
-});
-
-export type AgentConfig = z.infer<typeof AgentConfigSchema>;
-
 // =============================================================================
 // Per-Agent Configuration Schemas
 // =============================================================================
@@ -38,9 +27,11 @@ const ToolPermissionSchema = z.union([z.literal("all"), z.array(z.string())]);
 
 /**
  * Base per-agent configuration shared by all agents.
+ * Uses `defaultModel` as the active model and `models` as available options.
  */
 const BaseAgentConfigSchema = z.object({
-  model: z.string().optional(),
+  defaultModel: z.string().optional(),
+  models: z.array(z.string()).optional(),
   allowedTools: ToolPermissionSchema.optional(),
   deniedTools: z.array(z.string()).optional(),
 });
@@ -69,7 +60,7 @@ const GooseAgentConfigSchema = BaseAgentConfigSchema.extend({});
 
 /**
  * OpenCode-specific configuration.
- * Note: model is REQUIRED for opencode - validated separately.
+ * Note: defaultModel is REQUIRED for opencode - validated separately.
  */
 const OpenCodeAgentConfigSchema = BaseAgentConfigSchema.extend({});
 
@@ -92,23 +83,31 @@ export type KnownAgentName = (typeof KNOWN_AGENTS)[number];
 // =============================================================================
 
 /**
- * The full agent configuration section in bloom.yaml.
+ * The full agent configuration section in config.yaml.
  *
  * Example:
  * ```yaml
  * agent:
- *   default: claude
+ *   defaultInteractive: claude
+ *   defaultNonInteractive: claude
  *   timeout: 600
  *   claude:
- *     model: sonnet
+ *     defaultModel: claude-sonnet-4-20250514
+ *     models:
+ *       - claude-sonnet-4-20250514
+ *       - claude-opus-4-20250514
  *     allowedTools: all
  *   opencode:
- *     model: claude-sonnet-4  # REQUIRED
+ *     defaultModel: anthropic/claude-sonnet-4  # REQUIRED
+ *     models:
+ *       - anthropic/claude-sonnet-4
+ *       - openai/gpt-4o
  * ```
  */
 const AgentSectionSchema = z
   .object({
-    default: z.string().default("claude"),
+    defaultInteractive: z.string().default("claude"),
+    defaultNonInteractive: z.string().default("claude"),
     timeout: z.number().optional(),
     // Per-agent configurations using passthrough for forward compatibility
     claude: ClaudeAgentConfigSchema.optional(),
@@ -129,10 +128,6 @@ export type AgentSection = z.infer<typeof AgentSectionSchema> & {
 
 const UserConfigSchema = z.object({
   gitProtocol: z.enum(["ssh", "https"]).default("ssh"),
-  // Legacy agent configuration (deprecated)
-  interactiveAgent: AgentConfigSchema.optional(),
-  nonInteractiveAgent: AgentConfigSchema.optional(),
-  // New comprehensive agent configuration
   agent: AgentSectionSchema.optional(),
 });
 
@@ -153,8 +148,8 @@ export interface ConfigValidationResult {
  * Returns validation errors and warnings.
  *
  * Validation rules:
- * - `default` must be a valid agent name if specified
- * - `opencode.model` is REQUIRED (no silent defaults)
+ * - `defaultInteractive` and `defaultNonInteractive` must be valid agent names
+ * - `opencode.defaultModel` is REQUIRED (no silent defaults)
  * - Unknown agent configs produce warnings (forward compatibility)
  */
 export function validateAgentConfig(config: UserConfig): ConfigValidationResult {
@@ -167,15 +162,28 @@ export function validateAgentConfig(config: UserConfig): ConfigValidationResult 
 
   const agentSection = config.agent as AgentSection;
 
-  // Get all keys that look like agent configs (exclude 'default' and 'timeout')
-  const reservedKeys = ["default", "timeout"];
+  // Get all keys that look like agent configs (exclude reserved keys)
+  const reservedKeys = ["defaultInteractive", "defaultNonInteractive", "timeout"];
   const agentKeys = Object.keys(agentSection).filter((key) => !reservedKeys.includes(key));
 
-  // Validate 'default' references a valid agent
-  if (agentSection.default && !KNOWN_AGENTS.includes(agentSection.default as KnownAgentName)) {
-    // Check if it's a custom agent in the config
-    if (!agentKeys.includes(agentSection.default)) {
-      warnings.push(`agent.default '${agentSection.default}' is not a known agent (${KNOWN_AGENTS.join(", ")})`);
+  // Validate 'defaultInteractive' references a valid agent
+  if (agentSection.defaultInteractive && !KNOWN_AGENTS.includes(agentSection.defaultInteractive as KnownAgentName)) {
+    if (!agentKeys.includes(agentSection.defaultInteractive)) {
+      warnings.push(
+        `agent.defaultInteractive '${agentSection.defaultInteractive}' is not a known agent (${KNOWN_AGENTS.join(", ")})`
+      );
+    }
+  }
+
+  // Validate 'defaultNonInteractive' references a valid agent
+  if (
+    agentSection.defaultNonInteractive &&
+    !KNOWN_AGENTS.includes(agentSection.defaultNonInteractive as KnownAgentName)
+  ) {
+    if (!agentKeys.includes(agentSection.defaultNonInteractive)) {
+      warnings.push(
+        `agent.defaultNonInteractive '${agentSection.defaultNonInteractive}' is not a known agent (${KNOWN_AGENTS.join(", ")})`
+      );
     }
   }
 
@@ -186,11 +194,11 @@ export function validateAgentConfig(config: UserConfig): ConfigValidationResult 
     }
   }
 
-  // Validate opencode.model is required
+  // Validate opencode.defaultModel is required
   if (agentSection.opencode) {
     const openCodeConfig = agentSection.opencode as PerAgentConfig;
-    if (!openCodeConfig.model) {
-      errors.push("opencode.model is required (OpenCode requires explicit model selection)");
+    if (!openCodeConfig.defaultModel) {
+      errors.push("opencode.defaultModel is required (OpenCode requires explicit model selection)");
     }
   }
 
@@ -235,11 +243,49 @@ export function getAgentConfig(config: UserConfig, agentName: string): PerAgentC
 }
 
 /**
- * Get the default agent name from configuration.
+ * Get the default interactive agent name from configuration.
  * Falls back to 'claude' if not specified.
  */
-export function getDefaultAgentName(config: UserConfig): string {
-  return config.agent?.default ?? "claude";
+export function getDefaultInteractiveAgent(config: UserConfig): string {
+  return config.agent?.defaultInteractive ?? "claude";
+}
+
+/**
+ * Get the default non-interactive agent name from configuration.
+ * Falls back to 'claude' if not specified.
+ */
+export function getDefaultNonInteractiveAgent(config: UserConfig): string {
+  return config.agent?.defaultNonInteractive ?? "claude";
+}
+
+/**
+ * Get the default agent name for a given mode.
+ * Falls back to 'claude' if not specified.
+ */
+export function getDefaultAgentName(
+  config: UserConfig,
+  mode: "interactive" | "nonInteractive" = "interactive"
+): string {
+  if (mode === "interactive") {
+    return getDefaultInteractiveAgent(config);
+  }
+  return getDefaultNonInteractiveAgent(config);
+}
+
+/**
+ * Get the default model for an agent.
+ */
+export function getDefaultModel(config: UserConfig, agentName: string): string | undefined {
+  const agentConfig = getAgentConfig(config, agentName);
+  return agentConfig?.defaultModel;
+}
+
+/**
+ * Get available models for an agent from config.
+ */
+export function getConfiguredModels(config: UserConfig, agentName: string): string[] {
+  const agentConfig = getAgentConfig(config, agentName);
+  return agentConfig?.models ?? [];
 }
 
 /**
@@ -390,6 +436,78 @@ export async function saveUserConfig(config: UserConfig): Promise<void> {
 export async function setGitProtocol(protocol: "ssh" | "https"): Promise<void> {
   const config = await loadUserConfig();
   config.gitProtocol = protocol;
+  await saveUserConfig(config);
+}
+
+/**
+ * Set the default interactive agent.
+ */
+export async function setDefaultInteractiveAgent(agentName: string): Promise<void> {
+  const config = await loadUserConfig({ validate: false });
+  if (!config.agent) {
+    config.agent = { defaultInteractive: agentName, defaultNonInteractive: "claude" };
+  } else {
+    (config.agent as AgentSection).defaultInteractive = agentName;
+  }
+  await saveUserConfig(config);
+}
+
+/**
+ * Set the default non-interactive agent.
+ */
+export async function setDefaultNonInteractiveAgent(agentName: string): Promise<void> {
+  const config = await loadUserConfig({ validate: false });
+  if (!config.agent) {
+    config.agent = { defaultInteractive: "claude", defaultNonInteractive: agentName };
+  } else {
+    (config.agent as AgentSection).defaultNonInteractive = agentName;
+  }
+  await saveUserConfig(config);
+}
+
+/**
+ * Set the default model for an agent.
+ */
+export async function setAgentDefaultModel(agentName: string, model: string): Promise<void> {
+  const config = await loadUserConfig({ validate: false });
+  if (!config.agent) {
+    config.agent = { defaultInteractive: "claude", defaultNonInteractive: "claude" };
+  }
+  const agentSection = config.agent as AgentSection;
+  if (!agentSection[agentName]) {
+    agentSection[agentName] = { defaultModel: model, models: [model] };
+  } else {
+    const agentConfig = agentSection[agentName] as PerAgentConfig;
+    agentConfig.defaultModel = model;
+    // Add to models list if not already present
+    if (!agentConfig.models) {
+      agentConfig.models = [model];
+    } else if (!agentConfig.models.includes(model)) {
+      agentConfig.models.push(model);
+    }
+  }
+  await saveUserConfig(config);
+}
+
+/**
+ * Set the available models for an agent.
+ */
+export async function setAgentModels(agentName: string, models: string[]): Promise<void> {
+  const config = await loadUserConfig({ validate: false });
+  if (!config.agent) {
+    config.agent = { defaultInteractive: "claude", defaultNonInteractive: "claude" };
+  }
+  const agentSection = config.agent as AgentSection;
+  if (!agentSection[agentName]) {
+    agentSection[agentName] = { models, defaultModel: models[0] };
+  } else {
+    const agentConfig = agentSection[agentName] as PerAgentConfig;
+    agentConfig.models = models;
+    // Set default model if not already set or not in the new list
+    if (!agentConfig.defaultModel || !models.includes(agentConfig.defaultModel)) {
+      agentConfig.defaultModel = models[0];
+    }
+  }
   await saveUserConfig(config);
 }
 

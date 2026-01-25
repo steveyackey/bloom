@@ -2,8 +2,7 @@
 // Agent Factory - Creates agents based on user configuration
 // =============================================================================
 
-import type { AgentConfig } from "../user-config";
-import { getAgentConfig, getDefaultAgentName, loadUserConfig } from "../user-config";
+import { getAgentConfig, getDefaultAgentName, getDefaultModel, loadUserConfig } from "../user-config";
 import type { Agent } from "./core";
 import { GenericAgentProvider } from "./generic-provider";
 import { getAgentDefinition, getRegisteredAgentNames, isValidAgentName } from "./loader";
@@ -62,23 +61,19 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
  * @param options - Optional overrides for agent name and model
  * @returns A configured Agent instance
  *
- * Configuration is read from ~/.bloom/config.yaml.
- *
- * New configuration format (agent section):
+ * Configuration is read from ~/.bloom/config.yaml:
  * ```yaml
  * agent:
- *   default: claude
+ *   defaultInteractive: claude
+ *   defaultNonInteractive: claude
  *   timeout: 600
  *   claude:
- *     model: sonnet
+ *     defaultModel: claude-sonnet-4-20250514
+ *     models:
+ *       - claude-sonnet-4-20250514
+ *       - claude-opus-4-20250514
  *   opencode:
- *     model: claude-sonnet-4  # REQUIRED
- * ```
- *
- * Legacy format (still supported):
- * ```yaml
- * interactiveAgent: { agent: 'claude', model?: 'opus' }
- * nonInteractiveAgent: { agent: 'opencode', model?: 'gpt-4' }
+ *     defaultModel: anthropic/claude-sonnet-4  # REQUIRED
  * ```
  *
  * Falls back to claude if no configuration is present.
@@ -86,32 +81,21 @@ export function createAgentByName(agentName: string, isInteractive: boolean, mod
 export async function createAgent(mode: AgentMode, options: CreateAgentOptions = {}): Promise<Agent> {
   const userConfig = await loadUserConfig();
 
-  // Determine agent name: options override > new config > legacy config > default
+  // Determine agent name: options override > config default
   let agentName: string;
   let model: string | undefined = options.model;
 
   if (options.agentName) {
     // Explicit override
     agentName = options.agentName;
-  } else if (userConfig.agent) {
-    // New config format: use default agent
-    agentName = getDefaultAgentName(userConfig);
   } else {
-    // Legacy config format
-    const legacyConfig: AgentConfig | undefined =
-      mode === "interactive" ? userConfig.interactiveAgent : userConfig.nonInteractiveAgent;
-    agentName = legacyConfig?.agent ?? "claude";
-    if (!model) {
-      model = legacyConfig?.model;
-    }
+    // Use mode-specific default from config
+    agentName = getDefaultAgentName(userConfig, mode);
   }
 
-  // Get per-agent configuration
-  const perAgentConfig = getAgentConfig(userConfig, agentName);
-
-  // Use per-agent model if not overridden
-  if (!model && perAgentConfig?.model) {
-    model = perAgentConfig.model;
+  // Use per-agent default model if not overridden
+  if (!model) {
+    model = getDefaultModel(userConfig, agentName);
   }
 
   const isInteractive = mode === "interactive";

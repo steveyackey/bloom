@@ -15,7 +15,7 @@ import {
 } from "../../agents/loader";
 import { getAgentNamesSync } from "../../completions/providers";
 import { triggerInterject } from "../../human-queue";
-import { getDefaultAgentName, loadUserConfig } from "../../user-config";
+import { getDefaultInteractiveAgent, getDefaultNonInteractiveAgent, loadUserConfig } from "../../user-config";
 import { getTasksFile } from "../context";
 import { runAgentWorkLoop, startOrchestrator } from "../orchestrator";
 import { cmdAgents } from "../tasks";
@@ -130,7 +130,8 @@ export function registerAgentCommands(cli: Clerc): Clerc {
 
 async function cmdAgentCheck(): Promise<void> {
   const userConfig = await loadUserConfig({ validate: false });
-  const defaultAgent = getDefaultAgentName(userConfig);
+  const defaultInteractive = getDefaultInteractiveAgent(userConfig);
+  const defaultNonInteractive = getDefaultNonInteractiveAgent(userConfig);
   const registeredAgents = getRegisteredAgentNames();
 
   console.log(chalk.bold("Agent CLI Status\n"));
@@ -148,11 +149,21 @@ async function cmdAgentCheck(): Promise<void> {
 
   // Display results
   for (const name of registeredAgents) {
-    const isDefault = name === defaultAgent;
+    const isDefaultInteractive = name === defaultInteractive;
+    const isDefaultNonInteractive = name === defaultNonInteractive;
     const isAvailable = availability[name];
     const version = versions[name];
 
-    const defaultBadge = isDefault ? chalk.cyan(" (default)") : "";
+    // Build default badge
+    let defaultBadge = "";
+    if (isDefaultInteractive && isDefaultNonInteractive) {
+      defaultBadge = chalk.cyan(" (default)");
+    } else if (isDefaultInteractive) {
+      defaultBadge = chalk.cyan(" (interactive)");
+    } else if (isDefaultNonInteractive) {
+      defaultBadge = chalk.cyan(" (non-interactive)");
+    }
+
     const statusIcon = isAvailable ? chalk.green("✓") : chalk.red("✗");
     const nameText = isAvailable ? chalk.white(name) : chalk.dim(name);
     const versionText = version ? chalk.dim(` ${version}`) : "";
@@ -161,11 +172,20 @@ async function cmdAgentCheck(): Promise<void> {
     console.log(`  ${statusIcon} ${nameText}${defaultBadge}${versionText}${notInstalled}`);
   }
 
-  // Show warning if default agent is not available
-  if (!availability[defaultAgent]) {
+  // Show warnings if default agents are not available
+  const warnings: string[] = [];
+  if (!availability[defaultInteractive]) {
+    warnings.push(`Default interactive agent '${defaultInteractive}' is not installed`);
+  }
+  if (!availability[defaultNonInteractive] && defaultNonInteractive !== defaultInteractive) {
+    warnings.push(`Default non-interactive agent '${defaultNonInteractive}' is not installed`);
+  }
+  if (warnings.length > 0) {
     console.log("");
-    console.log(chalk.yellow(`Warning: Your default agent '${defaultAgent}' is not installed.`));
-    console.log(chalk.dim(`  Install it or change your default with: bloom config set-default <agent>`));
+    for (const warning of warnings) {
+      console.log(chalk.yellow(`Warning: ${warning}`));
+    }
+    console.log(chalk.dim("  Use 'bloom config set-interactive <agent>' or 'bloom config set-noninteractive <agent>'"));
   }
 
   // Summary
@@ -181,7 +201,8 @@ async function cmdAgentCheck(): Promise<void> {
 
 async function cmdAgentValidate(agentName?: string, streaming = false): Promise<void> {
   const userConfig = await loadUserConfig({ validate: false });
-  const defaultAgent = getDefaultAgentName(userConfig);
+  // Use appropriate default based on mode
+  const defaultAgent = streaming ? getDefaultNonInteractiveAgent(userConfig) : getDefaultInteractiveAgent(userConfig);
   const targetAgent = agentName || defaultAgent;
 
   // Check if agent is registered
