@@ -263,6 +263,15 @@ These are loaded at runtime and merged with built-in agents.
 # Run validation
 bun validate
 
+# Check agent CLI is detected
+bloom agent check
+
+# Validate agent works in interactive mode
+bloom agent validate myagent
+
+# Validate agent works in streaming (non-interactive) mode
+bloom agent validate myagent -s
+
 # Build docs
 cd docs && bun install && bun run build
 ```
