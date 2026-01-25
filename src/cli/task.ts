@@ -13,6 +13,10 @@ import {
   cmdReset,
   cmdSetStatus,
   cmdShow,
+  cmdStepDone,
+  cmdStepList,
+  cmdStepShow,
+  cmdStepStart,
   cmdValidate,
 } from "../commands/tasks";
 import { getAgentNamesSync, getTaskIdsSync, getTaskStatuses } from "../completions/providers";
@@ -40,6 +44,17 @@ const statusCompletionHandler = (complete: (value: string, description: string) 
   const statuses = getTaskStatuses();
   for (const status of statuses) {
     complete(status, "Task status");
+  }
+};
+
+const stepIdCompletionHandler = (complete: (value: string, description: string) => void) => {
+  // Step IDs are typically task-id.N format
+  const taskIds = getTaskIdsSync(getTasksFile());
+  for (const id of taskIds) {
+    // Suggest step IDs for tasks (common pattern: task-id.1, task-id.2, etc.)
+    complete(`${id}.1`, "Step 1");
+    complete(`${id}.2`, "Step 2");
+    complete(`${id}.3`, "Step 3");
   }
 };
 
@@ -300,6 +315,74 @@ export function registerTaskCommands(cli: Clerc): Clerc {
           console.error("Error: Either provide a task ID or use --stuck flag");
           process.exit(1);
         }
+      })
+
+      // step done <stepid> - Mark step as done and exit (for agent use)
+      .command("step done", "Mark a step as done (agent exits after this)", {
+        parameters: [
+          {
+            key: "<stepid>",
+            description: "Step ID to mark done (e.g., task-id.1)",
+            completions: {
+              handler: stepIdCompletionHandler,
+            },
+          },
+        ],
+        help: { group: "tasks" },
+      })
+      .on("step done", async (ctx) => {
+        await cmdStepDone(ctx.parameters.stepid as string);
+      })
+
+      // step start <stepid> - Mark step as in progress
+      .command("step start", "Mark a step as in progress", {
+        parameters: [
+          {
+            key: "<stepid>",
+            description: "Step ID to start",
+            completions: {
+              handler: stepIdCompletionHandler,
+            },
+          },
+        ],
+        help: { group: "tasks" },
+      })
+      .on("step start", async (ctx) => {
+        await cmdStepStart(ctx.parameters.stepid as string);
+      })
+
+      // step show <stepid> - Show step details
+      .command("step show", "Show step details", {
+        parameters: [
+          {
+            key: "<stepid>",
+            description: "Step ID to show",
+            completions: {
+              handler: stepIdCompletionHandler,
+            },
+          },
+        ],
+        help: { group: "tasks" },
+      })
+      .on("step show", async (ctx) => {
+        await cmdStepShow(ctx.parameters.stepid as string);
+      })
+
+      // step list [taskid] - List steps for a task or all tasks with steps
+      .command("step list", "List steps for a task or all tasks with steps", {
+        parameters: [
+          {
+            key: "[taskid]",
+            description: "Task ID to list steps for",
+            completions: {
+              handler: taskIdCompletionHandler,
+            },
+          },
+        ],
+        help: { group: "tasks" },
+      })
+      .on("step list", async (ctx) => {
+        await cmdStepList(ctx.parameters.taskid as string | undefined);
       })
   );
 }

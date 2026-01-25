@@ -45,6 +45,10 @@ export const TaskStepSchema = z.object({
   status: TaskStepStatusSchema.default("pending"),
   /** Optional acceptance criteria for this specific step */
   acceptance_criteria: z.array(z.string()).default([]),
+  /** ISO timestamp when step started */
+  started_at: z.string().optional(),
+  /** ISO timestamp when step completed */
+  completed_at: z.string().optional(),
 });
 export type TaskStep = z.infer<typeof TaskStepSchema>;
 
@@ -104,6 +108,10 @@ export type Task = {
   checkpoint?: boolean;
   /** Claude session ID for resuming interrupted work (shared across all steps) */
   session_id?: string;
+  /** ISO timestamp when task started (first moved to in_progress) */
+  started_at?: string;
+  /** ISO timestamp when task completed (moved to done) */
+  completed_at?: string;
 };
 
 export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
@@ -128,6 +136,8 @@ export const TaskSchema: z.ZodType<Task> = z.lazy(() =>
     validation_task_id: z.string().optional(),
     checkpoint: z.boolean().optional(),
     session_id: z.string().optional(),
+    started_at: z.string().optional(),
+    completed_at: z.string().optional(),
   })
 );
 

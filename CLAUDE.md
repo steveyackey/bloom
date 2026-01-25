@@ -50,7 +50,7 @@ CLI commands are organized by top-level command name in `src/cli/`. Each file is
 | `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
 | `run.ts` | `run` | `--agent/-a` |
 | `setup.ts` | `setup` | |
-| `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset` | `--stuck/-s` |
+| `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset`, `step done`, `step start`, `step show`, `step list` | `--stuck/-s` |
 | `update.ts` | `update` | |
 | `view.ts` | `view` (alias: `v`) | `--port`, `--open` |
 

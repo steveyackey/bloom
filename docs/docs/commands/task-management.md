@@ -223,6 +223,82 @@ bloom reset --stuck  # Reset ALL stuck tasks
 
 Resets task to `todo` and clears assignment.
 
+## Step Commands
+
+Steps are lightweight sub-instructions within a task that share the same agent session. Use steps when work builds on previous context.
+
+### bloom step done
+
+Mark a step as complete and exit. The agent should call this after completing each step.
+
+```bash
+bloom step done <stepid>
+```
+
+**Example:**
+
+```bash
+bloom step done refactor-auth.1
+```
+
+After marking a step done, the agent exits. Bloom will resume the session with the next step, preserving context.
+
+### bloom step start
+
+Mark a step as in progress (records start time for metrics).
+
+```bash
+bloom step start <stepid>
+```
+
+### bloom step show
+
+Show details about a specific step.
+
+```bash
+bloom step show <stepid>
+```
+
+**Output:**
+
+```
+Step ID:    refactor-auth.1
+Task:       refactor-auth - Refactor authentication module
+Status:     done
+Position:   1 of 3
+
+Instruction:
+Extract JWT validation logic from auth.ts into jwt-validator.ts
+
+Acceptance Criteria:
+  • jwt-validator.ts exists with validateToken() function
+  • auth.ts imports from jwt-validator.ts
+```
+
+### bloom step list
+
+List steps for a task or all tasks with steps.
+
+```bash
+bloom step list [taskid]
+```
+
+**Examples:**
+
+```bash
+bloom step list                 # All tasks with steps
+bloom step list refactor-auth   # Steps for specific task
+```
+
+**Output:**
+
+```
+refactor-auth: 1/3 steps done → refactor-auth.2
+  ✓ refactor-auth.1: Extract JWT validation...
+  → refactor-auth.2: Add unit tests...
+  ○ refactor-auth.3: Update documentation...
+```
+
 ## Examples
 
 ### Monitoring Workflow

@@ -70,9 +70,13 @@ tasks:
           First piece of work
         acceptance_criteria:     # OPTIONAL. When this step is done
           - Step-specific criterion
+        # started_at/completed_at are set automatically by bloom
       - id: task-id.2
         instruction: |
           Second piece of work (has context from step 1)
+    # Timing fields (set automatically by bloom, do not set manually):
+    # started_at: ISO timestamp when task started
+    # completed_at: ISO timestamp when task finished
 ```
 
 ## Agent Naming
@@ -110,11 +114,19 @@ Use `steps` when work benefits from accumulated context:
       instruction: Update the API documentation to reflect the new module structure
 ```
 
+**How steps execute:**
+1. Bloom starts agent session with step 1 instruction
+2. Agent completes work, commits, runs `bloom step done <step-id>`, exits
+3. Bloom resumes the same session with step 2 instruction
+4. Agent has full context from step 1, completes step 2, runs `bloom step done`, exits
+5. Repeat until all steps complete
+
 **Why use steps?**
 - Steps share the same agent session - step 2 already knows what step 1 created
 - Avoids re-reading files the agent just wrote
 - Each step can commit independently, creating a cleaner git history
 - If a step fails, the agent can resume from that step with full context
+- Agent must run `bloom step done <step-id>` to mark step complete and exit cleanly
 
 **When to use steps:**
 - Refactoring: extract → test → document

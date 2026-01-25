@@ -4,7 +4,7 @@
 
 import chalk from "chalk";
 import { createLogger } from "../infra/logger";
-import type { Task, TaskStatus } from "../task-schema";
+import type { Task, TaskStatus, TaskStep } from "../task-schema";
 import {
   findTask,
   getAllAgents,
@@ -518,6 +518,208 @@ export async function cmdValidate(): Promise<void> {
           console.log(`      ${chalk.dim("cd")} ${worktreePath}`);
         }
       }
+    }
+  }
+}
+
+// =============================================================================
+// Step Commands
+// =============================================================================
+
+/**
+ * Format duration between two dates in human-readable format.
+ */
+function formatDuration(start: Date, end: Date): string {
+  const ms = end.getTime() - start.getTime();
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  if (minutes > 0) {
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function colorStepStatus(status: TaskStep["status"]): string {
+  switch (status) {
+    case "done":
+      return chalk.green(status);
+    case "in_progress":
+      return chalk.cyan(status);
+    case "pending":
+      return chalk.gray(status);
+    default:
+      return status;
+  }
+}
+
+/**
+ * Find a step by ID across all tasks.
+ * Step IDs are typically formatted as "task-id.N" (e.g., "refactor-auth.1").
+ */
+function findStep(tasks: Task[], stepId: string): { task: Task; step: TaskStep; index: number } | null {
+  for (const task of tasks) {
+    if (task.steps) {
+      const index = task.steps.findIndex((s) => s.id === stepId);
+      if (index !== -1) {
+        return { task, step: task.steps[index], index };
+      }
+    }
+    // Check subtasks recursively
+    const found = findStep(task.subtasks, stepId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Get the current step for a task (first non-done step).
+ */
+function getCurrentStep(task: Task): { step: TaskStep; index: number } | null {
+  if (!task.steps) return null;
+  const index = task.steps.findIndex((s) => s.status !== "done");
+  if (index === -1) return null;
+  return { step: task.steps[index], index };
+}
+
+/**
+ * Get the next pending step for a task (after current).
+ */
+function getNextStep(task: Task, currentIndex: number): TaskStep | null {
+  if (!task.steps || currentIndex >= task.steps.length - 1) return null;
+  return task.steps[currentIndex + 1];
+}
+
+export async function cmdStepDone(stepId: string): Promise<void> {
+  const tasksFile = await loadTasks(getTasksFile());
+  const found = findStep(tasksFile.tasks, stepId);
+
+  if (!found) {
+    console.error(chalk.red(`Step not found: ${stepId}`));
+    process.exit(1);
+  }
+
+  const { task, step, index } = found;
+  const oldStatus = step.status;
+  step.status = "done";
+  step.completed_at = new Date().toISOString();
+
+  // Check if there's a next step
+  const nextStep = getNextStep(task, index);
+  const allStepsDone = !nextStep && task.steps?.every((s) => s.status === "done");
+
+  await saveTasks(getTasksFile(), tasksFile);
+
+  // Show duration if we have start time
+  const durationInfo = step.started_at
+    ? chalk.dim(` (${formatDuration(new Date(step.started_at), new Date(step.completed_at))})`)
+    : "";
+  console.log(
+    `${chalk.yellow(stepId)}: ${colorStepStatus(oldStatus)} ${chalk.dim("→")} ${colorStepStatus("done")}${durationInfo}`
+  );
+
+  if (nextStep) {
+    console.log(`\n${chalk.bold("Next step:")} ${chalk.yellow(nextStep.id)}`);
+    console.log(chalk.dim(nextStep.instruction.split("\n")[0]));
+    console.log(chalk.dim("\nBloom will resume your session with the next step."));
+  } else if (allStepsDone) {
+    console.log(
+      `\n${chalk.green.bold("All steps complete!")} Task ${chalk.yellow(task.id)} is ready for final review.`
+    );
+  }
+}
+
+export async function cmdStepList(taskId?: string): Promise<void> {
+  const tasksFile = await loadTasks(getTasksFile());
+
+  if (taskId) {
+    const task = findTask(tasksFile.tasks, taskId);
+    if (!task) {
+      console.error(chalk.red(`Task not found: ${taskId}`));
+      process.exit(1);
+    }
+    if (!task.steps || task.steps.length === 0) {
+      console.log(chalk.dim(`Task ${taskId} has no steps`));
+      return;
+    }
+    console.log(`${chalk.bold("Steps for")} ${chalk.yellow(taskId)}:`);
+    for (const step of task.steps) {
+      const icon =
+        step.status === "done" ? chalk.green("✓") : step.status === "in_progress" ? chalk.cyan("→") : chalk.gray("○");
+      console.log(`  ${icon} ${chalk.yellow(step.id)}: ${step.instruction.split("\n")[0]}`);
+    }
+    return;
+  }
+
+  // List all tasks with steps
+  let found = false;
+  function listSteps(tasks: Task[]) {
+    for (const task of tasks) {
+      if (task.steps && task.steps.length > 0) {
+        found = true;
+        const current = getCurrentStep(task);
+        const progress = task.steps.filter((s) => s.status === "done").length;
+        console.log(
+          `${chalk.yellow(task.id)}: ${chalk.dim(`${progress}/${task.steps.length} steps done`)}${current ? ` ${chalk.cyan(`→ ${current.step.id}`)}` : ""}`
+        );
+      }
+      listSteps(task.subtasks);
+    }
+  }
+  listSteps(tasksFile.tasks);
+
+  if (!found) {
+    console.log(chalk.dim("No tasks with steps found"));
+  }
+}
+
+export async function cmdStepStart(stepId: string): Promise<void> {
+  const tasksFile = await loadTasks(getTasksFile());
+  const found = findStep(tasksFile.tasks, stepId);
+
+  if (!found) {
+    console.error(chalk.red(`Step not found: ${stepId}`));
+    process.exit(1);
+  }
+
+  const { step } = found;
+  const oldStatus = step.status;
+  step.status = "in_progress";
+  step.started_at = new Date().toISOString();
+
+  await saveTasks(getTasksFile(), tasksFile);
+  console.log(
+    `${chalk.yellow(stepId)}: ${colorStepStatus(oldStatus)} ${chalk.dim("→")} ${colorStepStatus("in_progress")}`
+  );
+}
+
+export async function cmdStepShow(stepId: string): Promise<void> {
+  const tasksFile = await loadTasks(getTasksFile());
+  const found = findStep(tasksFile.tasks, stepId);
+
+  if (!found) {
+    console.error(chalk.red(`Step not found: ${stepId}`));
+    process.exit(1);
+  }
+
+  const { task, step, index } = found;
+
+  console.log(`${chalk.bold("Step ID:")}    ${chalk.yellow(step.id)}`);
+  console.log(`${chalk.bold("Task:")}       ${chalk.yellow(task.id)} - ${task.title}`);
+  console.log(`${chalk.bold("Status:")}     ${colorStepStatus(step.status)}`);
+  console.log(`${chalk.bold("Position:")}   ${index + 1} of ${task.steps!.length}`);
+  console.log(`\n${chalk.bold("Instruction:")}\n${step.instruction}`);
+
+  if (step.acceptance_criteria.length > 0) {
+    console.log(`\n${chalk.bold("Acceptance Criteria:")}`);
+    for (const c of step.acceptance_criteria) {
+      console.log(`  ${chalk.green("•")} ${c}`);
     }
   }
 }

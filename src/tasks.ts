@@ -43,6 +43,16 @@ export function updateTaskStatus(tasks: Task[], taskId: string, status: TaskStat
     if (task.id === taskId) {
       task.status = status;
       if (agentName) task.agent_name = agentName;
+
+      // Record timestamps for timing metrics
+      const now = new Date().toISOString();
+      if (status === "in_progress" && !task.started_at) {
+        task.started_at = now;
+      }
+      if (status === "done" || status === "done_pending_merge") {
+        task.completed_at = now;
+      }
+
       return true;
     }
     if (updateTaskStatus(task.subtasks, taskId, status, agentName)) return true;
