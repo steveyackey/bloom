@@ -14,7 +14,7 @@ import {
   isValidAgentName,
 } from "../agents/loader";
 import { getTasksFile } from "../commands/context";
-import { runAgentWorkLoop, startOrchestrator } from "../commands/orchestrator";
+import { startOrchestrator } from "../commands/orchestrator";
 import { cmdAgents } from "../commands/tasks";
 import { getAgentNamesSync } from "../completions/providers";
 import { triggerInterject } from "../human-queue";
@@ -42,27 +42,6 @@ export function registerAgentCommands(cli: Clerc): Clerc {
     .on("run", async (ctx) => {
       const agent = ctx.flags.agent as string | undefined;
       await startOrchestrator(agent);
-    })
-    .command("agent run", "Run a specific agent's work loop", {
-      parameters: [
-        {
-          key: "<name>",
-          description: "Name of the agent to run",
-          completions: {
-            handler: (complete) => {
-              const names = getAgentNamesSync(getTasksFile());
-              for (const name of names) {
-                complete(name, "Agent name");
-              }
-            },
-          },
-        },
-      ],
-      help: { group: "agent-ops" },
-    })
-    .on("agent run", async (ctx) => {
-      const name = ctx.parameters.name as string;
-      await runAgentWorkLoop(name);
     })
     .command("agent list", "List all agents defined in tasks", {
       help: { group: "agent-ops" },

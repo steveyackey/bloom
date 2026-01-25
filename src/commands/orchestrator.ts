@@ -1,37 +1,12 @@
 // =============================================================================
-// Orchestrator and Agent Work Loop
+// Orchestrator
 // =============================================================================
 
-import { runAgentWorkLoopCLI } from "../adapters/cli";
 import { runAgentWorkLoopTUI } from "../adapters/tui";
 import { listRepos, pullDefaultBranch } from "../infra/git";
 import { logger } from "../infra/logger";
 import { getAllAgents, getAllRepos, loadTasks, primeTasks, resetStuckTasks, saveTasks } from "../tasks";
 import { BLOOM_DIR, FLOATING_AGENT, getTasksFile, POLL_INTERVAL_MS, REPOS_DIR } from "./context";
-
-// =============================================================================
-// Agent Work Loop
-// =============================================================================
-
-/**
- * Run the agent work loop with CLI console output.
- * This is a convenience wrapper around the event-driven work loop.
- */
-export async function runAgentWorkLoop(agentName: string): Promise<void> {
-  const envOverride = process.env.BLOOM_AGENT_OVERRIDE;
-
-  await runAgentWorkLoopCLI(agentName, {
-    tasksFile: getTasksFile(),
-    bloomDir: BLOOM_DIR,
-    reposDir: REPOS_DIR,
-    pollIntervalMs: POLL_INTERVAL_MS,
-    agentProviderOverride: envOverride,
-  });
-}
-
-// =============================================================================
-// Orchestrator
-// =============================================================================
 
 export async function startOrchestrator(agentOverride?: string): Promise<void> {
   logger.orchestrator.info("Checking repos...");
