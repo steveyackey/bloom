@@ -94,9 +94,10 @@
 }
 
 .hero-brand {
+  font-family: var(--font-display);
   font-size: clamp(5rem, 18vw, 14rem);
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: -0.02em;
   line-height: 1;
   margin-bottom: 1rem;
   color: #fff;
@@ -132,9 +133,18 @@
 }
 
 .hero-subtitle {
-  font-size: 1.125rem;
-  color: var(--text-secondary);
+  font-size: 1.25rem;
+  color: var(--text-primary);
   max-width: 550px;
+  margin: 0 auto 1.5rem;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.hero-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  max-width: 500px;
   margin: 0 auto 2.5rem;
   line-height: 1.7;
 }
@@ -148,6 +158,7 @@
 
 /* Section Titles */
 .section-title {
+  font-family: var(--font-display);
   font-size: 2.5rem;
   font-weight: 700;
   text-align: center;
@@ -428,6 +439,7 @@
 }
 
 .cta-title {
+  font-family: var(--font-display);
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 1rem;
@@ -465,6 +477,7 @@
 }
 
 .footer-title {
+  font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.75rem;

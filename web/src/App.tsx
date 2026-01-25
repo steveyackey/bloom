@@ -39,10 +39,12 @@ function App() {
         </div>
         <div className="container hero-container">
           <h1 className="hero-brand">BLOOM</h1>
-          <p className="hero-tagline">Multi-Agent Task Orchestration</p>
+          <p className="hero-tagline">The Intentional Pause</p>
           <p className="hero-subtitle">
-            From PRD to production with AI agents.<br />
-            Collaborate on requirements, validate at checkpoints, ship faster.
+            Prepare carefully. Execute quickly. Ship confidently.
+          </p>
+          <p className="hero-description">
+            Collaborative planning with multi-agent orchestration—across your entire SDLC.
           </p>
           <div className="hero-actions">
             <a href="#install" className="btn btn-primary">
@@ -160,10 +162,13 @@ function App() {
             <h4>Requirements</h4>
             <ul>
               <li>
-                <strong>Claude Code CLI</strong> — <code>npm install -g @anthropic-ai/claude-code</code>
+                <strong>A supported agent CLI</strong> — Claude Code, Codex, Copilot CLI, Goose CLI, or OpenCode
               </li>
               <li>
                 <strong>Git 2.20+</strong> — For worktree support
+              </li>
+              <li>
+                <strong>GitHub CLI</strong> — For PR creation (<code>gh</code>)
               </li>
             </ul>
           </div>
