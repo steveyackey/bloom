@@ -18,8 +18,5 @@ export {
   runCreateInPlaceSession,
   runCreateSession,
 } from "./project-service";
-export {
-  formatPullResults,
-  type PullResult,
-  pullAndLogResults,
-} from "./repo-service";
+export { formatPullResults, type PullAllResult, type PullResult } from "./repo-service";
+export { pullAllDefaultBranches } from "../infra/git";

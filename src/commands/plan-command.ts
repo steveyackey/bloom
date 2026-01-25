@@ -5,8 +5,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
+import { pullAllDefaultBranches } from "../infra/git";
 import { runPlanSession } from "../services/planning-service";
-import { pullAndLogResults } from "../services/repo-service";
+import { formatPullResults } from "../services/repo-service";
 import { BLOOM_DIR } from "./context";
 
 // Re-export for backwards compatibility
@@ -29,7 +30,13 @@ export async function cmdPlan(agentName?: string): Promise<void> {
 
   // Pull updates from default branches before planning
   console.log(chalk.dim("Pulling latest updates from default branches...\n"));
-  await pullAndLogResults(BLOOM_DIR);
+  const pullResult = await pullAllDefaultBranches(BLOOM_DIR);
+  for (const line of formatPullResults(pullResult)) {
+    console.log(line);
+  }
+  if (pullResult.failed.length === 0 && (pullResult.updated.length > 0 || pullResult.upToDate.length > 0)) {
+    console.log("");
+  }
 
   await runPlanSession(workingDir, planFile, BLOOM_DIR, agentName);
 

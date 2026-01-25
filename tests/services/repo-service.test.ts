@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { formatPullResults, type PullAllResult, pullAndLogResults } from "../../src/services/repo-service";
+import { describe, expect, it } from "bun:test";
+import { formatPullResults, type PullAllResult } from "../../src/services/repo-service";
 
 describe("repo-service", () => {
   describe("formatPullResults", () => {
@@ -90,63 +90,4 @@ describe("repo-service", () => {
     });
   });
 
-  describe("pullAndLogResults", () => {
-    let originalLog: typeof console.log;
-    let loggedMessages: string[];
-
-    beforeEach(() => {
-      // Capture console.log output
-      originalLog = console.log;
-      loggedMessages = [];
-      console.log = (...args: unknown[]) => {
-        loggedMessages.push(args.map(String).join(" "));
-      };
-    });
-
-    afterEach(() => {
-      // Restore console.log
-      console.log = originalLog;
-    });
-
-    it("calls pullAllDefaultBranches with bloomDir", async () => {
-      // We can't easily mock the imported function, but we can verify
-      // by checking that the function doesn't throw and returns a result
-      // For a real integration test, this would use a test workspace
-      // For now, this is a placeholder that documents the expected behavior
-      expect(typeof pullAndLogResults).toBe("function");
-    });
-
-    it("logs formatted results to console", async () => {
-      // Since we can't easily mock pullAllDefaultBranches,
-      // we test formatPullResults directly and verify it produces correct output
-      // that pullAndLogResults would log
-      const mockResult: PullAllResult = {
-        updated: ["test-repo"],
-        upToDate: [],
-        failed: [],
-      };
-
-      const lines = formatPullResults(mockResult);
-
-      // Simulate what pullAndLogResults does
-      for (const line of lines) {
-        console.log(line);
-      }
-
-      expect(loggedMessages.length).toBeGreaterThan(0);
-      expect(loggedMessages.some((msg) => msg.includes("Updated:"))).toBe(true);
-      expect(loggedMessages.some((msg) => msg.includes("test-repo"))).toBe(true);
-    });
-
-    it("returns the PullAllResult for further use", async () => {
-      // Verify the function returns a PullAllResult structure
-      // For a real integration test, this would use a test workspace
-      // The function signature guarantees it returns Promise<PullAllResult>
-      expect(typeof pullAndLogResults).toBe("function");
-
-      // Type check: ensure the function signature matches
-      const fn: (bloomDir: string) => Promise<PullAllResult> = pullAndLogResults;
-      expect(fn).toBeDefined();
-    });
-  });
 });
