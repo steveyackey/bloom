@@ -4,7 +4,7 @@
  */
 
 import chalk from "chalk";
-import { type PullAllResult, pullAllDefaultBranches } from "../infra/git";
+import type { PullAllResult } from "../infra/git";
 
 // Re-export types and functions from repos.ts
 export type { CloneResult, PullAllResult, PullResult, RepoInfo, SyncResult } from "../infra/git";
@@ -62,4 +62,3 @@ export function formatPullResults(result: PullAllResult): string[] {
 
   return lines;
 }
-

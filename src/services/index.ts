@@ -3,6 +3,7 @@
  * Re-exports all service modules for convenient imports.
  */
 
+export { pullAllDefaultBranches } from "../infra/git";
 export { createDashboardService } from "./dashboard";
 export {
   buildReposContext,
@@ -19,4 +20,3 @@ export {
   runCreateSession,
 } from "./project-service";
 export { formatPullResults, type PullAllResult, type PullResult } from "./repo-service";
-export { pullAllDefaultBranches } from "../infra/git";

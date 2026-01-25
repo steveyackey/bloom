@@ -4,12 +4,12 @@
 
 import { type FSWatcher, watch } from "node:fs";
 import { dirname } from "node:path";
-import chalk from "chalk";
 import { createLogger } from "../infra/logger";
 import { loadTasks } from "../tasks";
 import { buildTaskGraph, type TaskGraph } from "./graph";
 
 const log = createLogger("view-server");
+
 import { buildSystemPrompt, buildTaskPrompt, computeWorkingDirectory } from "./prompts";
 import { renderHTML } from "./ui";
 

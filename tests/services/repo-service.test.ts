@@ -89,5 +89,4 @@ describe("repo-service", () => {
       expect(lines[4]).toContain("Proceeding with existing local state.");
     });
   });
-
 });
