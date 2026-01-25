@@ -11,10 +11,8 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
-import { ClaudeAgentProvider } from "../../src/agents/claude";
 import { createAgent } from "../../src/agents/factory";
-import { GooseAgentProvider } from "../../src/agents/goose";
-import { OpenCodeAgentProvider } from "../../src/agents/opencode";
+import { GenericAgentProvider } from "../../src/agents/generic-provider";
 
 describe("Orchestrator Agent Selection", () => {
   let testHomeDir: string;
@@ -47,12 +45,12 @@ describe("Orchestrator Agent Selection", () => {
     test("createAgent respects agentName option for opencode", async () => {
       // Even without config, specifying agentName should override
       const agent = await createAgent("nonInteractive", { agentName: "opencode" });
-      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("createAgent respects agentName option for goose", async () => {
       const agent = await createAgent("nonInteractive", { agentName: "goose" });
-      expect(agent).toBeInstanceOf(GooseAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("createAgent respects agentName option over config default", async () => {
@@ -61,7 +59,7 @@ describe("Orchestrator Agent Selection", () => {
         nonInteractiveAgent: { agent: "claude" },
       });
       const agent = await createAgent("nonInteractive", { agentName: "opencode" });
-      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("createAgent agentName option takes precedence over config agent.default", async () => {
@@ -69,7 +67,7 @@ describe("Orchestrator Agent Selection", () => {
         agent: { default: "claude" },
       });
       const agent = await createAgent("nonInteractive", { agentName: "goose" });
-      expect(agent).toBeInstanceOf(GooseAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 
@@ -81,9 +79,9 @@ describe("Orchestrator Agent Selection", () => {
 
       // We can identify by instanceof, but the Agent interface doesn't
       // expose the provider name - orchestrator has to track it separately
-      expect(claudeAgent).toBeInstanceOf(ClaudeAgentProvider);
-      expect(gooseAgent).toBeInstanceOf(GooseAgentProvider);
-      expect(opencodeAgent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(claudeAgent).toBeInstanceOf(GenericAgentProvider);
+      expect(gooseAgent).toBeInstanceOf(GenericAgentProvider);
+      expect(opencodeAgent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 });

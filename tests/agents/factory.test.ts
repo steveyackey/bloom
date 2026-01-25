@@ -3,12 +3,8 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as YAML from "yaml";
-import { ClaudeAgentProvider } from "../../src/agents/claude";
-import { CodexAgentProvider } from "../../src/agents/codex";
-import { CopilotAgentProvider } from "../../src/agents/copilot";
 import { createAgent, getRegisteredAgents, isAgentRegistered } from "../../src/agents/factory";
-import { GooseAgentProvider } from "../../src/agents/goose";
-import { OpenCodeAgentProvider } from "../../src/agents/opencode";
+import { GenericAgentProvider } from "../../src/agents/generic-provider";
 
 describe("agent factory", () => {
   let testHomeDir: string;
@@ -49,20 +45,20 @@ describe("agent factory", () => {
   }
 
   describe("default behavior (no config)", () => {
-    test("returns ClaudeAgentProvider when no config exists for interactive mode", async () => {
+    test("returns GenericAgentProvider when no config exists for interactive mode", async () => {
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("returns ClaudeAgentProvider when no config exists for nonInteractive mode", async () => {
+    test("returns GenericAgentProvider when no config exists for nonInteractive mode", async () => {
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("returns ClaudeAgentProvider when config exists but no agent config", async () => {
+    test("returns GenericAgentProvider when config exists but no agent config", async () => {
       await writeConfig({ gitProtocol: "https" });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 
@@ -72,7 +68,7 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "claude" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("respects interactiveAgent config for opencode", async () => {
@@ -80,7 +76,7 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "opencode" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("respects interactiveAgent config for goose", async () => {
@@ -88,7 +84,7 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "goose" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(GooseAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("uses interactiveAgent config only for interactive mode", async () => {
@@ -97,7 +93,7 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "claude" },
       });
       const interactiveAgent = await createAgent("interactive");
-      expect(interactiveAgent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(interactiveAgent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 
@@ -107,7 +103,7 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "claude" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("respects nonInteractiveAgent config for opencode", async () => {
@@ -115,7 +111,7 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "opencode" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("respects nonInteractiveAgent config for goose", async () => {
@@ -123,7 +119,7 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "goose" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(GooseAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("uses nonInteractiveAgent config only for nonInteractive mode", async () => {
@@ -132,18 +128,18 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "opencode" },
       });
       const nonInteractiveAgent = await createAgent("nonInteractive");
-      expect(nonInteractiveAgent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(nonInteractiveAgent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 
   describe("model passthrough", () => {
-    test("passes model to OpenCodeAgentProvider", async () => {
+    test("passes model to GenericAgentProvider", async () => {
       const customModel = "custom-model-123";
       await writeConfig({
         nonInteractiveAgent: { agent: "opencode", model: customModel },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
       // Note: We can't directly access private properties, but we verify
       // the agent was created successfully with the model config
     });
@@ -153,8 +149,8 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "claude", model: "opus" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
-      // ClaudeAgentProvider doesn't currently use model, but should not error
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
+      // GenericAgentProvider doesn't currently use model, but should not error
     });
 
     test("creates agent when model is undefined", async () => {
@@ -162,34 +158,30 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "opencode" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(OpenCodeAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 
-  describe("unknown agent name fallback", () => {
-    test("falls back to ClaudeAgentProvider for unknown agent name", async () => {
+  describe("unknown agent name validation", () => {
+    test("throws error for unknown agent name", async () => {
       await writeConfig({
         interactiveAgent: { agent: "unknown-agent" },
       });
-      const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      await expect(createAgent("interactive")).rejects.toThrow("Unknown agent");
     });
 
-    test("falls back to ClaudeAgentProvider for nonInteractive unknown agent", async () => {
+    test("throws error for nonInteractive unknown agent", async () => {
       await writeConfig({
         nonInteractiveAgent: { agent: "nonexistent-provider" },
       });
-      const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      await expect(createAgent("nonInteractive")).rejects.toThrow("Unknown agent");
     });
 
-    test("falls back to ClaudeAgentProvider for empty agent name", async () => {
+    test("throws error for empty agent name", async () => {
       await writeConfig({
         interactiveAgent: { agent: "" },
       });
-      // Empty string will be parsed, but fallback to claude due to switch default
-      const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(ClaudeAgentProvider);
+      await expect(createAgent("interactive")).rejects.toThrow("Unknown agent");
     });
   });
 
@@ -199,7 +191,7 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "codex" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(CodexAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("respects nonInteractiveAgent config for codex", async () => {
@@ -207,16 +199,16 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "codex" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(CodexAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("passes model to CodexAgentProvider", async () => {
+    test("passes model to GenericAgentProvider", async () => {
       const customModel = "gpt-4o";
       await writeConfig({
         nonInteractiveAgent: { agent: "codex", model: customModel },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(CodexAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 
@@ -226,7 +218,7 @@ describe("agent factory", () => {
         interactiveAgent: { agent: "copilot" },
       });
       const agent = await createAgent("interactive");
-      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
     test("respects nonInteractiveAgent config for copilot", async () => {
@@ -234,15 +226,15 @@ describe("agent factory", () => {
         nonInteractiveAgent: { agent: "copilot" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
 
-    test("passes model to CopilotAgentProvider", async () => {
+    test("passes model to GenericAgentProvider", async () => {
       await writeConfig({
         nonInteractiveAgent: { agent: "copilot", model: "claude" },
       });
       const agent = await createAgent("nonInteractive");
-      expect(agent).toBeInstanceOf(CopilotAgentProvider);
+      expect(agent).toBeInstanceOf(GenericAgentProvider);
     });
   });
 

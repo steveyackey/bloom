@@ -7,7 +7,7 @@ import {
   checkAllAgentsAvailability,
   getAgentDefaultModel,
   getAgentModels,
-  interjectSession,
+  interjectGenericSession,
   listAvailableAgents,
 } from "./agents";
 import { ansi, type BorderState, CSI, cellBgToAnsi, cellFgToAnsi, chalk, getBorderChalk } from "./colors";
@@ -828,7 +828,7 @@ export class OrchestratorTUI {
     }
 
     // Try to interject the agent session
-    const session = interjectSession(pane.config.name);
+    const session = interjectGenericSession(pane.config.name);
     const workingDir =
       session?.workingDirectory || (pane.config.type === "subprocess" ? pane.config.cwd : process.cwd());
 
