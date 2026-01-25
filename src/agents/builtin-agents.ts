@@ -163,7 +163,9 @@ export const gooseAgent: AgentDefinition = {
   },
 
   env: {
-    inject: {},
+    inject: {
+      GOOSE_MODE: "auto", // Autonomous mode - no approval required for tools
+    },
     required: [], // Uses goose configure
   },
 

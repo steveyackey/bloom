@@ -83,6 +83,26 @@ Popular extensions include:
 - **GitHub**: GitHub API integration
 - **Custom MCP Servers**: Connect any MCP-compatible tool
 
+#### Permission Modes
+
+Goose has four permission modes that control tool approval:
+
+| Mode | Description |
+|------|-------------|
+| **Auto** (Autonomous) | No approval required - goose can modify files, use extensions freely |
+| **Manual** | Requires confirmation before any tool or extension use |
+| **Smart** | Risk-based evaluation - auto-approves low-risk, flags high-risk |
+| **Chat Only** | Conversation only - no file modifications or extensions |
+
+**Bloom automatically sets `GOOSE_MODE=auto`** for non-interactive execution so tasks run without requiring approval.
+
+To change the mode manually:
+- **CLI**: Run `goose configure` → "goose settings" → "goose mode"
+- **Mid-session**: Use `/mode auto` command
+- **Environment**: Set `GOOSE_MODE=auto|approve|smart|chat`
+
+See [Goose Permissions Guide](https://block.github.io/goose/docs/guides/goose-permissions) for details.
+
 #### Scheduled Automation
 
 Run tasks on a schedule:
@@ -138,17 +158,21 @@ When Bloom runs Goose:
 
 ```bash
 # Interactive mode
-goose session -n <task-name>
+GOOSE_MODE=auto goose run -s --with-builtin developer -t "prompt"
 
 # Streaming mode (autonomous)
-goose run -t "prompt" --output-format stream-json -n <task-name>
+GOOSE_MODE=auto goose run --output-format json --with-builtin developer -t "prompt"
 
 # With system instructions
-goose run -t "prompt" --system "additional instructions" --output-format stream-json
+GOOSE_MODE=auto goose run --with-builtin developer --system "instructions" -t "prompt"
 
 # Resume session
-goose run -t "continue" --session-id <session_id> --output-format stream-json
+GOOSE_MODE=auto goose run --session-id <session_id> --with-builtin developer -t "prompt"
 ```
+
+Bloom automatically:
+- Sets `GOOSE_MODE=auto` for autonomous execution without approval prompts
+- Adds `--with-builtin developer` for development-focused capabilities
 
 ### Key Flags
 
