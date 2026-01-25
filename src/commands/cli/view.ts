@@ -21,7 +21,7 @@ export function registerViewCommands(cli: Clerc): Clerc {
           default: true,
         },
       },
-      group: "monitor",
+      help: { group: "monitor" },
     })
     .on("view", async (ctx) => {
       const { port, open } = ctx.flags as { port: number; open: boolean };
