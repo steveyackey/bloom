@@ -235,6 +235,11 @@ export async function runAgentWorkLoop(agentName: string): Promise<void> {
   // Cache agents by provider to avoid recreating them
   const agentCache = new Map<string, Awaited<ReturnType<typeof createAgent>>>();
 
+  // Track commit retry attempts per task to prevent infinite loops
+  // When an agent fails to commit changes, we retry up to MAX_COMMIT_RETRIES times
+  const MAX_COMMIT_RETRIES = 3;
+  const commitRetryCount = new Map<string, number>();
+
   async function getOrCreateAgent(provider: string) {
     if (!agentCache.has(provider)) {
       agentLog.debug(`Creating agent for provider: ${provider}`);

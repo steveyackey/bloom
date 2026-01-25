@@ -234,7 +234,7 @@ const STATIC_MODELS: Record<string, string[]> = {
 export async function listAgentModels(name: string): Promise<string[] | null> {
   // Check for static models first
   if (name in STATIC_MODELS) {
-    return STATIC_MODELS[name];
+    return STATIC_MODELS[name] ?? null;
   }
 
   const definition = getAgentDefinition(name);
@@ -289,7 +289,7 @@ function parseCopilotModels(output: string): string[] {
     // Parse model lines like:  - "claude-sonnet-4.5"
     if (inModelSection) {
       const match = line.match(/^\s+-\s+"([^"]+)"/);
-      if (match) {
+      if (match?.[1]) {
         models.push(match[1]);
       }
     }
