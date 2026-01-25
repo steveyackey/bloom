@@ -593,26 +593,46 @@ export class GenericAgentProvider implements Agent {
     // Handle goose-style output: { messages: [...], metadata: {...} }
     const messages = data.messages as Array<{
       role?: string;
-      content?: Array<{ type: string; text?: string }> | string;
+      content?: Array<Record<string, unknown>> | string;
     }>;
 
     if (Array.isArray(messages)) {
       for (const msg of messages) {
-        if (msg.role === "assistant") {
-          // Render assistant messages
-          if (typeof msg.content === "string") {
+        if (typeof msg.content === "string") {
+          // String content - render directly for assistant messages
+          if (msg.role === "assistant") {
             process.stdout.write(msg.content);
             outputAccumulator.value += msg.content;
-          } else if (Array.isArray(msg.content)) {
-            for (const block of msg.content) {
-              if (block.type === "text" && block.text) {
-                process.stdout.write(block.text);
-                outputAccumulator.value += block.text;
-              } else if (block.type === "tool_use" || block.type === "tool_call") {
-                const toolName = (block as Record<string, unknown>).name || "unknown";
-                process.stdout.write(`\n${chalk.cyan(`[tool: ${toolName}]`)}\n`);
-              } else if (block.type === "tool_result" || block.type === "tool_response") {
-                process.stdout.write(`${chalk.dim("[result]")}\n`);
+          }
+        } else if (Array.isArray(msg.content)) {
+          for (const block of msg.content) {
+            const blockType = block.type as string;
+
+            if (blockType === "text" && block.text) {
+              // Text block - render for assistant messages
+              if (msg.role === "assistant") {
+                const text = block.text as string;
+                process.stdout.write(text);
+                outputAccumulator.value += text;
+              }
+            } else if (blockType === "tool_use" || blockType === "tool_call" || blockType === "toolUse") {
+              // Tool use block
+              const toolName = (block.name || block.tool_name || "unknown") as string;
+              process.stdout.write(`\n${chalk.cyan(`[tool: ${toolName}]`)}\n`);
+            } else if (blockType === "tool_result" || blockType === "tool_response" || blockType === "toolResponse") {
+              // Tool response block (usually in user role messages)
+              process.stdout.write(`${chalk.dim("[result]")}\n`);
+
+              // Extract text from toolResult.value array if present (goose format)
+              const toolResult = block.toolResult as { value?: Array<Record<string, unknown>> } | undefined;
+              if (toolResult?.value && Array.isArray(toolResult.value)) {
+                for (const item of toolResult.value) {
+                  if (item.type === "text" && item.text) {
+                    const text = item.text as string;
+                    process.stdout.write(chalk.dim(text));
+                    outputAccumulator.value += text;
+                  }
+                }
               }
             }
           }
@@ -648,18 +668,34 @@ export class GenericAgentProvider implements Agent {
   private extractBatchText(data: Record<string, unknown>, outputAccumulator: { value: string }): void {
     const messages = data.messages as Array<{
       role?: string;
-      content?: Array<{ type: string; text?: string }> | string;
+      content?: Array<Record<string, unknown>> | string;
     }>;
 
     if (Array.isArray(messages)) {
       for (const msg of messages) {
-        if (msg.role === "assistant") {
-          if (typeof msg.content === "string") {
+        if (typeof msg.content === "string") {
+          // String content - extract from assistant messages
+          if (msg.role === "assistant") {
             outputAccumulator.value += msg.content;
-          } else if (Array.isArray(msg.content)) {
-            for (const block of msg.content) {
-              if (block.type === "text" && block.text) {
-                outputAccumulator.value += block.text;
+          }
+        } else if (Array.isArray(msg.content)) {
+          for (const block of msg.content) {
+            const blockType = block.type as string;
+
+            if (blockType === "text" && block.text) {
+              // Text block - extract from assistant messages
+              if (msg.role === "assistant") {
+                outputAccumulator.value += block.text as string;
+              }
+            } else if (blockType === "tool_result" || blockType === "tool_response" || blockType === "toolResponse") {
+              // Tool response block - extract text from toolResult.value array
+              const toolResult = block.toolResult as { value?: Array<Record<string, unknown>> } | undefined;
+              if (toolResult?.value && Array.isArray(toolResult.value)) {
+                for (const item of toolResult.value) {
+                  if (item.type === "text" && item.text) {
+                    outputAccumulator.value += item.text as string;
+                  }
+                }
               }
             }
           }
