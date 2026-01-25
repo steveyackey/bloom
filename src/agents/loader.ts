@@ -222,9 +222,21 @@ export async function getAgentVersion(name: string): Promise<string | null> {
 // =============================================================================
 
 /**
+ * Static model lists for agents without discovery commands
+ */
+const STATIC_MODELS: Record<string, string[]> = {
+  claude: ["sonnet", "haiku", "opus"],
+};
+
+/**
  * List available models for an agent (if supported)
  */
 export async function listAgentModels(name: string): Promise<string[] | null> {
+  // Check for static models first
+  if (name in STATIC_MODELS) {
+    return STATIC_MODELS[name];
+  }
+
   const definition = getAgentDefinition(name);
   if (!definition || !definition.models_command) {
     return null;
@@ -238,13 +250,52 @@ export async function listAgentModels(name: string): Promise<string[] | null> {
 
     if (result.exitCode === 0) {
       const output = result.stdout.toString().trim();
-      // Try to parse as lines
+
+      // Parse copilot's "help config" output format
+      if (name === "copilot" && definition.models_command.includes("help")) {
+        return parseCopilotModels(output);
+      }
+
+      // Default: parse as lines
       return output.split("\n").filter((line) => line.trim());
     }
     return null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Parse models from copilot help config output.
+ * Looks for lines like:  - "model-name"
+ */
+function parseCopilotModels(output: string): string[] {
+  const models: string[] = [];
+  const lines = output.split("\n");
+  let inModelSection = false;
+
+  for (const line of lines) {
+    // Detect start of model section
+    if (line.includes("`model`:")) {
+      inModelSection = true;
+      continue;
+    }
+
+    // Detect end of model section (next config key)
+    if (inModelSection && line.match(/^\s+`\w+`:/)) {
+      break;
+    }
+
+    // Parse model lines like:  - "claude-sonnet-4.5"
+    if (inModelSection) {
+      const match = line.match(/^\s+-\s+"([^"]+)"/);
+      if (match) {
+        models.push(match[1]);
+      }
+    }
+  }
+
+  return models;
 }
 
 // =============================================================================

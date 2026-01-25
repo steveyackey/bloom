@@ -87,6 +87,7 @@ export const copilotAgent: AgentDefinition = {
     session_id_field: "session_id",
   },
 
+  models_command: ["help", "config"],
   model_required_for_streaming: false,
 };
 
