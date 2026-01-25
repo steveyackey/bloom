@@ -2,10 +2,20 @@
 // Agent Commands for Clerc CLI
 // =============================================================================
 
+import chalk from "chalk";
 import type { Clerc } from "clerc";
 
+import { createAgentByName } from "../../agents/factory";
+import {
+  checkAllAgentAvailability,
+  getAgentDefinition,
+  getAgentVersion,
+  getRegisteredAgentNames,
+  isValidAgentName,
+} from "../../agents/loader";
 import { getAgentNamesSync } from "../../completions/providers";
 import { triggerInterject } from "../../human-queue";
+import { getDefaultAgentName, loadUserConfig } from "../../user-config";
 import { getTasksFile } from "../context";
 import { runAgentWorkLoop, startOrchestrator } from "../orchestrator";
 import { cmdAgents } from "../tasks";
@@ -84,5 +94,168 @@ export function registerAgentCommands(cli: Clerc): Clerc {
       const reason = (ctx.parameters.reason as string) || undefined;
       await triggerInterject(name, reason);
       console.log(`Interject triggered for agent: ${name}`);
+    })
+    .command("agent check", "Check which agent CLIs are installed and available", {
+      help: { group: "system" },
+    })
+    .on("agent check", async () => {
+      await cmdAgentCheck();
+    })
+    .command("agent validate", "Validate an agent works by running a test prompt", {
+      parameters: [
+        {
+          key: "[name]",
+          description: "Agent to validate (uses default if not specified)",
+        },
+      ],
+      flags: {
+        streaming: {
+          type: Boolean,
+          short: "s",
+          description: "Test streaming (non-interactive) mode instead of interactive",
+        },
+      },
+      help: { group: "system" },
+    })
+    .on("agent validate", async (ctx) => {
+      const name = ctx.parameters.name as string | undefined;
+      const streaming = ctx.flags.streaming as boolean;
+      await cmdAgentValidate(name, streaming);
     });
+}
+
+// =============================================================================
+// Agent Check Command
+// =============================================================================
+
+async function cmdAgentCheck(): Promise<void> {
+  const userConfig = await loadUserConfig({ validate: false });
+  const defaultAgent = getDefaultAgentName(userConfig);
+  const registeredAgents = getRegisteredAgentNames();
+
+  console.log(chalk.bold("Agent CLI Status\n"));
+
+  // Check availability of all agents
+  const availability = await checkAllAgentAvailability();
+
+  // Get versions for available agents
+  const versions: Record<string, string | null> = {};
+  for (const name of registeredAgents) {
+    if (availability[name]) {
+      versions[name] = await getAgentVersion(name);
+    }
+  }
+
+  // Display results
+  for (const name of registeredAgents) {
+    const isDefault = name === defaultAgent;
+    const isAvailable = availability[name];
+    const version = versions[name];
+
+    const defaultBadge = isDefault ? chalk.cyan(" (default)") : "";
+    const statusIcon = isAvailable ? chalk.green("✓") : chalk.red("✗");
+    const nameText = isAvailable ? chalk.white(name) : chalk.dim(name);
+    const versionText = version ? chalk.dim(` ${version}`) : "";
+    const notInstalled = isAvailable ? "" : chalk.red(" not installed");
+
+    console.log(`  ${statusIcon} ${nameText}${defaultBadge}${versionText}${notInstalled}`);
+  }
+
+  // Show warning if default agent is not available
+  if (!availability[defaultAgent]) {
+    console.log("");
+    console.log(chalk.yellow(`Warning: Your default agent '${defaultAgent}' is not installed.`));
+    console.log(chalk.dim(`  Install it or change your default with: bloom config set-default <agent>`));
+  }
+
+  // Summary
+  const availableCount = Object.values(availability).filter(Boolean).length;
+  const totalCount = registeredAgents.length;
+  console.log("");
+  console.log(chalk.dim(`${availableCount}/${totalCount} agents available`));
+}
+
+// =============================================================================
+// Agent Validate Command
+// =============================================================================
+
+async function cmdAgentValidate(agentName?: string, streaming = false): Promise<void> {
+  const userConfig = await loadUserConfig({ validate: false });
+  const defaultAgent = getDefaultAgentName(userConfig);
+  const targetAgent = agentName || defaultAgent;
+
+  // Check if agent is registered
+  if (!isValidAgentName(targetAgent)) {
+    console.error(chalk.red(`Unknown agent: ${targetAgent}`));
+    console.error(chalk.dim(`Available agents: ${getRegisteredAgentNames().join(", ")}`));
+    process.exit(1);
+  }
+
+  // Check if CLI is installed
+  const availability = await checkAllAgentAvailability();
+  if (!availability[targetAgent]) {
+    console.error(chalk.red(`Agent CLI not installed: ${targetAgent}`));
+    console.error(chalk.dim("Run 'bloom agent check' to see installation status"));
+    process.exit(1);
+  }
+
+  const definition = getAgentDefinition(targetAgent);
+  if (!definition) {
+    console.error(chalk.red(`No definition found for agent: ${targetAgent}`));
+    process.exit(1);
+  }
+
+  const mode = streaming ? "streaming" : "interactive";
+  console.log(chalk.bold(`\nValidating ${targetAgent} in ${mode} mode...\n`));
+
+  // Show the command that will be run
+  const modeConfig = streaming ? definition.streaming : definition.interactive;
+  const cmdParts = [definition.command];
+  if (modeConfig.subcommand) {
+    cmdParts.push(modeConfig.subcommand);
+  }
+  cmdParts.push(...modeConfig.base_args);
+  console.log(chalk.dim(`Command: ${cmdParts.join(" ")} [+ prompt]\n`));
+
+  const testPrompt = "Reply with ONLY the single word 'VALIDATED' and nothing else.";
+  const testSystemPrompt = "You are a validation test. Follow instructions exactly.";
+
+  try {
+    const agent = createAgentByName(targetAgent, !streaming);
+
+    const startTime = Date.now();
+    const result = await agent.run({
+      prompt: testPrompt,
+      systemPrompt: testSystemPrompt,
+      startingDirectory: process.cwd(),
+      agentName: `validate-${targetAgent}`,
+    });
+
+    const duration = Date.now() - startTime;
+
+    console.log("");
+    if (result.success) {
+      const hasValidated = result.output.toLowerCase().includes("validated");
+      if (hasValidated) {
+        console.log(chalk.green("✓ Agent validated successfully"));
+        console.log(chalk.dim(`  Response received in ${(duration / 1000).toFixed(1)}s`));
+      } else {
+        console.log(chalk.yellow("⚠ Agent responded but output unexpected"));
+        console.log(chalk.dim(`  Expected 'VALIDATED', got: ${result.output.slice(0, 100)}...`));
+      }
+    } else {
+      console.log(chalk.red("✗ Agent validation failed"));
+      if (result.error) {
+        console.log(chalk.red(`  Error: ${result.error}`));
+      }
+    }
+
+    if (result.sessionId) {
+      console.log(chalk.dim(`  Session: ${result.sessionId}`));
+    }
+  } catch (error) {
+    console.error(chalk.red("✗ Agent validation failed"));
+    console.error(chalk.red(`  Error: ${error instanceof Error ? error.message : String(error)}`));
+    process.exit(1);
+  }
 }

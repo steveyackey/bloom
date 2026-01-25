@@ -250,11 +250,21 @@ bloom repo worktree remove <repo> <branch> # Remove a worktree
 bloom repo worktree list <repo>            # List worktrees for repo
 ```
 
+### Agent Management
+
+```bash
+bloom agent check            # Check which agent CLIs are installed
+bloom agent validate [name]  # Validate an agent works with a test prompt
+bloom agent validate -s      # Validate in streaming (non-interactive) mode
+bloom agents                 # List agents and their assigned tasks
+```
+
 ### Configuration
 
 ```bash
 bloom config                 # Show user config (~/.bloom/config.yaml)
 bloom config set-protocol <ssh|https>  # Change git URL preference (SSH or HTTPS)
+bloom config set-default <agent>       # Change default agent (claude, goose, etc.)
 ```
 
 Git protocol preference is set during `bloom init` and stored in `~/.bloom/config.yaml`. This determines how repository URLs are normalized when cloning.

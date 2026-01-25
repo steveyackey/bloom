@@ -570,7 +570,7 @@ describe("CLI Smoke Tests", () => {
     const GOOSE_INSTALLED = isCLIInstalled("goose");
 
     test.skipIf(!GOOSE_INSTALLED)("goose CLI responds to version check", async () => {
-      const result = Bun.spawnSync(["goose", "version"], {
+      const result = Bun.spawnSync(["goose", "--version"], {
         stdout: "pipe",
         stderr: "pipe",
         timeout: 10000,

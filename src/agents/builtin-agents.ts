@@ -137,27 +137,28 @@ export const codexAgent: AgentDefinition = {
 
 export const gooseAgent: AgentDefinition = {
   command: "goose",
-  version: ["version"], // goose uses 'version' subcommand
+  version: ["--version"],
   docs: "https://block.github.io/goose/",
   description: "Block's Goose CLI for extensible automation via MCP",
 
   flags: {
-    model: [], // Uses configured provider
+    model: ["--model"],
     resume: ["--session-id"],
+    system_prompt: ["--system"],
   },
 
   interactive: {
-    subcommand: "session",
-    base_args: [],
-    prompt: "positional", // Session is interactive REPL
-    prepend_system_prompt: true,
+    subcommand: "run",
+    base_args: ["-s"], // -s continues interactively after processing prompt
+    prompt: { flag: "-t" },
+    prepend_system_prompt: false, // goose has --system flag
   },
 
   streaming: {
     subcommand: "run",
-    base_args: ["--output-format", "stream-json"],
+    base_args: ["--output-format", "json"],
     prompt: { flag: "-t" },
-    prepend_system_prompt: true,
+    prepend_system_prompt: false, // goose has --system flag
   },
 
   env: {
@@ -166,7 +167,7 @@ export const gooseAgent: AgentDefinition = {
   },
 
   output: {
-    format: "stream-json",
+    format: "json",
     session_id_field: "session_id",
   },
 
