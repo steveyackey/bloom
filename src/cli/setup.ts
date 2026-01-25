@@ -1,11 +1,9 @@
 // =============================================================================
-// Setup Commands for Clerc CLI (init, create, setup)
+// Setup Command for Clerc CLI
 // =============================================================================
 
 import type { Clerc } from "clerc";
 import { BLOOM_DIR } from "../commands/context";
-import { cmdCreate } from "../commands/create";
-import { cmdInit } from "../commands/init";
 import { listRepos, syncRepos } from "../infra/git";
 
 // =============================================================================
@@ -13,29 +11,10 @@ import { listRepos, syncRepos } from "../infra/git";
 // =============================================================================
 
 /**
- * Register setup commands with a Clerc CLI instance.
- *
- * Commands:
- * - init: Initialize a Bloom workspace
- * - create: Create a new project with PRD template
- * - setup: Sync repositories (clone or update)
+ * Register the setup command with a Clerc CLI instance.
  */
-export function registerSetupCommands(cli: Clerc): Clerc {
+export function registerSetupCommand(cli: Clerc): Clerc {
   return cli
-    .command("init", "Initialize a Bloom workspace in the current directory", {
-      help: { group: "workflow" },
-    })
-    .on("init", async () => {
-      await cmdInit();
-    })
-    .command("create", "Create a new project with PRD template", {
-      parameters: ["[name...]"],
-      help: { group: "workflow" },
-    })
-    .on("create", async (ctx) => {
-      const nameArgs = (ctx.parameters.name as string[]) || [];
-      await cmdCreate(nameArgs);
-    })
     .command("setup", "Sync repositories (clone or update all configured repos)", {
       help: { group: "system" },
     })

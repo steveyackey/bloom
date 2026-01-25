@@ -30,6 +30,25 @@ Installation changes must be reflected in:
 
 Flow: init workspace → clone repos → create project → refine PRD → plan → refine plan → generate → run
 
+## CLI Commands
+
+CLI commands are organized by top-level command name in `src/cli/`. Each file is named after the command it implements:
+
+| File | Commands |
+|------|----------|
+| `agent.ts` | `bloom agent list`, `bloom agent check`, etc. |
+| `repo.ts` | `bloom repo clone`, `bloom repo sync`, etc. |
+| `run.ts` | `bloom run` |
+| `task.ts` | `bloom list`, `bloom show`, `bloom done`, etc. |
+
+**Adding a new top-level command:**
+1. Create `src/cli/<command>.ts`
+2. Export `register<Command>Command(cli: Clerc)`
+3. Add export to `src/cli/index.ts`
+4. Register in `src/cli.ts`
+
+Entry point: `src/cli.ts` (Clerc setup + command registration)
+
 ## TUI Colors
 
 Use `chalk` for all terminal colors. For xterm.js cell rendering, use helper methods (`isFgDefault()`, `isFgPalette()`, `isFgRGB()`) not raw color mode values.
