@@ -7,7 +7,7 @@ import { dirname } from "node:path";
 import chalk from "chalk";
 import { loadTasks } from "../tasks";
 import { buildTaskGraph, type TaskGraph } from "./graph";
-import { buildSystemPrompt, buildTaskPrompt } from "./prompts";
+import { buildSystemPrompt, buildTaskPrompt, computeWorkingDirectory } from "./prompts";
 import { renderHTML } from "./ui";
 
 export interface ServerOptions {
@@ -96,10 +96,12 @@ async function handleRequest(req: Request): Promise<Response> {
         buildSystemPrompt(node, state.tasksFile),
         buildTaskPrompt(node, state.graph),
       ]);
+      const workingDirectory = computeWorkingDirectory(node, state.tasksFile);
 
       return Response.json({
         systemPrompt,
         userPrompt,
+        workingDirectory,
       });
     } catch (err) {
       return Response.json(
