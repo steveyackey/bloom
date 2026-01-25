@@ -16,8 +16,6 @@
 //
 // =============================================================================
 
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
 import { EMBEDDED_PROMPTS } from "../prompts-embedded";
 
 // =============================================================================
@@ -51,10 +49,8 @@ export interface CompileOptions {
  * Compiles prompt templates with variable substitution.
  */
 export class PromptCompiler {
-  private promptsDir: string;
-
-  constructor(promptsDir?: string) {
-    this.promptsDir = promptsDir ?? resolve(import.meta.dirname ?? ".", "..", "..", "prompts", "core");
+  constructor() {
+    // No longer needs promptsDir - always uses embedded prompts
   }
 
   /**
@@ -81,31 +77,20 @@ export class PromptCompiler {
   }
 
   /**
-   * Load and compile a prompt from a file.
-   * Falls back to embedded prompts if the file doesn't exist (for bundled binary).
+   * Load and compile a prompt from embedded prompts.
    *
-   * @param name - The prompt file name (without .md extension)
+   * @param name - The prompt name
    * @param options - Compilation options
    * @returns The compiled prompt
    */
   async loadAndCompile(name: string, options: CompileOptions = {}): Promise<string> {
-    const filePath = join(this.promptsDir, `${name}.md`);
+    const content = EMBEDDED_PROMPTS[name];
 
-    let content: string;
-
-    if (existsSync(filePath)) {
-      // Load from filesystem
-      content = await Bun.file(filePath).text();
-    } else if (EMBEDDED_PROMPTS[name]) {
-      // Fall back to embedded prompts (for bundled binary)
-      content = EMBEDDED_PROMPTS[name];
-    } else {
-      throw new Error(
-        `Prompt file not found: ${name} (checked: ${filePath}, embedded: ${Object.keys(EMBEDDED_PROMPTS).join(", ")})`
-      );
+    if (!content) {
+      throw new Error(`Prompt not found: ${name} (available: ${Object.keys(EMBEDDED_PROMPTS).join(", ")})`);
     }
 
-    return this.compile(content, { ...options, fileName: `${name}.md` });
+    return this.compile(content, { ...options, fileName: `${name}` });
   }
 
   /**
@@ -144,8 +129,8 @@ export class PromptCompiler {
 /**
  * Create a default PromptCompiler instance.
  */
-export function createCompiler(promptsDir?: string): PromptCompiler {
-  return new PromptCompiler(promptsDir);
+export function createCompiler(): PromptCompiler {
+  return new PromptCompiler();
 }
 
 /**
