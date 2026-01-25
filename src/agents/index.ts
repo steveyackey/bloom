@@ -12,7 +12,7 @@ export {
 } from "./availability";
 
 // Built-in agents
-export { BUILTIN_AGENTS, getBuiltinAgent, getBuiltinAgentNames } from "./builtin-agents";
+export { BUILTIN_AGENTS } from "./builtin-agents";
 
 // Agent registry types (backward compatibility)
 export type { AgentName, BuiltinAgentName } from "./capabilities";

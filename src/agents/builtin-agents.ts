@@ -277,17 +277,3 @@ export const BUILTIN_AGENTS: Record<string, AgentDefinition> = {
   opencode: opencodeAgent,
   test: testAgent,
 };
-
-/**
- * Get a built-in agent definition by name
- */
-export function getBuiltinAgent(name: string): AgentDefinition | undefined {
-  return BUILTIN_AGENTS[name];
-}
-
-/**
- * Get all built-in agent names
- */
-export function getBuiltinAgentNames(): string[] {
-  return Object.keys(BUILTIN_AGENTS);
-}

@@ -251,5 +251,4 @@ export async function listAgentModels(name: string): Promise<string[] | null> {
 // Re-exports for convenience
 // =============================================================================
 
-export { BUILTIN_AGENTS, getBuiltinAgent, getBuiltinAgentNames } from "./builtin-agents";
 export type { AgentDefinition } from "./schema";
