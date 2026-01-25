@@ -292,6 +292,8 @@ agent:
 
 ```bash
 bloom run                    # Start TUI with all agents
+bloom run --agent copilot    # Use a different agent provider
+bloom run --agent test       # Use test agent (for development/CI)
 ```
 
 ### Planning

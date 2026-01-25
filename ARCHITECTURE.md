@@ -1,6 +1,6 @@
 # Bloom Architecture
 
-This document describes the architecture of Bloom, a CLI tool for orchestrating AI agents across multiple repositories.
+Bloom is a CLI tool for orchestrating AI agents across multiple repositories. This document describes its layered architecture and key design decisions.
 
 ## Directory Structure
 
@@ -24,29 +24,28 @@ src/
 │   └── orchestrator/             # Agent orchestration system
 │       ├── index.ts              # Public exports
 │       ├── events.ts             # Event type definitions
-│       ├── work-loop.ts          # Main agent work loop (accepts EventHandler)
+│       ├── work-loop.ts          # Main agent work loop
 │       ├── task-prompt.ts        # Task fetching and prompt building
-│       └── post-task.ts          # Post-task git operations (push, PR, merge)
+│       └── post-task.ts          # Post-task git operations
 │
 ├── adapters/                     # Interface-specific implementations
 │   ├── cli/                      # CLI adapter
 │   │   ├── index.ts              # Public exports
 │   │   └── event-handler.ts      # Event → console output
 │   │
-│   └── tui/                      # Event-driven TUI adapter
+│   └── tui/                      # Terminal UI adapter
 │       ├── index.ts              # Public exports
 │       ├── tui.ts                # EventDrivenTUI class
 │       └── types.ts              # TUI type definitions
 │
 ├── commands/                     # Command implementations
-│   ├── orchestrator.ts           # Orchestrator startup and TUI
+│   ├── orchestrator.ts           # Orchestrator startup
 │   ├── tasks.ts                  # Task command handlers
 │   └── ...                       # Other command handlers
 │
 ├── infra/                        # Infrastructure adapters
 │   ├── git/                      # Git operations
-│   │   ├── index.ts              # Re-exports
-│   │   ├── config.ts             # bloom.config.yaml schema and paths
+│   │   ├── config.ts             # bloom.config.yaml schema
 │   │   ├── clone.ts              # Clone and create operations
 │   │   ├── sync.ts               # Pull, sync, remove, list
 │   │   ├── worktree.ts           # Worktree management
@@ -54,20 +53,19 @@ src/
 │   │   └── merge-lock.ts         # Merge lock system
 │   │
 │   ├── config/                   # User configuration
-│   │   ├── index.ts              # Re-exports
 │   │   ├── schema.ts             # Zod schemas
-│   │   ├── agent-config.ts       # Per-agent configuration helpers
-│   │   ├── loader.ts             # Config load/save operations
+│   │   ├── agent-config.ts       # Per-agent configuration
+│   │   ├── loader.ts             # Config load/save
 │   │   └── git-url.ts            # Git URL utilities
 │   │
 │   ├── logger.ts                 # Structured logging
-│   └── terminal.ts               # Process stats utilities
+│   ├── terminal.ts               # Process stats utilities
+│   └── colors.ts                 # Chalk-based styling
 │
 ├── agents/                       # Agent provider system
-│   ├── index.ts                  # Public exports
 │   ├── core.ts                   # Agent interfaces
 │   ├── factory.ts                # Agent creation factory
-│   ├── loader.ts                 # Agent registry and validation
+│   ├── loader.ts                 # Agent registry
 │   ├── capabilities.ts           # Agent capabilities
 │   ├── availability.ts           # CLI availability checking
 │   ├── schema.ts                 # AgentDefinition schema
@@ -84,9 +82,6 @@ src/
 │   ├── graph.ts                  # Task dependency graph
 │   └── prompts.ts                # Prompt UI components
 │
-├── completions/                  # CLI argument completions
-│   └── providers.ts              # Completion providers
-│
 ├── task-schema.ts                # Task data models (Zod schemas)
 └── prompts-embedded.ts           # Embedded prompt templates
 ```
@@ -95,87 +90,114 @@ src/
 
 ### CLI Layer (`src/cli/`)
 
-Thin command definitions using the Clerc framework. Each file:
-- Registers commands with Clerc
-- Parses arguments and flags
-- Delegates to core layer for business logic
-- Handles CLI-specific output formatting
-
-**Rule:** No business logic in CLI layer. Commands should be <50 lines.
+Thin command definitions using the Clerc framework. Each file registers commands, parses arguments, and delegates to the core layer. No business logic lives here—commands should be under 50 lines.
 
 ### Core Layer (`src/core/`)
 
-Business logic and orchestration. This layer:
-- Implements the main workflows (orchestration, planning, project creation)
-- Manages task state and transitions
-- Coordinates between infrastructure components
+Business logic and orchestration, designed to be I/O-free and event-driven:
 
-**Key modules:**
-- `orchestrator/` - The agent work loop, task assignment, and post-task git operations
-- `tui/` - Multi-pane terminal UI for monitoring agents
-- `project.ts` - Project scaffolding from templates
-- `planning.ts` - AI-assisted planning sessions
-- `tasks.ts` - Task file CRUD operations
-- `questions.ts` - Human-in-the-loop question queue
+- **`orchestrator/`** - The agent work loop, task assignment, and post-task git operations. Emits events rather than writing to stdout directly.
+
+### Adapters Layer (`src/adapters/`)
+
+Interface-specific implementations that consume events from the core layer:
+
+- **`cli/`** - Converts orchestrator events to console log output
+- **`tui/`** - Renders events in a multi-pane terminal UI with scrollable output
 
 ### Infrastructure Layer (`src/infra/`)
 
 Low-level operations and external integrations:
 
-**`git/`** - All git operations via subprocess:
-- Bare repository management
-- Worktree creation/cleanup
-- Branch operations, push, merge
-- Merge lock system for concurrent agents
-
-**`config/`** - Configuration management:
-- User config (`~/.bloom/config.yaml`)
-- Agent-specific settings
-- Git URL normalization
-
-**`terminal.ts`** - Process stats utilities for CPU/memory monitoring
-
-**`output.ts`** - Unified output system:
-- Structured logging with levels
-- Chalk-based styled output
-- Semantic output helpers (`out.success()`, `out.error()`, etc.)
+- **`git/`** - All git operations via subprocess (bare repos, worktrees, branches, merge locks)
+- **`config/`** - Configuration management (`~/.bloom/config.yaml`, agent settings)
+- **`logger.ts`** - Structured logging with levels
+- **`terminal.ts`** - Process stats (CPU/memory) for running agents
+- **`colors.ts`** - Chalk-based terminal styling
 
 ### Agents Layer (`src/agents/`)
 
-Pluggable AI agent system:
-- Generic provider supporting multiple backends (Claude, Copilot, Codex, etc.)
-- Agent capability registry
-- Session management for resume/interjection
+Pluggable AI agent system with a generic provider supporting multiple backends (Claude, Copilot, Codex, Goose, OpenCode). Includes session management for resume and interjection.
 
 ### Prompts Layer (`src/prompts/`)
 
-Prompt template system:
-- Loads prompts from markdown files
-- Variable substitution for task context
-- Embedded prompts for bundled distribution
+Prompt template system that loads markdown files and performs variable substitution for task context.
 
-## Data Flow
+## Event-Driven Orchestration
+
+The orchestrator uses an event-based architecture to decouple core logic from output rendering:
 
 ```
-User Input
-    │
-    ▼
-┌─────────┐
-│   CLI   │  Parse args, validate, delegate
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│  Core   │  Business logic, orchestration
-└────┬────┘
-     │
-     ├──────────────┬──────────────┐
-     ▼              ▼              ▼
-┌─────────┐   ┌─────────┐   ┌─────────┐
-│  Infra  │   │ Agents  │   │ Prompts │
-│  (git)  │   │         │   │         │
-└─────────┘   └─────────┘   └─────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         Core Layer                              │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              core/orchestrator/                          │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │   │
+│  │  │  work-loop   │  │ task-prompt  │  │  post-task   │   │   │
+│  │  └──────┬───────┘  └──────────────┘  └──────────────┘   │   │
+│  │         │                                                │   │
+│  │         │ emits OrchestratorEvent                        │   │
+│  │         ▼                                                │   │
+│  │  ┌──────────────┐                                        │   │
+│  │  │  events.ts   │  ← EventHandler callback               │   │
+│  │  └──────────────┘                                        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌───────────────────────────────────────────────────┐
+│                   Adapters Layer                  │
+│  ┌─────────────────────┐  ┌─────────────────────┐ │
+│  │    adapters/cli     │  │    adapters/tui     │ │
+│  │   → console.log     │  │   → TUI render      │ │
+│  └─────────────────────┘  └─────────────────────┘ │
+└───────────────────────────────────────────────────┘
 ```
+
+### Event Categories
+
+Events are defined in `src/core/orchestrator/events.ts`:
+
+| Category | Events |
+|----------|--------|
+| **Agent Lifecycle** | `agent:started`, `agent:idle`, `agent:output`, `agent:process_started`, `agent:process_ended` |
+| **Task Lifecycle** | `task:found`, `task:started`, `task:completed`, `task:failed`, `task:blocked` |
+| **Git Operations** | `git:pulling`, `git:pulled`, `git:pushing`, `git:pushed`, `git:merging`, `git:merged`, `git:merge_conflict`, `git:cleanup` |
+| **Worktree** | `worktree:creating`, `worktree:created` |
+| **PR Operations** | `git:pr_creating`, `git:pr_created` |
+| **Merge Lock** | `merge:lock_waiting`, `merge:lock_acquired`, `merge:lock_timeout` |
+| **Conflict Resolution** | `merge:conflict_resolving`, `merge:conflict_resolved` |
+| **Session** | `session:corrupted` |
+| **Generic** | `error`, `log` |
+
+### Using the Event System
+
+```typescript
+import { runAgentWorkLoop } from './core/orchestrator';
+
+// Subscribe to events with a callback
+await runAgentWorkLoop(agentName, options, (event) => {
+  switch (event.type) {
+    case 'task:found':
+      console.log(`Found: ${event.taskId}`);
+      break;
+    case 'task:completed':
+      console.log(`Done: ${event.taskId} (${event.duration}s)`);
+      break;
+  }
+});
+
+// Or use the CLI adapter for standard console output
+import { runAgentWorkLoopCLI } from './adapters/cli';
+await runAgentWorkLoopCLI(agentName, options);
+```
+
+### Why Events?
+
+- **Testability** - Mock the event handler to verify behavior without I/O
+- **Flexibility** - Add new interfaces (TUI, web, etc.) without modifying core logic
+- **Observability** - Events can be logged, streamed, or analyzed
+- **Decoupling** - Core logic doesn't know about output format
 
 ## Key Design Decisions
 
@@ -187,31 +209,19 @@ All persistent state is stored in YAML files:
 - `~/.bloom/config.yaml` - User preferences
 - `.questions/`, `.interjections/` - Human interaction queues
 
-This enables:
-- Easy debugging (inspect files directly)
-- Git-friendly (can commit task state)
-- No database dependency
+This enables easy debugging (inspect files directly), git-friendly workflows (commit task state), and no database dependency.
 
 ### 2. Worktree-Based Isolation
 
-Each agent works in its own git worktree:
-- Agents can work on different tasks concurrently
-- No conflicts between agent changes
-- Clean merge workflow back to main branches
+Each agent works in its own git worktree, enabling concurrent work on different tasks without conflicts. Changes merge back to main branches through the post-task workflow.
 
 ### 3. Human-in-the-Loop
 
-File-based queues enable asynchronous human interaction:
-- Agents can ask questions and continue other work
-- Humans can interject running agents
-- State persists across restarts
+File-based queues enable asynchronous human interaction. Agents can ask questions and continue other work. Humans can interject running agents. State persists across restarts.
 
 ### 4. Generic Agent Provider
 
-Single provider implementation supports all agent types:
-- Schema-driven configuration
-- Consistent session management
-- Easy to add new agent backends
+A single provider implementation supports all agent types through schema-driven configuration. This provides consistent session management and makes it easy to add new agent backends.
 
 ## Configuration Hierarchy
 
@@ -227,107 +237,3 @@ project/PRD.md                # Project requirements
 project/plan.md               # Project plan
 project/CLAUDE.md             # Agent instructions
 ```
-
----
-
-## Event-Based Architecture
-
-The orchestrator uses an event-based architecture to decouple core logic from output rendering. This enables multiple interfaces (CLI, TUI, Web) to consume the same core logic.
-
-### Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Core Layer                              │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              core/orchestrator/                          │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │   │
-│  │  │  work-loop   │  │ task-prompt  │  │  post-task   │   │   │
-│  │  │    .ts       │  │    .ts       │  │    .ts       │   │   │
-│  │  └──────┬───────┘  └──────────────┘  └──────────────┘   │   │
-│  │         │                                                │   │
-│  │         │ emits OrchestratorEvent                        │   │
-│  │         ▼                                                │   │
-│  │  ┌──────────────┐                                        │   │
-│  │  │  events.ts   │  (EventHandler callback)               │   │
-│  │  └──────────────┘                                        │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌───────────────────────────────────────────────────┐
-│                   Adapters Layer                  │
-│  ┌─────────────────────┐  ┌─────────────────────┐ │
-│  │    adapters/cli     │  │    adapters/tui     │ │
-│  │                     │  │                     │ │
-│  │   event-handler     │  │   EventDrivenTUI    │ │
-│  │   → console.log     │  │   → TUI render      │ │
-│  └─────────────────────┘  └─────────────────────┘ │
-└───────────────────────────────────────────────────┘
-```
-
-### Event Types
-
-Events are defined in `src/core/orchestrator/events.ts`. Key event categories:
-
-| Category | Events |
-|----------|--------|
-| **Agent Lifecycle** | `agent:started`, `agent:idle`, `agent:output`, `agent:process_started`, `agent:process_ended` |
-| **Task Lifecycle** | `task:found`, `task:started`, `task:completed`, `task:failed`, `task:blocked` |
-| **Git Operations** | `git:pulling`, `git:pulled`, `git:pushing`, `git:pushed`, `git:merging`, `git:merged`, `git:merge_conflict`, `git:cleanup` |
-| **Worktree** | `worktree:creating`, `worktree:created` |
-| **PR Operations** | `git:pr_creating`, `git:pr_created` |
-| **Merge Lock** | `merge:lock_waiting`, `merge:lock_acquired`, `merge:lock_timeout` |
-| **Conflict Resolution** | `merge:conflict_resolving`, `merge:conflict_resolved` |
-| **Session** | `session:corrupted` |
-| **Generic** | `error`, `log` |
-
-### Usage
-
-```typescript
-// Core function accepts EventHandler
-import { runAgentWorkLoop } from './core/orchestrator';
-
-await runAgentWorkLoop(agentName, options, (event) => {
-  switch (event.type) {
-    case 'task:found':
-      console.log(`Found: ${event.taskId}`);
-      break;
-    case 'task:completed':
-      console.log(`Done: ${event.taskId} (${event.duration}s)`);
-      break;
-  }
-});
-
-// CLI adapter provides ready-to-use wrapper
-import { runAgentWorkLoopCLI } from './adapters/cli';
-
-await runAgentWorkLoopCLI(agentName, options);
-```
-
-### Migration Status
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 1 | ✅ Complete | File splits and layer separation |
-| Phase 2 | ✅ Complete | Define event types for orchestrator |
-| Phase 3 | ✅ Complete | Add EventHandler parameter to work loop |
-| Phase 4 | ✅ Complete | Create CLI adapter that subscribes to events |
-| Phase 5 | ✅ Complete | Event-driven TUI adapter (no xterm/PTY) |
-
-### Benefits
-
-- **Testability:** Mock event handler to verify behavior
-- **Flexibility:** Add new interfaces without modifying core
-- **Observability:** Events can be logged, streamed, or analyzed
-- **Decoupling:** Core logic doesn't know about output format
-
-### SOLID Compliance
-
-| Principle | How It's Achieved |
-|-----------|-------------------|
-| **Single Responsibility** | Each file/module has one clear purpose |
-| **Open/Closed** | Add new event handlers without modifying core |
-| **Liskov Substitution** | N/A (no inheritance hierarchies) |
-| **Interface Segregation** | EventHandler is a minimal interface |
-| **Dependency Inversion** | Core depends on EventHandler abstraction |
