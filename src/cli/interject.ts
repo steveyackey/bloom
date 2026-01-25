@@ -1,5 +1,5 @@
 // =============================================================================
-// Interjection Commands for Clerc CLI
+// Interject Commands for Clerc CLI
 // =============================================================================
 
 import type { Clerc } from "clerc";
@@ -12,9 +12,15 @@ import { getInterjectionIdsSync } from "../completions/providers";
 // =============================================================================
 
 /**
- * Register interjection commands with a Clerc CLI instance.
+ * Register interject commands with a Clerc CLI instance.
+ *
+ * Commands:
+ * - interject: List pending interjections
+ * - interject list: List pending interjections
+ * - interject resume: Resume an interjected session
+ * - interject dismiss: Dismiss an interjection
  */
-export function registerInterjectionCommands(cli: Clerc): Clerc {
+export function registerInterjectCommands(cli: Clerc): Clerc {
   return cli
     .command("interject", "List pending interjections", {
       help: { group: "collab" },

@@ -30,6 +30,40 @@ Installation changes must be reflected in:
 
 Flow: init workspace → clone repos → create project → refine PRD → plan → refine plan → generate → run
 
+## CLI Commands
+
+CLI commands are organized by top-level command name in `src/cli/`. Each file is named after the command it implements:
+
+| File | Commands | Flags |
+|------|----------|-------|
+| `agent.ts` | `agent list`, `agents`, `agent interject <name>`, `agent check`, `agent validate [name]` | `--streaming/-s` |
+| `config.ts` | `config` (alias: `cfg`), `config set-protocol`, `config set-interactive`, `config set-noninteractive`, `config set-model`, `config models` | `--discover/-d`, `--save/-s` |
+| `create.ts` | `create [name...]` | |
+| `enter.ts` | `enter` | `--agent/-a` |
+| `generate.ts` | `generate` | `--agent/-a` |
+| `init.ts` | `init` | |
+| `interject.ts` | `interject`, `interject list`, `interject resume <id>`, `interject dismiss <id>` | |
+| `plan.ts` | `plan` | `--agent/-a` |
+| `prompt.ts` | `prompt compile <agent>` | `--task/-t`, `--prompt/-p` |
+| `questions.ts` | `questions` (alias: `qs`), `questions-dashboard` (alias: `qd`), `ask`, `answer`, `wait-answer`, `clear-answered` | `--all/-a`, `--task/-t`, `--type`, `--choices/-c`, `--on-yes`, `--on-no`, `--add-note` |
+| `refine.ts` | `refine` | `--agent/-a` |
+| `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
+| `run.ts` | `run` | `--agent/-a` |
+| `setup.ts` | `setup` | |
+| `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset` | `--stuck/-s` |
+| `update.ts` | `update` | |
+| `view.ts` | `view` (alias: `v`) | `--port`, `--open` |
+
+**Global flags** (all commands): `--file/-f`, `--logLevel/-l`, `--verbose/-v`, `--quiet/-q`
+
+**Adding a new top-level command:**
+1. Create `src/cli/<command>.ts`
+2. Export `register<Command>Command(cli: Clerc)`
+3. Add export to `src/cli/index.ts`
+4. Register in `src/cli.ts`
+
+Entry point: `src/cli.ts` (Clerc setup + command registration)
+
 ## TUI Colors
 
 Use `chalk` for all terminal colors. For xterm.js cell rendering, use helper methods (`isFgDefault()`, `isFgPalette()`, `isFgRGB()`) not raw color mode values.

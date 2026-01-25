@@ -2,7 +2,150 @@
 // =============================================================================
 // Bloom CLI Entry Point
 // =============================================================================
-// This file routes all commands through the Clerc CLI framework.
+
+import { resolve } from "node:path";
+import chalk from "chalk";
+import { Clerc, completionsPlugin, friendlyErrorPlugin, helpPlugin, notFoundPlugin, versionPlugin } from "clerc";
+
+import {
+  registerAgentCommands,
+  registerConfigCommands,
+  registerCreateCommand,
+  registerEnterCommand,
+  registerGenerateCommand,
+  registerInitCommand,
+  registerInterjectCommands,
+  registerPlanCommand,
+  registerPromptCommands,
+  registerQuestionCommands,
+  registerRefineCommand,
+  registerRepoCommands,
+  registerRunCommand,
+  registerSetupCommand,
+  registerTaskCommands,
+  registerUpdateCommand,
+  registerViewCommands,
+} from "./cli/index";
+import { setTasksFile } from "./commands/context";
+import { type LogLevel, setLogLevel } from "./infra/logger";
+import { VERSION } from "./version";
+
+// Valid log levels for validation
+const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+
+// =============================================================================
+// Command Groups Definition
 // =============================================================================
 
-import "./cli-clerc";
+// Groups are ordered by frequency of human use - common commands first
+const COMMAND_GROUPS = {
+  commands: [
+    // Most common human commands
+    ["workflow", "Workflow"],
+    ["monitor", "Monitor & Interact"],
+    ["repo", "Repository Management"],
+    // Less common / mixed human-AI
+    ["tasks", "Task Operations"],
+    // Primarily AI-used commands
+    ["agent-ops", "Agent Operations"],
+    ["collab", "Agent Collaboration"],
+    // System/config
+    ["system", "System"],
+  ] as [string, string][],
+};
+
+// =============================================================================
+// CLI Setup
+// =============================================================================
+
+const cli = Clerc.create()
+  .name("bloom")
+  .scriptName("bloom")
+  .description("Multi-agent task orchestrator with YAML-based task management")
+  .version(VERSION)
+  // Add plugins
+  .use(versionPlugin())
+  .use(
+    helpPlugin({
+      groups: COMMAND_GROUPS,
+    })
+  )
+  .use(completionsPlugin())
+  .use(friendlyErrorPlugin())
+  .use(notFoundPlugin())
+  // Global flags
+  .globalFlag("file", "Path to tasks file", {
+    short: "f",
+    type: String,
+  })
+  .globalFlag("logLevel", "Log level (debug, info, warn, error)", {
+    short: "l",
+    type: String,
+  })
+  .globalFlag("verbose", "Enable debug logging", {
+    short: "v",
+    type: Boolean,
+  })
+  .globalFlag("quiet", "Enable error-only logging", {
+    short: "q",
+    type: Boolean,
+  })
+  .interceptor({
+    enforce: "pre",
+    handler: (ctx, next) => {
+      const { file, logLevel, verbose, quiet } = ctx.flags as {
+        file?: string;
+        logLevel?: string;
+        verbose?: boolean;
+        quiet?: boolean;
+      };
+
+      // Handle tasks file path
+      if (file) {
+        setTasksFile(resolve(file));
+      }
+
+      // Handle log level - verbose and quiet take precedence
+      if (verbose) {
+        setLogLevel("debug");
+      } else if (quiet) {
+        setLogLevel("error");
+      } else if (logLevel) {
+        if (!VALID_LOG_LEVELS.includes(logLevel as LogLevel)) {
+          console.error(
+            `${chalk.red("Error:")} Invalid log level "${logLevel}". Valid levels: ${VALID_LOG_LEVELS.join(", ")}`
+          );
+          process.exit(1);
+        }
+        setLogLevel(logLevel as LogLevel);
+      }
+
+      return next();
+    },
+  });
+
+// =============================================================================
+// Register Commands
+// =============================================================================
+// Each registration function is in src/cli/<command>.ts
+// Files are named after the top-level command they represent
+
+registerAgentCommands(cli);
+registerConfigCommands(cli);
+registerCreateCommand(cli);
+registerEnterCommand(cli);
+registerGenerateCommand(cli);
+registerInitCommand(cli);
+registerInterjectCommands(cli);
+registerPlanCommand(cli);
+registerPromptCommands(cli);
+registerQuestionCommands(cli);
+registerRefineCommand(cli);
+registerRepoCommands(cli);
+registerRunCommand(cli);
+registerSetupCommand(cli);
+registerTaskCommands(cli);
+registerUpdateCommand(cli);
+registerViewCommands(cli);
+
+cli.parse();

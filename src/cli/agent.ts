@@ -14,7 +14,6 @@ import {
   isValidAgentName,
 } from "../agents/loader";
 import { getTasksFile } from "../commands/context";
-import { startOrchestrator } from "../commands/orchestrator";
 import { cmdAgents } from "../commands/tasks";
 import { getAgentNamesSync } from "../completions/providers";
 import { triggerInterject } from "../human-queue";
@@ -26,23 +25,16 @@ import { getDefaultInteractiveAgent, getDefaultNonInteractiveAgent, loadUserConf
 
 /**
  * Register agent commands with a Clerc CLI instance.
+ *
+ * Commands:
+ * - agent list: List all agents defined in tasks
+ * - agents: Alias for agent list
+ * - agent interject: Trigger an interject for a running agent
+ * - agent check: Check which agent CLIs are installed
+ * - agent validate: Validate an agent works
  */
 export function registerAgentCommands(cli: Clerc): Clerc {
   return cli
-    .command("run", "Start the orchestrator with all agents", {
-      flags: {
-        agent: {
-          type: String,
-          short: "a",
-          description: "Override the default agent for task execution",
-        },
-      },
-      help: { group: "workflow" },
-    })
-    .on("run", async (ctx) => {
-      const agent = ctx.flags.agent as string | undefined;
-      await startOrchestrator(agent);
-    })
     .command("agent list", "List all agents defined in tasks", {
       help: { group: "agent-ops" },
     })

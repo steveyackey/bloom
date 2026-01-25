@@ -6,19 +6,26 @@ Bloom is a CLI tool for orchestrating AI agents across multiple repositories. Th
 
 ```
 src/
-├── cli/                          # Thin CLI layer (command definitions)
-│   ├── index.ts                  # Clerc registration and setup
-│   ├── tasks.ts                  # task commands
-│   ├── repo.ts                   # repo commands
-│   ├── agents.ts                 # agent commands
-│   ├── planning.ts               # plan/refine/generate commands
-│   ├── config.ts                 # config commands
-│   ├── questions.ts              # question queue commands
-│   ├── interjections.ts          # interjection commands
-│   ├── prompt.ts                 # prompt inspection commands
-│   ├── view.ts                   # view server commands
-│   ├── setup.ts                  # setup commands
-│   └── utility.ts                # utility commands
+├── cli.ts                        # CLI entry point (Clerc setup)
+├── cli/                          # Command definitions (one file per command)
+│   ├── index.ts                  # Re-exports all command registrations
+│   ├── agent.ts                  # `bloom agent *` commands
+│   ├── config.ts                 # `bloom config *` commands
+│   ├── create.ts                 # `bloom create` command
+│   ├── enter.ts                  # `bloom enter` command
+│   ├── generate.ts               # `bloom generate` command
+│   ├── init.ts                   # `bloom init` command
+│   ├── interject.ts              # `bloom interject *` commands
+│   ├── plan.ts                   # `bloom plan` command
+│   ├── prompt.ts                 # `bloom prompt *` commands
+│   ├── questions.ts              # `bloom questions *`, `bloom ask`, etc.
+│   ├── refine.ts                 # `bloom refine` command
+│   ├── repo.ts                   # `bloom repo *` commands
+│   ├── run.ts                    # `bloom run` command
+│   ├── setup.ts                  # `bloom setup` command
+│   ├── task.ts                   # Task ops: `bloom list`, `bloom show`, etc.
+│   ├── update.ts                 # `bloom update` command
+│   └── view.ts                   # `bloom view` command
 │
 ├── core/                         # Business logic (event-driven, no I/O)
 │   └── orchestrator/             # Agent orchestration system
@@ -88,9 +95,22 @@ src/
 
 ## Layer Responsibilities
 
-### CLI Layer (`src/cli/`)
+### CLI Layer (`src/cli.ts` and `src/cli/`)
 
-Thin command definitions using the Clerc framework. Each file registers commands, parses arguments, and delegates to the core layer. No business logic lives here—commands should be under 50 lines.
+Thin command definitions using the Clerc framework. **Files are organized by top-level CLI command** for easy discoverability:
+
+- `agent.ts` → `bloom agent list`, `bloom agent check`, etc.
+- `repo.ts` → `bloom repo clone`, `bloom repo sync`, etc.
+- `run.ts` → `bloom run`
+- `task.ts` → `bloom list`, `bloom show`, `bloom done`, etc.
+
+**Adding a new command:**
+1. Create `src/cli/<command>.ts` named after the top-level command
+2. Export a `register<Command>Command(cli: Clerc)` function
+3. Add the export to `src/cli/index.ts`
+4. Register in `src/cli.ts`
+
+Commands parse arguments and delegate to `src/commands/` handlers. No business logic lives here—commands should be under 50 lines.
 
 ### Core Layer (`src/core/`)
 

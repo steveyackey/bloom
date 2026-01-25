@@ -1,9 +1,8 @@
 // =============================================================================
-// Utility Commands for Clerc CLI
+// Update Command for Clerc CLI
 // =============================================================================
 
 import type { Clerc } from "clerc";
-
 import { cmdUpdate } from "../commands/update";
 
 // =============================================================================
@@ -11,13 +10,9 @@ import { cmdUpdate } from "../commands/update";
 // =============================================================================
 
 /**
- * Register utility commands with a Clerc CLI instance.
- *
- * Note: The `version` command is handled by Clerc's built-in `.version()` method.
- * The `completions` command is handled by the `completionsPlugin()`.
- * The `help` command is handled by Clerc's built-in helpPlugin (via --help flag).
+ * Register the update command with a Clerc CLI instance.
  */
-export function registerUtilityCommands(cli: Clerc): Clerc {
+export function registerUpdateCommand(cli: Clerc): Clerc {
   return cli
     .command("update", "Update bloom to the latest version", {
       help: { group: "system" },

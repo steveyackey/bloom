@@ -1,5 +1,5 @@
 // =============================================================================
-// Clerc CLI Task Management Commands
+// Task Commands for Clerc CLI
 // =============================================================================
 
 import type { Clerc } from "clerc";
@@ -49,6 +49,21 @@ const statusCompletionHandler = (complete: (value: string, description: string) 
 
 /**
  * Register task management commands with a Clerc CLI instance.
+ *
+ * Commands:
+ * - list: List tasks, optionally filtered by status
+ * - show: Show task details
+ * - dashboard: Live dashboard showing task progress
+ * - validate: Validate tasks file for errors
+ * - next: Show available tasks (ready to start)
+ * - ready: Mark task as ready for agent
+ * - start: Mark task as in progress
+ * - done: Mark task as done
+ * - block: Mark task as blocked
+ * - todo: Mark task as todo
+ * - assign: Assign task to an agent
+ * - note: Add a note to a task
+ * - reset: Reset task to ready_for_agent
  */
 export function registerTaskCommands(cli: Clerc): Clerc {
   return (
@@ -103,8 +118,6 @@ export function registerTaskCommands(cli: Clerc): Clerc {
       .on("validate", async () => {
         await cmdValidate();
       })
-
-      // Note: 'agents' command is registered in agents.ts as 'agent list' with alias 'agents'
 
       // next [agent] - Show available tasks
       .command("next", "Show available tasks (ready to start)", {
