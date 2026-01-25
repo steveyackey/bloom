@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.3.2](https://github.com/steveyackey/bloom/compare/bloom-v0.3.1...bloom-v0.3.2) (2026-01-25)
+
+
+### Features
+
+* add step commands and timing metrics for session reuse ([ae3545f](https://github.com/steveyackey/bloom/commit/ae3545f586f4328fc2a7c68f2004a60a7983bf39))
+* add TaskStep schema for agent session reuse ([26c732b](https://github.com/steveyackey/bloom/commit/26c732bc17c101768dbe63bf428bad9eb613fe27))
+* implement event-driven orchestrator architecture ([bc7d74e](https://github.com/steveyackey/bloom/commit/bc7d74ee8a7735806d3c48ec80f9aa2e039f241b))
+* implement event-driven TUI architecture (Phase 5) ([9dfbe54](https://github.com/steveyackey/bloom/commit/9dfbe5407ad41cd549bf83d8bb669c79d0008634))
+* implement step-aware work loop for session reuse ([09b266d](https://github.com/steveyackey/bloom/commit/09b266d06d6a1515edb14350c57f3f4e61d9fd89))
+* refactor project architecture (Option 4) ([cafdccb](https://github.com/steveyackey/bloom/commit/cafdccb3f82085d6ddff6ed05e8ace6b4cddc1dd))
+* **web:** polish landing page with Outfit font and updated copy ([56b2112](https://github.com/steveyackey/bloom/commit/56b21126a8f950841a67dec44ed85733f1ed9211))
+
+
+### Bug Fixes
+
+* add approval bypass flag for interactive mode ([07e0046](https://github.com/steveyackey/bloom/commit/07e004607be38461074b6d227cfa9b011992ee7a))
+* add optional chaining for array access in tests ([08de364](https://github.com/steveyackey/bloom/commit/08de364f9c66565978fccb762a0a04d94c096ef4))
+* remove unused imports after logging refactor ([c1647c3](https://github.com/steveyackey/bloom/commit/c1647c3be9c331bb54d8c6c74da74c1569d4b324))
+
+
+### Documentation
+
+* add comprehensive CLI command reference to CLAUDE.md ([8756e69](https://github.com/steveyackey/bloom/commit/8756e6917a9e2e13534bea2aedb68451cdd7cb92))
+* define logging standards and refactor for compliance ([8bfb255](https://github.com/steveyackey/bloom/commit/8bfb2556a5abbb084d66b71945c4be6ad29e19f3))
+* fix obsolete command in test-agent README ([38820d5](https://github.com/steveyackey/bloom/commit/38820d502f5e1acbadf1e75bcf3de629ed32e329))
+* improve architecture docs and add --agent flag documentation ([3bf1d5c](https://github.com/steveyackey/bloom/commit/3bf1d5c02c86d11e0d4ec7b47d37f425177f0313))
+* remove web adapter from planned architecture ([cd2f81f](https://github.com/steveyackey/bloom/commit/cd2f81f7de455d791d34410c45f498bf3331c5c5))
+
 ## [0.3.1](https://github.com/steveyackey/bloom/compare/bloom-v0.3.0...bloom-v0.3.1) (2026-01-25)
 
 
