@@ -9,10 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BLOOM_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Use bun to run bloom CLI
-bloom() {
-    bun run "$BLOOM_ROOT/src/cli.ts" "$@"
-}
+# After install, bloom will be in PATH at ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
 
 # Colors
 CYAN='\033[0;36m'
@@ -62,14 +60,15 @@ echo -e "${NC}"
 sleep 2
 
 # ============================================================================
-# STEP 1: Install (informational)
+# STEP 1: Install Bloom
 # ============================================================================
 echo -e "\n${YELLOW}${BOLD}━━━ Step 1: Install Bloom ━━━${NC}\n"
 sleep 0.5
 
 show_note "Install with a single command (macOS/Linux)"
 type_cmd "curl -fsSL https://raw.githubusercontent.com/steveyackey/bloom/main/install.sh | bash"
-echo -e "${DIM}(Already installed for this demo)${NC}"
+# Actually run the install (idempotent)
+curl -fsSL https://raw.githubusercontent.com/steveyackey/bloom/main/install.sh | bash
 sleep 1
 
 # ============================================================================
@@ -85,10 +84,12 @@ cd "$DEMO_DIR"
 run_cmd "mkdir my-workspace && cd my-workspace"
 cd my-workspace 2>/dev/null || mkdir -p my-workspace && cd my-workspace
 
-run_cmd "git init"
-git init -q
+type_cmd "git init"
+git init -q 2>/dev/null
 git config user.email "demo@example.com"
 git config user.name "Demo User"
+echo "Initialized empty Git repository"
+sleep 0.8
 
 # ============================================================================
 # STEP 3: Initialize Bloom
@@ -337,7 +338,7 @@ echo -e "${DIM}Starting orchestrator...${NC}"
 sleep 0.5
 
 # Run briefly to show the TUI
-timeout 5s bun run "$BLOOM_ROOT/src/cli.ts" run -f auth-feature/tasks.yaml 2>&1 || true
+timeout 5s bloom run -f auth-feature/tasks.yaml 2>&1 || true
 
 sleep 1
 
