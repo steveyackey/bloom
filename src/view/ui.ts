@@ -1066,6 +1066,18 @@ async function renderDetails(node) {
         </div>
       </div>
 
+      <div class="accordion" id="acc-working-dir">
+        <button class="accordion-trigger" onclick="toggleAccordion('acc-working-dir'); loadPromptSection('\${node.id}', 'pwd')">
+          <span>Working Directory</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
+        <div class="accordion-content" id="prompt-pwd-\${node.id}">
+          <span class="loading">Click to load...</span>
+        </div>
+      </div>
+
       <div class="accordion" id="acc-system-prompt">
         <button class="accordion-trigger" onclick="toggleAccordion('acc-system-prompt'); loadPromptSection('\${node.id}', 'system')">
           <span>System Prompt</span>
@@ -1127,7 +1139,14 @@ async function loadPromptSection(taskId, type) {
   if (prompts.error) {
     container.innerHTML = \`<span class="error">Error: \${escapeHtml(prompts.error)}</span>\`;
   } else {
-    const content = type === 'system' ? prompts.systemPrompt : prompts.userPrompt;
+    let content;
+    if (type === 'system') {
+      content = prompts.systemPrompt;
+    } else if (type === 'user') {
+      content = prompts.userPrompt;
+    } else if (type === 'pwd') {
+      content = prompts.workingDirectory || 'Unknown';
+    }
     container.innerHTML = \`<pre>\${escapeHtml(content)}</pre>\`;
     container.dataset.loaded = 'true';
   }

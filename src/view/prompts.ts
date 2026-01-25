@@ -2,7 +2,9 @@
 // Prompt Builder for View - Reuses real Bloom prompt generation logic
 // =============================================================================
 
+import { dirname, resolve } from "node:path";
 import { PromptCompiler } from "../prompts/compiler";
+import { getWorktreePath } from "../repos";
 import type { TaskGraph, TaskNode } from "./graph";
 
 /**
@@ -90,4 +92,32 @@ If you encounter blockers, mark it as blocked:
 Begin working on the task now.`;
 
   return prompt;
+}
+
+/**
+ * Compute the working directory for a task.
+ * This mirrors the logic in orchestrator.ts:runAgentWorkLoop() lines 256-319.
+ */
+export function computeWorkingDirectory(node: TaskNode, tasksFile: string): string {
+  const bloomDir = dirname(tasksFile);
+
+  if (!node.repo) {
+    return bloomDir;
+  }
+
+  const isPath = node.repo.startsWith("./") || node.repo.startsWith("/");
+
+  if (isPath) {
+    // Direct path - resolve relative to BLOOM_DIR
+    return resolve(bloomDir, node.repo);
+  }
+
+  // Repo name - use worktree architecture
+  if (node.branch) {
+    return getWorktreePath(bloomDir, node.repo, node.branch);
+  }
+
+  // No branch - would use default branch worktree
+  // For the preview, show the repos directory since we don't know the default branch
+  return `${bloomDir}/repos/${node.repo}/worktrees/<default-branch>`;
 }
