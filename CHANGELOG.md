@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/steveyackey/bloom/compare/bloom-v0.3.0...bloom-v0.3.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* Revise plan document by removing questions section ([ba25599](https://github.com/steveyackey/bloom/commit/ba25599bbc5d78b7430d4602205b085da1a58597))
+* update prompt tests to match adjusted prompt content ([97e7932](https://github.com/steveyackey/bloom/commit/97e79326c60f12b96dc52ae4d2b13d021fa7310c))
+
 ## [0.3.0](https://github.com/steveyackey/bloom/compare/bloom-v0.2.8...bloom-v0.3.0) (2026-01-25)
 
 
