@@ -275,24 +275,40 @@ Tasks file: {{TASKS_FILE}}
 
 ## Clarifying Questions
 
-After reading the plan, ask the user about git configuration if the workflow involves:
-- **Merging to main/master**: Ask about PR vs auto-merge preference
-- **Team collaboration**: If multiple people might be working on related branches
-- **CI/CD**: If the plan mentions automated testing or deployment pipelines
+After reading the plan, ask the user about these configuration options:
 
-**Questions to ask**:
+### 1. Git Configuration
+If the workflow involves pull requests, team collaboration, or CI/CD:
 
-1. **For workflows targeting main/master**:
-> "I see tasks will merge into main/master. Would you prefer:
-> - **PR-based (Recommended)**: Creates GitHub PRs for code review before merging
-> - **Auto-merge**: Directly merges without review (faster, but no code review)"
-
-If they choose PR-based, add \`open_pr: true\` to tasks that would merge into main/master.
-
-2. **For any workflow with branches**:
-> "Would you like to enable \`push_to_remote: true\`? This pushes branches to the remote after each task completes, which is required for PR workflows and provides backup of work in progress. (Default is false - local only)"
+> "I see this workflow will create pull requests / merge branches. Would you like to enable \`push_to_remote: true\`? This pushes branches to the remote after each task completes, which is recommended for PR workflows and provides backup of work in progress. (Default is false - local only)"
 
 If the user confirms, set \`push_to_remote: true\` in the git config.
+
+### 2. Validation Mode
+Ask about validation approach:
+
+> "How would you like to handle validation?
+>
+> **Option A: Human checkpoints** (default)
+> - \`[CHECKPOINT]\` tasks pause for human review at phase boundaries
+> - You manually review and approve before continuing
+> - Best for: critical work, learning the system, high-stakes projects
+>
+> **Option B: Auto mode** (agent validation until final merge)
+> - Agents run automated validation (tests, linting) at phase boundaries
+> - NO human pauses until the very end, right before final merge to main
+> - Single \`[CHECKPOINT]\` at the end for final human review before merge
+> - Best for: routine work, trusted test suites, faster iteration
+>
+> Which approach would you prefer?"
+
+Based on the answer:
+- **Option A**: Create \`[CHECKPOINT]\` tasks with \`checkpoint: true\` at each phase boundary
+- **Option B (Auto mode)**:
+  - Create regular validation tasks at phase boundaries that run tests/checks automatically
+  - These tasks do NOT have \`checkpoint: true\` - agents handle them
+  - Only ONE \`[CHECKPOINT]\` at the very end, right before the final \`merge_into: main\`
+  - This checkpoint is for human review before merging all work to main
 
 ## Task Schema
 
@@ -315,7 +331,6 @@ tasks:                           # Root array of tasks
     branch: feature/my-work      # OPTIONAL. Working branch for this task
     base_branch: main            # OPTIONAL. Branch to create working branch from (default: repo's default)
     merge_into: main             # OPTIONAL. Branch to merge into when done (same as branch = no merge)
-    open_pr: true                # OPTIONAL. Create GitHub PR instead of auto-merge (requires push_to_remote)
     agent_name: claude-code      # OPTIONAL. Agent name for task grouping (see AGENT NAMING below)
     instructions: |              # OPTIONAL. Detailed multi-line instructions
       Step by step instructions
@@ -359,7 +374,7 @@ The \`agent_name\` field controls how tasks are grouped and assigned:
 
 1. By domain: "frontend", "backend", "database", "infra"
 2. By feature: "auth-agent", "payment-agent", "search-agent"
-3. By branch: "phase-1-agent", "phase-2-agent" (keeps branch work sequential)
+3. By worktree: "phase-1-agent", "phase-2-agent" (keeps worktree work sequential)
 4. Mixed: Use specific names for specialized work, leave generic tasks unnamed
 
 ### Examples
@@ -381,79 +396,140 @@ conflicts. Tasks working in different directories can use different agents.
 5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
 6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
 7. **SMALL TASKS**: Each task should be 1-4 hours of focused work
-8. **YAML QUOTING**: Quote strings containing special characters:
+8. **ALL WORK MUST REACH MAIN**: Every branch must reach main - typically via \`open_pr: true\`, or \`merge_into: main\` for internal branches.
+9. **YAML QUOTING**: Quote strings containing special characters:
    - Backticks: \\\`command\\\` -> "\\\`command\\\`"
    - Curly braces: { key: value } -> "{ key: value }"
    - Colons with space: foo: bar -> "foo: bar"
    - Leading special chars: @, *, &, !, %, ?, |, >
    - Example: \`- "\\\`bun test\\\` passes"\` NOT \`- \\\`bun test\\\` passes\`
 
-## Git Branching Strategy
+## Git Branching Strategy (Worktrees)
+
+**How Bloom handles branches**: Each branch gets its own **worktree** (a separate directory) at \`repos/{repo-name}/{branch-name}\`. This means:
+- Multiple branches can be worked on simultaneously
+- No need for \`git checkout\` - each branch has its own folder
+- Branch names with slashes (\`feature/foo\`) become hyphenated paths (\`feature-foo\`)
 
 Use the \`branch\`, \`base_branch\`, and \`merge_into\` fields to control git workflow:
 
-### Pattern 1: Feature Branch with Merge Back
+### Pattern 1: Feature Branch with PR (typical)
 \`\`\`yaml
 - id: implement-feature
   repo: my-app
-  branch: feature/new-feature      # Working branch
+  branch: feature/new-feature      # Worktree at: repos/my-app/feature-new-feature
   base_branch: main                # Create from main
-  merge_into: main                 # Merge back when done
+  open_pr: true                    # Opens PR to main when done
 \`\`\`
-Agent creates \`feature/new-feature\` from \`main\`, does work, then merges back to \`main\`.
+Agent works in \`repos/my-app/feature-new-feature/\`, then opens a PR to main.
 
-### Pattern 2: Development on a Shared Branch
+**Alternative: Direct merge** (for internal branches or automation):
+\`\`\`yaml
+  merge_into: main                 # Merges directly, no PR
+\`\`\`
+
+### Pattern 2: Work on Default Branch
 \`\`\`yaml
 - id: add-component
   repo: my-app
-  branch: develop                  # Work directly on develop
-  # No base_branch - branch already exists
-  # No merge_into - no merge needed
+  branch: main                     # Worktree at: repos/my-app/main
+  # No base_branch - use existing main
+  # No merge_into - working directly on main
 \`\`\`
-Agent works directly on \`develop\` branch without creating new branches.
+Agent works directly in the main worktree without creating new branches.
 
-### Pattern 3: Sequential Tasks on Same Branch
+### Pattern 3: Sequential Tasks, Shared Worktree
 \`\`\`yaml
 - id: task-1
   repo: my-app
-  branch: feature/big-feature
+  branch: feature/big-feature      # Worktree at: repos/my-app/feature-big-feature
   base_branch: main
+  agent_name: feature-agent        # SAME agent for all tasks on this branch
   # No merge_into - don't merge yet
 
 - id: task-2
   depends_on: [task-1]
   repo: my-app
-  branch: feature/big-feature      # Same branch
+  branch: feature/big-feature      # Same worktree
+  agent_name: feature-agent        # Must be same agent to avoid conflicts
   merge_into: main                 # Merge after all work done
 \`\`\`
-Multiple tasks work on the same branch, only the last one merges.
+Multiple tasks share the same worktree. **Important**: Use the same \`agent_name\` for tasks sharing a branch to prevent conflicts.
 
-### Pattern 4: PR-Based Workflow (Recommended for main/master)
+### Pattern 4: Parallel Feature Branches (both open PRs)
 \`\`\`yaml
-- id: implement-feature
+- id: frontend-feature
   repo: my-app
-  branch: feature/new-feature
+  branch: feature/frontend         # Worktree: repos/my-app/feature-frontend
   base_branch: main
-  merge_into: main                 # PR targets main
-  open_pr: true                    # Creates PR instead of auto-merge
+  agent_name: frontend-agent       # Different agent
+  open_pr: true                    # ← Each branch opens its own PR
+
+- id: backend-feature
+  repo: my-app
+  branch: feature/backend          # Worktree: repos/my-app/feature-backend
+  base_branch: main
+  agent_name: backend-agent        # Different agent
+  open_pr: true                    # ← Each branch opens its own PR
 \`\`\`
-Agent works on feature branch, then orchestrator creates a GitHub PR for code review.
-Requires \`push_to_remote: true\` in git config.
+Both branches open PRs to main. After human review, both get merged.
+
+**Alternative: Direct merge (for internal/automation workflows)**
+\`\`\`yaml
+# If you need direct merge instead of PRs, use a consolidation task:
+- id: merge-all-features
+  depends_on: [frontend-feature, backend-feature]
+  repo: my-app
+  branch: feature/frontend
+  merge_into: main                 # Direct merge, no PR
+  instructions: Merge both feature branches to main, resolve conflicts
+\`\`\`
+
+### Worktree Path Reference
+When validating or debugging, tasks are located at:
+- \`repos/{repo-name}/{branch-with-slashes-as-hyphens}/\`
+- Example: \`branch: feature/auth/oauth\` → \`repos/my-app/feature-auth-oauth/\`
 
 ### Git Configuration
 Enable \`push_to_remote: true\` in the \`git:\` section to automatically push after each task.
-This is **required** for \`open_pr: true\` tasks.
+
+## CRITICAL: All Work Must Reach Main
+
+**Every task list MUST end with all work in main** - typically via PR, or direct merge for internal branches.
+
+### Reaching main: Two options
+
+| Option | When to use | Task field |
+|--------|-------------|------------|
+| **PR (typical)** | Feature branches to main, needs review | \`open_pr: true\` |
+| **Direct merge** | Internal/phase branches, automation | \`merge_into: main\` |
+
+### What to check:
+1. **Trace every branch**: Follow each \`branch\` → does it have \`open_pr: true\` or \`merge_into\` leading to main?
+2. **Last task reaches main**: Final task(s) should have \`open_pr: true\` or \`merge_into: main\`
+3. **No orphaned branches**: A branch with no path to main is a bug
+
+### Common mistakes:
+- ❌ Parallel tasks without final PR/merge tasks to consolidate
+- ❌ \`merge_into: some-feature-branch\` without that branch ever reaching main
+- ❌ Checkpoint that validates but doesn't merge or open PR
+- ❌ Forgetting \`open_pr: true\` or \`merge_into\` on the last task of a phase
+
+### Self-check before saving:
+Ask yourself: "After all tasks complete and PRs are merged, will main contain all the work?" If no, add PR/merge tasks.
 
 ## Complete Example
 
+This example shows a two-phase project with parallel work that converges to main via PRs:
+
 \`\`\`yaml
 git:
-  push_to_remote: true
+  push_to_remote: true               # Required for PRs
   auto_cleanup_merged: true
 
 tasks:
   # ===========================================================================
-  # Phase 1: Setup
+  # Phase 1: Setup (sequential work → PR to main)
   # ===========================================================================
   - id: setup-project-structure
     title: Initialize project structure
@@ -462,7 +538,8 @@ tasks:
     depends_on: []
     repo: core-package
     branch: feature/phase-1-setup
-    base_branch: main
+    base_branch: main                # Branch from main
+    agent_name: setup-agent
     instructions: Create base directory layout and config files
     acceptance_criteria:
       - src/ directory exists with index.ts
@@ -472,48 +549,111 @@ tasks:
     title: Install core dependencies
     status: todo
     phase: 1
-    depends_on:
-      - setup-project-structure
+    depends_on: [setup-project-structure]
     repo: core-package
-    branch: feature/phase-1-setup
+    branch: feature/phase-1-setup    # Same branch as above (sequential)
+    agent_name: setup-agent          # Same agent (sequential)
     instructions: Add zod and yaml packages
     acceptance_criteria:
       - zod installed for schema validation
       - yaml installed for file parsing
-    validation_task_id: validate-phase-1
 
-  # CHECKPOINT - Human validates before next phase
+  # CHECKPOINT - Validates and opens PR for phase 1
   - id: validate-phase-1
-    title: "[CHECKPOINT] Validate phase 1 setup"
+    title: "[CHECKPOINT] Validate phase 1 and open PR"
     status: todo
     phase: 1
     checkpoint: true
-    depends_on:
-      - setup-project-structure
-      - setup-dependencies
+    depends_on: [setup-dependencies]
     repo: core-package
     branch: feature/phase-1-setup
-    merge_into: main
+    open_pr: true                    # ← PR TO MAIN (typical workflow)
+    agent_name: setup-agent
     instructions: |
       VALIDATION CHECKPOINT - Human review required.
-
-      Run these checks:
-      - bun install succeeds
-      - tsc --noEmit passes
-
-      After validation, merge to main and mark done.
+      1. Run: bun install && tsc --noEmit
+      2. Push branch and open PR to main
+      3. Wait for review/merge before phase 2 can branch from updated main
     acceptance_criteria:
       - "\`bun install\` succeeds"
       - "\`tsc --noEmit\` passes"
-      - Human has reviewed and approved
+      - PR opened and ready for review
+
+  # ===========================================================================
+  # Phase 2: Features (parallel work → both open PRs to main)
+  # ===========================================================================
+  - id: add-frontend-feature
+    title: Add frontend components
+    status: todo
+    phase: 2
+    depends_on: [validate-phase-1]   # Depends on phase 1 PR merge
+    repo: core-package
+    branch: feature/frontend         # Separate branch
+    base_branch: main                # Branch from updated main
+    agent_name: frontend-agent       # Different agent (parallel)
+    open_pr: true                    # ← PR TO MAIN
+    instructions: |
+      Create React components for the UI.
+      When done, push and open a PR to main.
+    acceptance_criteria:
+      - Components render without errors
+      - Unit tests pass
+      - PR opened to main
+
+  - id: add-backend-feature
+    title: Add backend API
+    status: todo
+    phase: 2
+    depends_on: [validate-phase-1]   # Same dep - runs in PARALLEL with frontend
+    repo: core-package
+    branch: feature/backend          # Separate branch
+    base_branch: main                # Branch from updated main
+    agent_name: backend-agent        # Different agent (parallel)
+    open_pr: true                    # ← PR TO MAIN
+    instructions: |
+      Create Express API endpoints.
+      When done, push and open a PR to main.
+    acceptance_criteria:
+      - API endpoints respond correctly
+      - Integration tests pass
+      - PR opened to main
+
+  # FINAL CHECKPOINT - Validates all PRs are ready
+  - id: validate-phase-2
+    title: "[CHECKPOINT] Final validation - all PRs ready"
+    status: todo
+    phase: 2
+    checkpoint: true
+    depends_on: [add-frontend-feature, add-backend-feature]  # Wait for BOTH
+    repo: core-package
+    branch: main                     # Work from main to verify
+    agent_name: frontend-agent
+    instructions: |
+      FINAL CHECKPOINT - Verify all PRs are ready for merge.
+
+      1. Check that frontend PR is open and CI passes
+      2. Check that backend PR is open and CI passes
+      3. Review for any conflicts between the two PRs
+      4. After human merges both PRs, main will contain all work
+    acceptance_criteria:
+      - Frontend PR open with passing CI
+      - Backend PR open with passing CI
+      - No merge conflicts between PRs
+      - Ready for human to merge both PRs
 \`\`\`
+
+**Path to main verification:**
+- Phase 1: \`feature/phase-1-setup\` → PR to main ✓
+- Phase 2: \`feature/frontend\` → PR to main ✓, \`feature/backend\` → PR to main ✓
+- **Result**: After PRs are merged, all work ends up in main ✓
 
 ## When Done
 
 After writing the tasks.yaml, let the user know:
 1. The tasks have been generated to \`tasks.yaml\`
-2. They can review and edit it if needed
-3. They should run \`bloom run\` to start the orchestrator and begin execution
+2. **Verify path to main**: List all branches and confirm each reaches main (via \`open_pr: true\` or \`merge_into\`)
+3. They can review and edit it if needed
+4. They should run \`bloom run\` to start the orchestrator and begin execution
 `,
 
   plan: `# Planning Assistant
@@ -544,12 +684,48 @@ Before writing the plan, ask the user:
 
 1. **Checkpoints**: "How often would you like verification checkpoints? (e.g., after each phase, after major features, etc.)"
 2. **Merge Strategy**: "How should code be merged? Options:
-   - **PR-based (Recommended for main/master)**: Feature branches with PRs for code review before merging
+   - **PR-based (Recommended for main/master)**: Feature branches with PRs for code review before merging to main
    - **Auto-merge**: Direct merge without review (for internal/automation workflows)
-   - **Phase branches**: Work accumulates in phase branch, merged at checkpoint
+   - **Phase branches**: Work accumulates in a phase branch, merged to main at checkpoint
    - **Trunk-based**: Small, frequent commits directly to main"
 3. **Parallelization**: "Should tasks be parallelized where possible, or kept sequential for easier review?"
 4. **Any constraints**: "Are there any time constraints, dependencies, or requirements I should know about?"
+
+## CRITICAL: All Work Must Reach Main
+
+**All work MUST end up in main** - typically via PR, or direct merge for internal branches. This is the most important invariant:
+
+1. **Every feature branch** must eventually reach main (via PR or merge)
+2. **The final phase** must include tasks that open PRs or merge all remaining work
+3. **Parallel work** must converge - if you have branches A and B in parallel, both must reach main
+4. **Never leave orphaned branches** - a branch with no path to main is a bug
+
+### Reaching Main: Two Options
+
+| Option | When to use | Task field |
+|--------|-------------|------------|
+| **PR (typical)** | Main branch, needs review | \`open_pr: true\` |
+| **Direct merge** | Internal/phase branches, automation | \`merge_into: main\` |
+
+### Flow Examples
+
+**Sequential with PRs (most common):**
+\`\`\`
+feature/task-1 → PR to main → feature/task-2 (from main) → PR to main
+\`\`\`
+
+**Parallel with PRs:**
+\`\`\`
+feature/frontend ─────────────┬─→ PR to main
+                              │
+feature/backend ──────────────┴─→ PR to main
+\`\`\`
+
+**Phase branches (internal merge, final PR):**
+\`\`\`
+feature/phase-1-work → merge to phase-1 → PR to main
+feature/phase-2-work → merge to phase-2 → PR to main
+\`\`\`
 
 ## Plan Format
 
@@ -579,13 +755,16 @@ For each task, specify:
 - Include clear acceptance criteria for each task
 - Add checkpoint tasks at phase boundaries
 - Consider which tasks can run in parallel (different repos/directories)
+- **ALWAYS include a final phase** that opens PRs or merges all work to main
+- **Verify the path to main**: trace each branch - it must reach main via PR or merge
 
 ## When Done
 
 After writing the plan, let the user know:
 1. The plan has been saved to \`plan.md\`
 2. They can review and edit it
-3. They should run \`bloom generate\` to create the tasks.yaml file for execution
+3. **Verify the path to main**: Confirm that all branches reach main (via PR or merge)
+4. They should run \`bloom generate\` to create the tasks.yaml file for execution
 `,
 
   "create-in-place": `# Project Creation Assistant (In-Place Mode)
@@ -649,237 +828,5 @@ After writing the PRD, let the user know:
 3. Next step is to run \`bloom plan\` to create a detailed implementation plan
 
 Be encouraging and acknowledge the work they've already done gathering research!
-`,
-
-  planning: `# Planning System Prompt
-
-You are a task planning assistant. Your ONLY job is to help the user break down
-their project into tasks and write them to: {{TASKS_FILE}}
-
-You will:
-1. Ask the user what they want to build
-2. Break it into phases with clear tasks
-3. Write the tasks to {{TASKS_FILE}} in the exact YAML format shown below
-
-## Task Schema
-
-Every field explained:
-
-\`\`\`yaml
-# Top-level git configuration
-git:
-  push_to_remote: false          # Push branches to remote after each task (default: false)
-  auto_cleanup_merged: false     # Delete local branches after they're merged (default: false)
-
-tasks:                           # Root array of tasks
-  - id: kebab-case-id            # REQUIRED. Unique identifier, kebab-case
-    title: Short description     # REQUIRED. Human-readable title
-    status: todo                 # REQUIRED. One of: todo, ready_for_agent, assigned, in_progress, done, blocked
-    phase: 1                     # OPTIONAL. Number to group related tasks (1, 2, 3...)
-    depends_on:                  # OPTIONAL. Array of task IDs that must complete first
-      - other-task-id
-    repo: my-repo-name           # OPTIONAL. Repository name (from bloom repo list)
-    branch: feature/my-work      # OPTIONAL. Working branch for this task
-    base_branch: main            # OPTIONAL. Branch to create working branch from (default: repo's default)
-    merge_into: main             # OPTIONAL. Branch to merge into when done (same as branch = no merge)
-    open_pr: true                # OPTIONAL. Create GitHub PR instead of auto-merge (requires push_to_remote)
-    agent_name: claude-code      # OPTIONAL. Agent name for task grouping (see AGENT NAMING below)
-    instructions: |              # OPTIONAL. Detailed multi-line instructions
-      Step by step instructions
-      for the agent to follow.
-    acceptance_criteria:         # OPTIONAL. Array of strings defining "done"
-      - First criterion
-      - Second criterion
-    ai_notes:                    # OPTIONAL. Notes added by AI during execution
-      - Note from AI
-    validation_task_id: task-id  # OPTIONAL. Points to a checkpoint task
-    checkpoint: true             # OPTIONAL. If true, requires human approval before downstream tasks proceed
-    subtasks:                    # OPTIONAL. Nested tasks (same schema, recursive)
-      - id: subtask-id
-        title: Subtask title
-        status: todo
-        acceptance_criteria:
-          - Subtask criterion
-\`\`\`
-
-## Status Values
-
-- \`todo\`: Not started, not ready for agent
-- \`ready_for_agent\`: Ready to be picked up by any available agent
-- \`assigned\`: Claimed by a specific agent but not started
-- \`in_progress\`: Currently being worked on
-- \`done\`: Completed
-- \`blocked\`: Waiting on something (human review, external dependency, etc.)
-
-## Agent Naming (How to Split Work Across Agents)
-
-The \`agent_name\` field controls how tasks are grouped and assigned:
-
-- **You choose the names**: Use any descriptive name that makes sense for your project
-- **Same name = Same agent**: All tasks with the same agent_name will be worked on
-  by the SAME agent instance sequentially (one agent pane in the TUI)
-- **Different names = Different agents**: Tasks with different agent_names will run
-  in PARALLEL with separate agent instances (multiple panes in the TUI)
-- **No agent_name**: Tasks without an agent_name go to the "floating" pool and are
-  picked up by any available agent
-
-### Naming Strategies
-
-1. By domain: "frontend", "backend", "database", "infra"
-2. By feature: "auth-agent", "payment-agent", "search-agent"
-3. By branch: "phase-1-agent", "phase-2-agent" (keeps branch work sequential)
-4. Mixed: Use specific names for specialized work, leave generic tasks unnamed
-
-### Examples
-
-- \`agent_name: frontend\` - All frontend tasks → same agent
-- \`agent_name: backend\` - All backend tasks → different agent (parallel)
-- \`agent_name: claude-code\` - Generic name for sequential tasks
-- (no agent_name) - Floating pool - any agent can pick it up
-
-**TIP**: Tasks that modify the same files should use the same agent_name to avoid
-conflicts. Tasks working in different directories can use different agents.
-
-## Planning Rules
-
-1. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
-2. **DEPENDENCIES**: Use depends_on to enforce task ordering
-3. **CHECKPOINTS**: Add \`checkpoint: true\` to validation tasks at phase boundaries
-4. **BRANCHES**: One agent per branch at a time (no conflicts)
-5. **AGENT NAMES**: Use the same agent_name for tasks that touch the same files
-6. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
-7. **SMALL TASKS**: Each task should be 1-4 hours of focused work
-8. **YAML QUOTING**: Quote strings containing special characters:
-   - Backticks: \\\`command\\\` → "\\\`command\\\`"
-   - Curly braces: { key: value } → "{ key: value }"
-   - Colons with space: foo: bar → "foo: bar"
-   - Leading special chars: @, *, &, !, %, ?, |, >
-   - Example: \`- "\\\`bun test\\\` passes"\` NOT \`- \\\`bun test\\\` passes\`
-
-## Complete Example
-
-\`\`\`yaml
-git:
-  push_to_remote: true
-  auto_cleanup_merged: true
-
-tasks:
-  # ===========================================================================
-  # Phase 1: Setup
-  # ===========================================================================
-  - id: setup-project-structure
-    title: Initialize project structure
-    status: todo
-    phase: 1
-    depends_on: []
-    repo: core-package
-    branch: feature/phase-1-setup
-    base_branch: main
-    instructions: Create base directory layout and config files
-    acceptance_criteria:
-      - src/ directory exists with index.ts
-      - tsconfig.json configured for strict mode
-
-  - id: setup-dependencies
-    title: Install core dependencies
-    status: todo
-    phase: 1
-    depends_on:
-      - setup-project-structure
-    repo: core-package
-    branch: feature/phase-1-setup
-    instructions: Add zod and yaml packages
-    acceptance_criteria:
-      - zod installed for schema validation
-      - yaml installed for file parsing
-    validation_task_id: validate-phase-1
-
-  # Checkpoint - Human validates before next phase
-  - id: validate-phase-1
-    title: Validate phase 1 setup
-    status: todo
-    phase: 1
-    checkpoint: true
-    depends_on:
-      - setup-project-structure
-      - setup-dependencies
-    repo: core-package
-    branch: feature/phase-1-setup
-    merge_into: main
-    instructions: |
-      Human review required before proceeding to next phase.
-
-      Run these checks:
-      - bun install succeeds
-      - tsc --noEmit passes
-
-      After validation, merge to main and mark done.
-    acceptance_criteria:
-      - "\`bun install\` succeeds"
-      - "\`tsc --noEmit\` passes"
-      - Human has reviewed and approved
-
-  # ===========================================================================
-  # Phase 2: Implementation
-  # ===========================================================================
-  - id: implement-core-feature
-    title: Implement the core feature
-    status: todo
-    phase: 2
-    depends_on:
-      - validate-phase-1
-    repo: core-package
-    branch: feature/phase-2-impl
-    base_branch: main
-    agent_name: claude-code
-    instructions: |
-      Build the main feature logic.
-      Follow existing patterns in the codebase.
-    acceptance_criteria:
-      - Feature works as specified
-      - Tests pass
-    validation_task_id: validate-phase-2
-    subtasks:
-      - id: implement-data-model
-        title: Create data model
-        status: todo
-        acceptance_criteria:
-          - Types defined
-          - Validation works
-      - id: implement-business-logic
-        title: Add business logic
-        status: todo
-        depends_on:
-          - implement-data-model
-        acceptance_criteria:
-          - Core functions implemented
-          - Edge cases handled
-
-  - id: validate-phase-2
-    title: Validate phase 2 implementation
-    status: todo
-    phase: 2
-    checkpoint: true
-    depends_on:
-      - implement-core-feature
-    branch: feature/phase-2-impl
-    merge_into: main
-    instructions: |
-      Human review required before proceeding.
-      Verify all tests pass and implementation is correct.
-    acceptance_criteria:
-      - All tests pass
-      - Code review approved
-      - Human has signed off
-\`\`\`
-
-## Your Task
-
-1. Ask the user what they want to build
-2. Understand the scope and requirements
-3. Break it into phases with tasks following the schema above
-4. Write the complete tasks to: {{TASKS_FILE}}
-
-Start by asking: "What would you like to build?"
 `,
 };
