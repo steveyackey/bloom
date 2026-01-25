@@ -244,6 +244,15 @@ function handleEvent(event: OrchestratorEvent, log: Logger): void {
       log[event.level](event.message, ...(event.args || []));
       break;
 
+    case "question:created":
+      // Questions are handled by the TUI/questions system, not CLI adapter
+      log.debug(`Question created: ${event.questionId} from ${event.agentName}`);
+      break;
+
+    case "question:answered":
+      log.debug(`Question answered: ${event.questionId}`);
+      break;
+
     default: {
       // Exhaustive check - TypeScript will error if we miss an event type
       const _exhaustiveCheck: never = event;

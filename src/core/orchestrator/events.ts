@@ -318,6 +318,26 @@ export interface SessionCorruptedEvent {
 }
 
 /**
+ * Event emitted when a question is created by an agent
+ */
+export interface QuestionCreatedEvent {
+  type: "question:created";
+  questionId: string;
+  agentName: string;
+  question: string;
+  questionType: "yes_no" | "open" | "choice";
+}
+
+/**
+ * Event emitted when a question is answered
+ */
+export interface QuestionAnsweredEvent {
+  type: "question:answered";
+  questionId: string;
+  answer: string;
+}
+
+/**
  * Generic error event
  */
 export interface ErrorEvent {
@@ -403,6 +423,8 @@ export type OrchestratorEvent =
   | MergeConflictResolvedEvent
   | GitCleanupEvent
   | SessionCorruptedEvent
+  | QuestionCreatedEvent
+  | QuestionAnsweredEvent
   | ErrorEvent
   | LogEvent;
 

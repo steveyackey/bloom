@@ -23,6 +23,9 @@ export async function runAgentWorkLoopTUI(config: TUIConfig): Promise<void> {
     tui.addPane(agentName);
   }
 
+  // Set tasks file for dashboard summary
+  tui.setTasksFile(config.tasksFile);
+
   // Start the TUI
   tui.start();
 

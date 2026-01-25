@@ -2,6 +2,7 @@
 // TUI Types
 // =============================================================================
 
+import type { QuestionType } from "../../human-queue";
 import type { ProcessStats } from "../../infra/terminal";
 
 /**
@@ -51,4 +52,27 @@ export interface TUIConfig {
   pollIntervalMs: number;
   /** Optional agent provider override */
   agentProviderOverride?: string;
+}
+
+/**
+ * Represents a pending question for display in the TUI.
+ */
+export interface QuestionDisplay {
+  id: string;
+  agentName: string;
+  question: string;
+  questionType: QuestionType;
+  options?: string[];
+  createdAt: Date;
+}
+
+/**
+ * Summary of task statuses for dashboard display.
+ */
+export interface TasksSummary {
+  total: number;
+  done: number;
+  inProgress: number;
+  blocked: number;
+  pending: number;
 }

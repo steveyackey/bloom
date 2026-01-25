@@ -4,12 +4,22 @@
 // Pure event-driven TUI using simple scrollable text logs instead of xterm.
 // Much lower memory footprint and simpler architecture.
 
+import type { FSWatcher } from "node:fs";
+import { watch } from "node:fs";
 import { interjectGenericSession } from "../../agents";
 import type { EventHandler, OrchestratorEvent } from "../../core/orchestrator";
-import { createInterjection } from "../../human-queue";
+import {
+  answerQuestion,
+  createInterjection,
+  listQuestions,
+  type Question,
+  type QueueEventHandler,
+  watchQueue,
+} from "../../human-queue";
 import { ansi, type BorderState, chalk, getBorderChalk, style } from "../../infra/colors";
 import { getProcessStatsBatch } from "../../infra/terminal";
-import type { AgentPane, ViewMode } from "./types";
+import { loadTasks } from "../../tasks";
+import type { AgentPane, QuestionDisplay, TasksSummary, ViewMode } from "./types";
 
 // Maximum lines to keep per pane (prevents unbounded memory growth)
 const MAX_OUTPUT_LINES = 2000;
@@ -30,9 +40,29 @@ export class EventDrivenTUI {
   private statsUpdateInterval?: ReturnType<typeof setInterval>;
   private isRunning = false;
 
+  // Questions panel state
+  private pendingQuestions: QuestionDisplay[] = [];
+  private selectedQuestionIndex = 0;
+  private showQuestionsPanel = false;
+  private answerMode = false;
+  private answerInput = "";
+  private questionWatcherCleanup?: () => void;
+
+  // Dashboard/tasks summary state
+  private tasksFile?: string;
+  private tasksWatcher?: FSWatcher;
+  private tasksSummary?: TasksSummary;
+
   constructor() {
     this.cols = process.stdout.columns || 80;
     this.rows = process.stdout.rows || 24;
+  }
+
+  /**
+   * Set the tasks file path for dashboard summary.
+   */
+  setTasksFile(tasksFile: string): void {
+    this.tasksFile = tasksFile;
   }
 
   /**
@@ -97,8 +127,100 @@ export class EventDrivenTUI {
     this.statsUpdateInterval = setInterval(() => this.updateStats(), 5000);
     this.updateStats();
 
+    // Start questions watcher
+    this.initializeQuestionsWatcher();
+
+    // Start tasks file watcher for dashboard
+    this.initializeTasksWatcher();
+
     // Initial render
     this.render();
+  }
+
+  /**
+   * Initialize questions watcher and load existing questions.
+   */
+  private async initializeQuestionsWatcher(): Promise<void> {
+    // Load existing pending questions
+    try {
+      const questions = await listQuestions("pending");
+      this.pendingQuestions = questions.map((q) => ({
+        id: q.id,
+        agentName: q.agentName,
+        question: q.question,
+        questionType: q.questionType || "open",
+        options: q.options,
+        createdAt: new Date(q.createdAt),
+      }));
+      if (this.pendingQuestions.length > 0) {
+        this.scheduleRender();
+      }
+    } catch {
+      // Questions directory may not exist yet
+    }
+
+    // Watch for changes
+    this.questionWatcherCleanup = watchQueue((event) => {
+      if (event.type === "question_added" && event.question) {
+        // Add if not already present
+        if (!this.pendingQuestions.find((q) => q.id === event.questionId)) {
+          this.pendingQuestions.push({
+            id: event.question.id,
+            agentName: event.question.agentName,
+            question: event.question.question,
+            questionType: event.question.questionType || "open",
+            options: event.question.options,
+            createdAt: new Date(event.question.createdAt),
+          });
+        }
+      } else if (event.type === "question_answered" || event.type === "question_deleted") {
+        this.pendingQuestions = this.pendingQuestions.filter((q) => q.id !== event.questionId);
+        // Adjust selected index if needed
+        if (this.selectedQuestionIndex >= this.pendingQuestions.length) {
+          this.selectedQuestionIndex = Math.max(0, this.pendingQuestions.length - 1);
+        }
+      }
+      this.scheduleRender();
+    });
+  }
+
+  /**
+   * Initialize tasks file watcher for dashboard summary.
+   */
+  private initializeTasksWatcher(): void {
+    if (!this.tasksFile) return;
+
+    // Initial load
+    this.updateTasksSummary();
+
+    // Watch for changes
+    this.tasksWatcher = watch(this.tasksFile, { persistent: false }, () => {
+      this.updateTasksSummary();
+    });
+  }
+
+  /**
+   * Update tasks summary from the tasks file.
+   */
+  private async updateTasksSummary(): Promise<void> {
+    if (!this.tasksFile) return;
+
+    try {
+      const tasksData = await loadTasks(this.tasksFile);
+      const tasks = tasksData.tasks || [];
+
+      this.tasksSummary = {
+        total: tasks.length,
+        done: tasks.filter((t) => t.status === "done" || t.status === "done_pending_merge").length,
+        inProgress: tasks.filter((t) => t.status === "in_progress" || t.status === "assigned").length,
+        blocked: tasks.filter((t) => t.status === "blocked").length,
+        pending: tasks.filter((t) => t.status === "todo" || t.status === "ready_for_agent").length,
+      };
+
+      this.scheduleRender();
+    } catch {
+      // Tasks file may not exist or be invalid
+    }
   }
 
   /**
@@ -110,6 +232,18 @@ export class EventDrivenTUI {
 
     if (this.statsUpdateInterval) {
       clearInterval(this.statsUpdateInterval);
+    }
+
+    // Clean up question watcher
+    if (this.questionWatcherCleanup) {
+      this.questionWatcherCleanup();
+      this.questionWatcherCleanup = undefined;
+    }
+
+    // Clean up tasks watcher
+    if (this.tasksWatcher) {
+      this.tasksWatcher.close();
+      this.tasksWatcher = undefined;
     }
 
     process.stdout.write(ansi.showCursor + ansi.leaveAltScreen);
@@ -406,6 +540,12 @@ export class EventDrivenTUI {
       process.exit(0);
     }
 
+    // Handle answer mode input
+    if (this.answerMode) {
+      this.handleAnswerModeInput(str);
+      return;
+    }
+
     switch (str) {
       case "v":
         // Toggle view mode
@@ -421,22 +561,40 @@ export class EventDrivenTUI {
 
       case "h":
       case "\x1b[D": // Left arrow
-        this.navigate("left");
+        if (this.showQuestionsPanel) {
+          // Navigate questions if panel is open
+        } else {
+          this.navigate("left");
+        }
         break;
 
       case "j":
       case "\x1b[B": // Down arrow
-        this.navigate("down");
+        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+          this.selectedQuestionIndex = Math.min(this.selectedQuestionIndex + 1, this.pendingQuestions.length - 1);
+          this.scheduleRender();
+        } else {
+          this.navigate("down");
+        }
         break;
 
       case "k":
       case "\x1b[A": // Up arrow
-        this.navigate("up");
+        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+          this.selectedQuestionIndex = Math.max(this.selectedQuestionIndex - 1, 0);
+          this.scheduleRender();
+        } else {
+          this.navigate("up");
+        }
         break;
 
       case "l":
       case "\x1b[C": // Right arrow
-        this.navigate("right");
+        if (this.showQuestionsPanel) {
+          // Navigate questions if panel is open
+        } else {
+          this.navigate("right");
+        }
         break;
 
       case "i":
@@ -458,7 +616,90 @@ export class EventDrivenTUI {
         // Page down
         this.scrollSelectedPane(this.getContentHeight());
         break;
+
+      case "?":
+        // Toggle questions panel visibility
+        this.showQuestionsPanel = !this.showQuestionsPanel;
+        this.lastRenderedOutput = ""; // Force full re-render
+        this.scheduleRender();
+        break;
+
+      case "a":
+        // Enter answer mode for selected question
+        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+          this.answerMode = true;
+          this.answerInput = "";
+          this.lastRenderedOutput = ""; // Force full re-render
+          this.scheduleRender();
+        }
+        break;
+
+      case "y":
+        // Quick yes answer for yes/no questions
+        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+          const q = this.pendingQuestions[this.selectedQuestionIndex];
+          if (q && q.questionType === "yes_no") {
+            this.submitAnswer("yes");
+          }
+        }
+        break;
+
+      case "n":
+        // Quick no answer for yes/no questions (but not if it would conflict with navigation)
+        if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+          const q = this.pendingQuestions[this.selectedQuestionIndex];
+          if (q && q.questionType === "yes_no") {
+            this.submitAnswer("no");
+          }
+        }
+        break;
     }
+  }
+
+  /**
+   * Handle input while in answer mode.
+   */
+  private handleAnswerModeInput(str: string): void {
+    if (str === "\x1b" || str === "\x1b\x1b") {
+      // Escape - exit answer mode
+      this.answerMode = false;
+      this.answerInput = "";
+      this.scheduleRender();
+    } else if (str === "\r" || str === "\n") {
+      // Enter - submit answer
+      if (this.answerInput.trim()) {
+        this.submitAnswer(this.answerInput.trim());
+      }
+    } else if (str === "\x7f" || str === "\b") {
+      // Backspace
+      this.answerInput = this.answerInput.slice(0, -1);
+      this.scheduleRender();
+    } else if (str.length === 1 && str >= " " && str <= "~") {
+      // Printable character
+      this.answerInput += str;
+      this.scheduleRender();
+    }
+  }
+
+  /**
+   * Submit an answer to the selected question.
+   */
+  private async submitAnswer(answer: string): Promise<void> {
+    if (this.pendingQuestions.length === 0) return;
+
+    const q = this.pendingQuestions[this.selectedQuestionIndex];
+    if (!q) return;
+
+    try {
+      await answerQuestion(q.id, answer);
+      // The question will be removed via the watcher
+    } catch {
+      // Handle error silently - the watcher will update state
+    }
+
+    this.answerMode = false;
+    this.answerInput = "";
+    this.scheduleRender();
   }
 
   private navigate(dir: "up" | "down" | "left" | "right"): void {
@@ -603,6 +844,11 @@ export class EventDrivenTUI {
       output += this.renderTiledPanes();
     }
 
+    // Render questions panel if visible
+    if (this.showQuestionsPanel && this.pendingQuestions.length > 0) {
+      output += this.renderQuestionsPanel();
+    }
+
     // Only write if changed
     if (output !== this.lastRenderedOutput) {
       this.lastRenderedOutput = output;
@@ -630,13 +876,98 @@ export class EventDrivenTUI {
     const statsText =
       totalCpu > 0 || totalMem > 0 ? chalk.dim(` [${totalCpu.toFixed(1)}% ${totalMem.toFixed(0)}MB]`) : "";
 
-    const keys = chalk.dim("v:view hjkl:nav i:interject g/G:scroll q:quit");
+    // Task summary
+    let tasksText = "";
+    if (this.tasksSummary) {
+      const { done, total, inProgress, blocked } = this.tasksSummary;
+      tasksText = ` ${chalk.dim("|")} ${chalk.blue("Tasks:")} ${chalk.green(String(done))}/${total}`;
+      if (inProgress > 0) tasksText += chalk.cyan(` ${inProgress}▶`);
+      if (blocked > 0) tasksText += chalk.red(` ${blocked}✗`);
+    }
 
-    const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Agents:")} ${agentCount}${statsText} ${chalk.dim("|")} ${keys}`;
+    // Questions indicator
+    let questionsText = "";
+    if (this.pendingQuestions.length > 0) {
+      questionsText = ` ${chalk.dim("|")} ${chalk.yellow(`?:${this.pendingQuestions.length}`)}`;
+    }
+
+    const keys = chalk.dim("v:view ?:questions hjkl:nav i:interject q:quit");
+
+    const header = `${title} ${chalk.dim("|")} ${viewInfo} ${chalk.dim("|")} ${chalk.yellow("Agents:")} ${agentCount}${statsText}${tasksText}${questionsText} ${chalk.dim("|")} ${keys}`;
 
     // Pad to full width
     const visibleLen = this.stripAnsi(header).length;
     return header + " ".repeat(Math.max(0, this.cols - visibleLen));
+  }
+
+  /**
+   * Render the questions panel at the bottom of the screen.
+   */
+  private renderQuestionsPanel(): string {
+    let output = "";
+
+    // Calculate panel size
+    const maxQuestions = Math.min(5, this.pendingQuestions.length);
+    const panelHeight = maxQuestions + 4; // Questions + header + footer + borders
+    const panelStartRow = this.rows - panelHeight;
+
+    // Draw separator line
+    output += ansi.moveTo(panelStartRow, 1);
+    output += chalk.yellow("═".repeat(this.cols));
+
+    // Header
+    output += ansi.moveTo(panelStartRow + 1, 1);
+    const headerText = chalk.bold.yellow(` Pending Questions (${this.pendingQuestions.length})`);
+    output += headerText;
+    output += " ".repeat(Math.max(0, this.cols - this.stripAnsi(headerText).length));
+
+    // Questions list
+    for (let i = 0; i < maxQuestions; i++) {
+      const q = this.pendingQuestions[i];
+      if (!q) continue;
+
+      const row = panelStartRow + 2 + i;
+      output += ansi.moveTo(row, 1);
+
+      const selected = i === this.selectedQuestionIndex;
+      const prefix = selected ? chalk.cyan("▶ ") : "  ";
+      const typeIndicator =
+        q.questionType === "yes_no"
+          ? chalk.magenta("[Y/N]")
+          : q.questionType === "choice"
+            ? chalk.blue("[choice]")
+            : chalk.gray("[open]");
+
+      // Truncate question to fit
+      const agentPart = chalk.dim(`[${q.agentName}]`);
+      const questionMaxLen = this.cols - 25;
+      let questionText = q.question.replace(/\n/g, " ");
+      if (questionText.length > questionMaxLen) {
+        questionText = questionText.slice(0, questionMaxLen - 3) + "...";
+      }
+
+      const line = `${prefix}${typeIndicator} ${agentPart} ${questionText}`;
+      output += line;
+      output += " ".repeat(Math.max(0, this.cols - this.stripAnsi(line).length));
+    }
+
+    // Footer with help text
+    output += ansi.moveTo(panelStartRow + 2 + maxQuestions, 1);
+    let footerText: string;
+    if (this.answerMode) {
+      footerText = chalk.cyan(` Answer: ${this.answerInput}█`) + chalk.dim(" (Enter to submit, Esc to cancel)");
+    } else {
+      const selectedQ = this.pendingQuestions[this.selectedQuestionIndex];
+      if (selectedQ?.questionType === "yes_no") {
+        footerText = chalk.dim(" j/k:navigate  y:yes  n:no  a:custom answer  ?:close");
+      } else {
+        footerText = chalk.dim(" j/k:navigate  a:answer  ?:close");
+      }
+    }
+    output += footerText;
+    output += " ".repeat(Math.max(0, this.cols - this.stripAnsi(footerText).length));
+
+    return output;
   }
 
   private renderEmptyState(): string {

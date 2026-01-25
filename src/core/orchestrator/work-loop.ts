@@ -294,16 +294,19 @@ export async function runAgentWorkLoop(
         });
 
         // Check for fatal session errors that indicate corrupted state
+        // Only clear session if there's an actual corruption pattern, not just any failure
+        // (benign failures like user interruption or timeout shouldn't clear session)
         const errorOrOutput = `${result.error || ""} ${result.output || ""}`;
         const hasFatalSessionPattern =
-          errorOrOutput.includes("tool_use") ||
+          errorOrOutput.includes("tool_use_id") ||
+          errorOrOutput.includes("duplicate tool_use") ||
           errorOrOutput.includes("concurrency") ||
           errorOrOutput.includes("must be unique") ||
           errorOrOutput.includes("must start with") ||
           errorOrOutput.includes("invalid_format") ||
           errorOrOutput.includes("invalid_request_error");
         const wasResuming = !!currentSessionId;
-        const isFatalSessionError = !result.success && (hasFatalSessionPattern || wasResuming);
+        const isFatalSessionError = !result.success && hasFatalSessionPattern;
 
         // Save session ID for future resumption (only if session is healthy)
         if (result.sessionId && taskResult.taskId && !isFatalSessionError) {
@@ -676,8 +679,20 @@ async function handleMerge(
         },
       });
 
-      if (conflictResult.sessionId && ctx.taskId) {
+      // Check for fatal session errors in merge conflict resolution
+      const mergeErrorOrOutput = `${conflictResult.error || ""} ${conflictResult.output || ""}`;
+      const hasMergeFatalPattern =
+        mergeErrorOrOutput.includes("invalid_request_error") ||
+        mergeErrorOrOutput.includes("must be unique") ||
+        mergeErrorOrOutput.includes("invalid_format") ||
+        mergeErrorOrOutput.includes("tool_use_id") ||
+        mergeErrorOrOutput.includes("duplicate tool_use");
+
+      if (conflictResult.sessionId && ctx.taskId && !hasMergeFatalPattern) {
         await saveTaskSessionId(ctx.tasksFile, ctx.taskId, conflictResult.sessionId);
+      } else if (hasMergeFatalPattern && ctx.taskId) {
+        // Clear corrupted session
+        await saveTaskSessionId(ctx.tasksFile, ctx.taskId, undefined);
       }
 
       onEvent({
