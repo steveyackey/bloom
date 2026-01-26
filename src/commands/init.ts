@@ -7,6 +7,7 @@ import { join, resolve } from "node:path";
 import chalk from "chalk";
 import * as YAML from "yaml";
 import { getUserConfigPath, loadUserConfig, setGitProtocol } from "../infra/config";
+import { DEFAULT_PLAN_TEMPLATE, DEFAULT_PRD_TEMPLATE } from "../prompts-embedded";
 import { BLOOM_DIR, isInGitRepo } from "./context";
 
 // Path to template folder (relative to this file's package)
@@ -97,69 +98,12 @@ export async function initWorkspace(dir: string = BLOOM_DIR): Promise<InitResult
         result.created.push(`template/${file}`);
       }
     } else {
-      // Fallback: create minimal templates if package template dir doesn't exist
-      const prdContent = `# Product Requirements Document: [Project Name]
+      // Fallback: use embedded templates (for bundled binary where package template dir doesn't exist)
+      await Bun.write(join(templateDir, "PRD.md"), DEFAULT_PRD_TEMPLATE);
+      result.created.push("template/PRD.md");
 
-## Overview
-Brief description of the project and its purpose.
-
-## Problem Statement
-What problem does this solve? Why does it need to exist?
-
-## Target Users
-Who will use this? What are their needs?
-
-## Goals & Success Criteria
-- Primary goal
-- How will we measure success?
-
-## Core Features
-1. **Feature Name**: Description
-2. **Feature Name**: Description
-
-## Technical Requirements
-- Platform/runtime requirements
-- Key technologies or frameworks
-- Constraints or limitations
-
-## Non-Goals (Out of Scope)
-- What this project will NOT do (for this version)
-
-## Open Questions
-- Any unresolved decisions or unknowns
-`;
-
-      const planContent = `# Implementation Plan
-
-## Summary
-Brief summary of what will be implemented based on the PRD.
-
-## Architecture Overview
-High-level architecture decisions and design patterns to be used.
-
-## Implementation Phases
-
-### Phase 1: [Phase Name]
-**Goal**: What this phase accomplishes
-
-**Tasks**:
-1. Task description
-2. Task description
-
-**Acceptance Criteria**:
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Dependencies
-- List any external dependencies or prerequisites
-
-## Risks & Mitigations
-- **Risk**: Description
-  - **Mitigation**: How to address it
-
-## Open Questions
-- Questions that need resolution before or during implementation
-`;
+      await Bun.write(join(templateDir, "plan.md"), DEFAULT_PLAN_TEMPLATE);
+      result.created.push("template/plan.md");
 
       const claudeContent = `# Project Guidelines
 
@@ -176,12 +120,6 @@ Always use conventional commits.
 - Add tests for new functionality
 - Update documentation as needed
 `;
-
-      await Bun.write(join(templateDir, "PRD.md"), prdContent);
-      result.created.push("template/PRD.md");
-
-      await Bun.write(join(templateDir, "plan.md"), planContent);
-      result.created.push("template/plan.md");
 
       await Bun.write(join(templateDir, "CLAUDE.template.md"), claudeContent);
       result.created.push("template/CLAUDE.template.md");

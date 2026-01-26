@@ -1,13 +1,10 @@
 // =============================================================================
-// Prompt Loading from Markdown Files
+// Prompt Loading (Embedded Only)
 // =============================================================================
 
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { DEFAULT_PLAN_TEMPLATE, DEFAULT_PRD_TEMPLATE, EMBEDDED_PROMPTS } from "./prompts-embedded";
-
-// Try to resolve prompts directory, but it may not exist in bundled binaries
-const PROMPTS_DIR = resolve(import.meta.dirname ?? ".", "..", "prompts");
 
 export interface PromptVariables {
   [key: string]: string;
@@ -39,26 +36,17 @@ async function loadTemplates(bloomDir?: string): Promise<{ prdTemplate: string; 
 }
 
 /**
- * Load a prompt from a markdown file and replace variables
- * Falls back to embedded prompts when files aren't accessible (bundled binary)
+ * Load a prompt from embedded prompts and replace variables
  *
- * @param name - The prompt name (without .md extension)
+ * @param name - The prompt name
  * @param variables - Variables to replace in the prompt
  * @param bloomDir - Optional bloom workspace directory for loading templates
  */
 export async function loadPrompt(name: string, variables: PromptVariables = {}, bloomDir?: string): Promise<string> {
-  const filePath = join(PROMPTS_DIR, `${name}.md`);
+  const content = EMBEDDED_PROMPTS[name];
 
-  let content: string;
-
-  if (existsSync(filePath)) {
-    // Load from external file (development mode)
-    content = await Bun.file(filePath).text();
-  } else if (EMBEDDED_PROMPTS[name]) {
-    // Fall back to embedded prompt (bundled binary)
-    content = EMBEDDED_PROMPTS[name];
-  } else {
-    throw new Error(`Prompt not found: ${name} (checked: ${filePath})`);
+  if (!content) {
+    throw new Error(`Prompt not found: ${name} (available: ${Object.keys(EMBEDDED_PROMPTS).join(", ")})`);
   }
 
   // Load templates and add to variables if not already provided
@@ -70,10 +58,11 @@ export async function loadPrompt(name: string, variables: PromptVariables = {}, 
   };
 
   // Replace all {{VARIABLE}} placeholders
+  let result = content;
   for (const [key, value] of Object.entries(allVariables)) {
     const pattern = new RegExp(`\\{\\{${key}\\}\\}`, "g");
-    content = content.replace(pattern, value);
+    result = result.replace(pattern, value);
   }
 
-  return content;
+  return result;
 }

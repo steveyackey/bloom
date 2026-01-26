@@ -1,31 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { createProject } from "../src/commands/create";
+import { DEFAULT_PLAN_TEMPLATE, DEFAULT_PRD_TEMPLATE } from "../src/prompts-embedded";
 
 const TEST_DIR = join(import.meta.dirname ?? ".", "test-create-workspace");
-const PACKAGE_TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "template");
 
-// Mock BLOOM_DIR to point to TEST_DIR for testing
-// The createProject function uses BLOOM_DIR/template as the source
-function setupWorkspaceTemplates() {
+// Create workspace templates from embedded defaults
+async function setupWorkspaceTemplates() {
   const templateDir = join(TEST_DIR, "template");
   if (!existsSync(templateDir)) {
     mkdirSync(templateDir, { recursive: true });
-    // Copy templates from package
-    if (existsSync(PACKAGE_TEMPLATE_DIR)) {
-      cpSync(PACKAGE_TEMPLATE_DIR, templateDir, { recursive: true });
-    }
+
+    // Write templates from embedded defaults
+    await Bun.write(join(templateDir, "PRD.md"), DEFAULT_PRD_TEMPLATE);
+    await Bun.write(join(templateDir, "plan.md"), DEFAULT_PLAN_TEMPLATE);
+
+    const claudeContent = `# Project Guidelines
+
+## Commit Style
+Always use conventional commits.
+
+## Development Workflow
+1. Review the PRD in PRD.md
+2. Check the plan in plan.md
+3. Follow the tasks in tasks.yaml
+
+## Code Standards
+- Write clear, maintainable code
+- Add tests for new functionality
+- Update documentation as needed
+`;
+    await Bun.write(join(templateDir, "CLAUDE.template.md"), claudeContent);
   }
 }
 
 describe("create command", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
     mkdirSync(TEST_DIR, { recursive: true });
-    setupWorkspaceTemplates();
+    await setupWorkspaceTemplates();
   });
 
   afterEach(() => {

@@ -80,7 +80,7 @@ src/
 │   └── generic-provider.ts       # Unified agent provider
 │
 ├── prompts/                      # Prompt system
-│   ├── index.ts                  # Prompt loading
+│   ├── index.ts                  # Prompt loading (always uses embedded)
 │   └── compiler.ts               # Template compilation
 │
 ├── view/                         # Web-based task visualization
@@ -90,7 +90,7 @@ src/
 │   └── prompts.ts                # Prompt UI components
 │
 ├── task-schema.ts                # Task data models (Zod schemas)
-└── prompts-embedded.ts           # Embedded prompt templates
+└── prompts-embedded.ts           # System prompts and workspace templates (embedded in binary)
 ```
 
 ## Layer Responsibilities
@@ -141,7 +141,7 @@ Pluggable AI agent system with a generic provider supporting multiple backends (
 
 ### Prompts Layer (`src/prompts/`)
 
-Prompt template system that loads markdown files and performs variable substitution for task context.
+Prompt template system with variable substitution for task context. All system prompts and workspace templates (PRD, plan, CLAUDE.template) are embedded in `src/prompts-embedded.ts` for bundled binary distribution. Templates are copied to workspaces during `bloom init`.
 
 ## Event-Driven Orchestration
 
