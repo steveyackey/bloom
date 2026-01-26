@@ -451,6 +451,67 @@ export async function cmdValidate(): Promise<void> {
     }
   }
 
+  // Validate checkpoint tasks
+  function checkCheckpoints(tasks: Task[]) {
+    for (const task of tasks) {
+      // Rule 1: Checkpoint tasks cannot have open_pr: true
+      // Checkpoints are never executed by agents, they only create approval questions
+      if (task.checkpoint && task.open_pr) {
+        hasErrors = true;
+        console.error(
+          chalk.red(`ERROR: Task '${task.id}' is a checkpoint with open_pr: true. `) +
+            chalk.red("Checkpoint tasks are never executed and cannot create PRs.")
+        );
+      }
+
+      // Rule 2: Checkpoint tasks before terminal PR tasks are redundant
+      // Find tasks that depend on this checkpoint
+      if (task.checkpoint) {
+        const dependents: Task[] = [];
+        function findDependents(searchTasks: Task[]) {
+          for (const t of searchTasks) {
+            if (t.depends_on.includes(task.id)) {
+              dependents.push(t);
+            }
+            findDependents(t.subtasks);
+          }
+        }
+        findDependents(tasksFile.tasks);
+
+        // Check if any dependent has open_pr and no other tasks depend on it (terminal)
+        for (const dep of dependents) {
+          if (dep.open_pr) {
+            // Check if this dependent is terminal (no other tasks depend on it)
+            let isTerminal = true;
+            function hasOtherDependents(searchTasks: Task[]): boolean {
+              for (const t of searchTasks) {
+                if (t.depends_on.includes(dep.id)) {
+                  return true;
+                }
+                if (hasOtherDependents(t.subtasks)) {
+                  return true;
+                }
+              }
+              return false;
+            }
+            isTerminal = !hasOtherDependents(tasksFile.tasks);
+
+            if (isTerminal) {
+              hasErrors = true;
+              console.error(
+                chalk.red(`ERROR: Checkpoint task '${task.id}' is followed by terminal PR task '${dep.id}'. `) +
+                  chalk.red("This is redundant - the PR itself serves as a review checkpoint.")
+              );
+            }
+          }
+        }
+      }
+
+      checkCheckpoints(task.subtasks);
+    }
+  }
+  checkCheckpoints(tasksFile.tasks);
+
   if (hasErrors) {
     console.log(`\n${chalk.red.bold("Validation FAILED")}`);
     process.exit(1);

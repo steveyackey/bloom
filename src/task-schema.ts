@@ -104,7 +104,7 @@ export type Task = {
   subtasks: Task[];
   /** Points to a validation task that verifies this task's work (e.g. run tests, lint) */
   validation_task_id?: string;
-  /** If true, this task requires human approval before downstream tasks can proceed */
+  /** If true, this task requires human approval before downstream tasks can proceed. Use for mid-project validation in long workflows, not before terminal PR tasks (PRs are already review gates). */
   checkpoint?: boolean;
   /** Claude session ID for resuming interrupted work (shared across all steps) */
   session_id?: string;
