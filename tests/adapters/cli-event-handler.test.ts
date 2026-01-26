@@ -435,6 +435,9 @@ describe("CLI Event Handler", () => {
         targetBranch: "main",
         deleted: ["feature/a", "feature/b"],
         failed: [],
+        worktreesRemoved: [],
+        remotesDeleted: [],
+        remotesFailed: [],
       });
 
       const output = getCapturedOutput();
@@ -449,11 +452,65 @@ describe("CLI Event Handler", () => {
         targetBranch: "main",
         deleted: [],
         failed: [{ branch: "protected-branch", error: "Protected" }],
+        worktreesRemoved: [],
+        remotesDeleted: [],
+        remotesFailed: [],
       });
 
       const output = getCapturedOutput();
       expect(output).toContain("protected-branch");
       expect(output).toContain("Protected");
+    });
+
+    test("git:cleanup logs worktrees removed", () => {
+      const handler = createCLIEventHandler("test-agent");
+      handler({
+        type: "git:cleanup",
+        targetBranch: "main",
+        deleted: ["feature/a"],
+        failed: [],
+        worktreesRemoved: ["feature/a"],
+        remotesDeleted: [],
+        remotesFailed: [],
+      });
+
+      const output = getCapturedOutput();
+      expect(output).toContain("Removed worktrees");
+      expect(output).toContain("feature/a");
+    });
+
+    test("git:cleanup logs remote branches deleted", () => {
+      const handler = createCLIEventHandler("test-agent");
+      handler({
+        type: "git:cleanup",
+        targetBranch: "main",
+        deleted: ["feature/a"],
+        failed: [],
+        worktreesRemoved: [],
+        remotesDeleted: ["feature/a"],
+        remotesFailed: [],
+      });
+
+      const output = getCapturedOutput();
+      expect(output).toContain("Deleted remote branches");
+      expect(output).toContain("feature/a");
+    });
+
+    test("git:cleanup logs failed remote deletions", () => {
+      const handler = createCLIEventHandler("test-agent");
+      handler({
+        type: "git:cleanup",
+        targetBranch: "main",
+        deleted: [],
+        failed: [],
+        worktreesRemoved: [],
+        remotesDeleted: [],
+        remotesFailed: [{ branch: "feature/x", error: "Network error" }],
+      });
+
+      const output = getCapturedOutput();
+      expect(output).toContain("feature/x");
+      expect(output).toContain("Network error");
     });
   });
 
@@ -497,7 +554,15 @@ describe("CLI Event Handler", () => {
         { type: "git:merge_conflict", sourceBranch: "b", targetBranch: "main", error: "conflict" },
         { type: "merge:conflict_resolving", sourceBranch: "b", targetBranch: "main" },
         { type: "merge:conflict_resolved", sourceBranch: "b", targetBranch: "main", success: true },
-        { type: "git:cleanup", targetBranch: "main", deleted: [], failed: [] },
+        {
+          type: "git:cleanup",
+          targetBranch: "main",
+          deleted: [],
+          failed: [],
+          worktreesRemoved: [],
+          remotesDeleted: [],
+          remotesFailed: [],
+        },
         { type: "session:corrupted", taskId: "t1", wasResuming: true, reason: "error" },
         { type: "error", message: "error" },
         { type: "log", level: "info", message: "log" },

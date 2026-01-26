@@ -303,8 +303,16 @@ export interface MergeConflictResolvedEvent {
 export interface GitCleanupEvent {
   type: "git:cleanup";
   targetBranch: string;
+  /** Local branches deleted */
   deleted: string[];
+  /** Branches that failed to delete */
   failed: Array<{ branch: string; error: string }>;
+  /** Worktrees that were removed */
+  worktreesRemoved: string[];
+  /** Remote branches deleted */
+  remotesDeleted: string[];
+  /** Remote branches that failed to delete */
+  remotesFailed: Array<{ branch: string; error: string }>;
 }
 
 /**

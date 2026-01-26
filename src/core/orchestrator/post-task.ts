@@ -374,14 +374,20 @@ export function pushMergedBranch(ctx: MergeContext, onEvent: EventHandler): { su
 
 /**
  * Clean up branches that have been merged into the target.
+ * Also removes worktrees and remote branches (if push_to_remote is enabled).
  */
 export async function cleanupMergedBranchesForTask(ctx: MergeContext, onEvent: EventHandler): Promise<void> {
-  const result = await cleanupMergedBranches(ctx.bloomDir, ctx.repo, ctx.gitInfo.mergeInto!);
+  const result = await cleanupMergedBranches(ctx.bloomDir, ctx.repo, ctx.gitInfo.mergeInto!, {
+    deleteRemote: ctx.gitConfig?.push_to_remote ?? false,
+  });
 
   onEvent({
     type: "git:cleanup",
     targetBranch: ctx.gitInfo.mergeInto!,
     deleted: result.deleted,
     failed: result.failed,
+    worktreesRemoved: result.worktreesRemoved,
+    remotesDeleted: result.remotesDeleted,
+    remotesFailed: result.remotesFailed,
   });
 }
