@@ -575,7 +575,6 @@ After writing tasks.yaml, tell the user:
 3. Next step: run \`bloom run\` to start execution
 `,
 
-
   plan: `# Planning Assistant
 
 You are a project planning assistant. Your job is to analyze the project context and create a detailed implementation plan.

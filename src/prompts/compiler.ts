@@ -49,10 +49,6 @@ export interface CompileOptions {
  * Compiles prompt templates with variable substitution.
  */
 export class PromptCompiler {
-  constructor() {
-    // No longer needs promptsDir - always uses embedded prompts
-  }
-
   /**
    * Compile a prompt string with the given options.
    *

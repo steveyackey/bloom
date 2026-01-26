@@ -7,8 +7,8 @@ import { join, resolve } from "node:path";
 import chalk from "chalk";
 import * as YAML from "yaml";
 import { getUserConfigPath, loadUserConfig, setGitProtocol } from "../infra/config";
-import { BLOOM_DIR, isInGitRepo } from "./context";
 import { DEFAULT_PLAN_TEMPLATE, DEFAULT_PRD_TEMPLATE } from "../prompts-embedded";
+import { BLOOM_DIR, isInGitRepo } from "./context";
 
 // Path to template folder (relative to this file's package)
 const PACKAGE_TEMPLATE_DIR = resolve(import.meta.dirname ?? ".", "..", "..", "template");
