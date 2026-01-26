@@ -527,9 +527,7 @@ export async function cmdValidate(): Promise<void> {
 
   if (tasksWithPR.length > 0 && !tasksFile.git?.push_to_remote) {
     hasErrors = true;
-    console.error(
-      chalk.red(`ERROR: Tasks with open_pr require git.push_to_remote: true to push branches to remote.`)
-    );
+    console.error(chalk.red(`ERROR: Tasks with open_pr require git.push_to_remote: true to push branches to remote.`));
     console.error(chalk.red(`  Tasks requiring push: ${tasksWithPR.join(", ")}`));
     console.error(chalk.red(`  Add 'git.push_to_remote: true' to your tasks.yaml`));
   }
