@@ -1,153 +1,195 @@
 # Multi-Agent & Cluster Mode
 
-Bloom supports running multiple agents concurrently, from a single machine to a distributed cluster of runners. This guide covers the different modes and when to use each.
+Bloom supports running agents across multiple projects simultaneously, from a single machine to a distributed cluster.
 
-## Quick Reference
+## The Core Idea: Workspace-Level Orchestration
 
-| Mode | Command | Use Case |
-|------|---------|----------|
-| Single agent | `bloom run` | Simple projects, one task at a time |
-| Multi-agent | `bloom run` | Parallel tasks within a project |
-| Multi-process | `bloom run --workers 3` | More parallelism on one machine |
-| Cluster | `bloom cluster start` | Distributed compute across machines |
+Currently, `bloom run` operates on a single project's `tasks.yaml`. But a workspace can have many projects:
+
+```
+my-workspace/
+├─ bloom.config.yaml
+├─ repos/
+├─ projects/
+│  ├─ auth-refactor/
+│  │  └─ tasks.yaml       # 5 tasks
+│  ├─ new-dashboard/
+│  │  └─ tasks.yaml       # 8 tasks
+│  └─ bug-fixes/
+│     └─ tasks.yaml       # 3 tasks
+└─ inbox.yaml              # Ad-hoc tasks
+```
+
+**The new model**: `bloom run` pulls tasks from ALL projects (and inbox) in the workspace.
 
 ---
 
-## Ad-hoc Tasks & The Inbox
+## Quick Reference
 
-Not everything needs a full project. Use the inbox for quick bugs, research, and one-off tasks.
+| Command | Scope | Use Case |
+|---------|-------|----------|
+| `bloom run` | Entire workspace | Run all projects + inbox |
+| `bloom run --project auth-refactor` | Single project | Focus on one project |
+| `bloom run --inbox-only` | Inbox only | Just ad-hoc tasks |
+| `bloom run --workers 3` | Workspace, parallel | More compute |
+| `bloom cluster start` | Distributed | Multi-machine |
 
-### Adding Tasks to Inbox
+---
+
+## Workspace Mode (Default)
+
+Running `bloom run` from anywhere in the workspace now discovers and runs all projects:
 
 ```bash
-# Quick bug fix
-bloom inbox add "Fix the null pointer in auth.ts line 42" --repo my-app
-
-# Research task
-bloom inbox add "How does the caching layer work?" --repo my-app
-
-# From a GitHub issue
-bloom inbox add --issue my-org/my-app#123
-
-# With priority (urgent tasks get picked up first)
-bloom inbox add "Production bug in payments" --repo billing --priority high
+bloom run
 ```
 
-### Viewing Your Inbox
+```
+WORKSPACE: my-workspace
+──────────────────────────────────────────────────────────
+ Source              Tasks    Ready    In Progress
+──────────────────────────────────────────────────────────
+ auth-refactor       5        2        0
+ new-dashboard       8        3        1
+ bug-fixes           3        1        0
+ inbox               2        2        0
+──────────────────────────────────────────────────────────
+ Total               18       8        1
+
+Starting 4 agents across all sources...
+```
+
+### How Tasks Are Scheduled
+
+Tasks from all projects enter a unified queue, ordered by:
+
+1. **Priority** (explicit `priority: high/normal/low`)
+2. **Dependencies satisfied** (ready vs blocked)
+3. **Project order** (configurable in `bloom.config.yaml`)
+4. **FIFO within same priority**
+
+```yaml
+# bloom.config.yaml
+orchestrator:
+  # Control project priority
+  project_order:
+    - bug-fixes      # Highest priority
+    - inbox
+    - auth-refactor
+    - new-dashboard  # Lowest priority
+```
+
+### Project Isolation
+
+Each project's tasks still operate in their own context:
+- Own `tasks.yaml` state
+- Own branches and worktrees
+- Own session IDs
+- Own CLAUDE.md context
+
+Projects don't share agents mid-task—an agent finishes its current task before picking up work from another project.
+
+---
+
+## The Inbox
+
+The inbox is a lightweight project for ad-hoc work:
 
 ```bash
+# Add tasks to inbox
+bloom inbox add "Fix null pointer in auth.ts" --repo my-app
+bloom inbox add --issue my-org/repo#123
+bloom inbox add "Research: how does caching work?" --repo my-app
+
+# View inbox
 bloom inbox
 ```
 
 ```
 INBOX (3 tasks)
 ─────────────────────────────────────────────────────────
- #   Priority   Repo      Title
+ ID       Repo      Title                          Status
 ─────────────────────────────────────────────────────────
- 1   high       billing   Production bug in payments
- 2   normal     my-app    Fix null pointer in auth.ts
- 3   low        my-app    How does the caching layer work?
+ inbox-1  my-app    Fix null pointer in auth.ts    ready
+ inbox-2  repo      GitHub issue #123              ready
+ inbox-3  my-app    Research: how does caching...  ready
 ```
 
-### Running Inbox Tasks
-
-Inbox tasks run alongside project tasks automatically:
-
-```bash
-bloom run  # Picks up both project tasks AND inbox
-```
-
-Or run inbox only:
-
-```bash
-bloom inbox run
-```
+Inbox tasks are just tasks—they run alongside project tasks automatically.
 
 ### Inbox vs Projects
 
 | Inbox | Projects |
 |-------|----------|
-| Quick, one-off tasks | Planned, multi-task work |
-| No PRD or plan needed | Full PRD → Plan → Generate flow |
-| Auto-cleanup after merge | Persistent task history |
-| Great for bugs & research | Great for features & refactors |
+| `bloom inbox add` | `bloom create` → refine → plan → generate |
+| No PRD, no plan | Full workflow |
+| Auto-cleanup on merge | Persistent history |
+| Single tasks | Task trees with dependencies |
 
 ---
 
-## Multi-Agent Mode (Single Process)
+## Selecting What to Run
 
-By default, `bloom run` extracts agent names from your `tasks.yaml` and runs them concurrently:
-
-```yaml
-# tasks.yaml
-tasks:
-  - id: frontend-work
-    agent_name: frontend
-    title: "Build login page"
-
-  - id: backend-work
-    agent_name: backend
-    title: "Add auth endpoints"
-
-  - id: more-frontend
-    agent_name: frontend
-    title: "Build dashboard"
-```
+### Run Everything (Default)
 
 ```bash
 bloom run
 ```
 
-This spawns two concurrent work loops:
-- `frontend` agent works on frontend-work, then more-frontend
-- `backend` agent works on backend-work in parallel
+### Run Specific Projects
 
-The TUI shows both agents side-by-side:
+```bash
+# Single project
+bloom run --project auth-refactor
 
+# Multiple projects
+bloom run --project auth-refactor --project bug-fixes
+
+# Exclude a project
+bloom run --exclude new-dashboard
 ```
-┌─ frontend ──────────────────┬─ backend ───────────────────┐
-│ Working on: Build login     │ Working on: Add auth        │
-│                             │ endpoints                   │
-│ > Creating LoginForm.tsx... │                             │
-│ > Adding validation...      │ > Scaffolding routes...     │
-│                             │ > Adding JWT middleware...  │
-└─────────────────────────────┴─────────────────────────────┘
+
+### Run Inbox Only
+
+```bash
+bloom run --inbox-only
+# or
+bloom inbox run
+```
+
+### Run a Project + Inbox
+
+```bash
+bloom run --project auth-refactor --inbox
 ```
 
 ---
 
-## Multi-Process Mode (Same Machine)
+## Multi-Worker Mode
 
-Need more parallelism? Run multiple bloom processes:
+Scale up on a single machine:
 
 ```bash
-# Option 1: Specify worker count
 bloom run --workers 3
-
-# Option 2: Run separate processes manually
-bloom run &
-bloom run &
-bloom run &
 ```
 
-### How It Works
-
-Each process registers with a local coordinator and claims tasks atomically:
+This spawns 3 coordinated processes that pull from the unified task queue:
 
 ```
 ┌─────────────────────────────────────────┐
-│           ~/.bloom/coordinator          │
-│  ├─ task-claims.db (SQLite)             │
-│  └─ workers.json                        │
+│         Workspace Coordinator           │
+│  ├─ Discovers all projects              │
+│  ├─ Builds unified task queue           │
+│  └─ Coordinates task claims             │
 └─────────────────────────────────────────┘
         ↑           ↑           ↑
-   bloom run   bloom run   bloom run
-    (pid 1)     (pid 2)     (pid 3)
+   Worker 1    Worker 2    Worker 3
+   (auth task) (dashboard) (inbox bug)
 ```
 
-Tasks are claimed atomically—no duplicates, no races.
+### Task Claiming
 
-### Viewing All Workers
+Workers claim tasks atomically via SQLite:
 
 ```bash
 bloom workers
@@ -156,132 +198,122 @@ bloom workers
 ```
 ACTIVE WORKERS
 ──────────────────────────────────────────────────────────
- PID     Status    Current Task         Started
+ PID     Project          Task                 Duration
 ──────────────────────────────────────────────────────────
- 12345   working   frontend-work        2 min ago
- 12346   working   backend-work         2 min ago
- 12347   idle      -                    1 min ago
+ 12345   auth-refactor    Implement JWT        2m 30s
+ 12346   new-dashboard    Build sidebar        1m 15s
+ 12347   inbox            Fix null pointer     45s
 ```
 
-### Stopping Workers
+### Worker Affinity (Optional)
+
+Assign workers to specific projects:
 
 ```bash
-bloom workers stop          # Graceful shutdown (finish current tasks)
-bloom workers stop --force  # Immediate shutdown
+# This worker only handles auth-refactor
+bloom run --worker --project auth-refactor
+
+# This worker handles inbox and bug-fixes
+bloom run --worker --project inbox --project bug-fixes
 ```
 
 ---
 
-## Cluster Mode (Distributed)
+## Cluster Mode
 
-For large projects or teams, run bloom across multiple machines.
+Distribute work across multiple machines.
 
-### Starting a Cluster
-
-**On the coordinator machine:**
+### Start Coordinator
 
 ```bash
 bloom cluster start --port 9000
 ```
 
-```
-Cluster coordinator started on ws://192.168.1.10:9000
-Waiting for workers...
+The coordinator:
+- Discovers all projects in the workspace
+- Syncs workspace state to workers
+- Schedules tasks across the cluster
+- Aggregates results and updates task files
 
-Join command for other machines:
-  bloom cluster join ws://192.168.1.10:9000
-```
+### Join Workers
 
-**On worker machines:**
+On other machines:
 
 ```bash
-bloom cluster join ws://192.168.1.10:9000
+bloom cluster join ws://coordinator:9000
 ```
 
-```
-Connected to cluster at 192.168.1.10:9000
-Registered as worker-3a7f
-Waiting for tasks...
-```
-
-### Cluster Architecture
-
-```
-┌──────────────────────────────────────┐
-│         Coordinator (your machine)   │
-│  ├─ Task queue & scheduling          │
-│  ├─ Git repo sync                    │
-│  ├─ Result aggregation               │
-│  └─ Web dashboard (:9001)            │
-└──────────────────────────────────────┘
-           ↓ WebSocket ↓
-    ┌──────────┬──────────┬──────────┐
-    │ Worker 1 │ Worker 2 │ Worker 3 │
-    │ (local)  │ (remote) │ (remote) │
-    └──────────┴──────────┴──────────┘
-```
+Workers receive:
+- Workspace configuration
+- Repo access (via coordinator's git credentials)
+- Task assignments
 
 ### Cluster Dashboard
 
-Access the web dashboard at `http://coordinator:9001`:
-
 ```bash
 bloom cluster dashboard
-# Opens browser to http://localhost:9001
 ```
 
-The dashboard shows:
-- All connected workers and their status
-- Task queue and assignments
-- Live output from all agents
-- Resource usage per worker
-
-### Worker Capabilities
-
-Workers can advertise their capabilities:
-
-```bash
-# This worker has GPU, good for heavy tasks
-bloom cluster join ws://coord:9000 --capabilities gpu,high-memory
-
-# This worker is limited
-bloom cluster join ws://coord:9000 --capabilities basic
+```
+CLUSTER: my-workspace @ coordinator:9000
+──────────────────────────────────────────────────────────
+ Worker          Status    Project          Task
+──────────────────────────────────────────────────────────
+ alice-mbp       working   auth-refactor    JWT impl
+ bob-linux       working   new-dashboard    Sidebar
+ ci-runner-1     working   bug-fixes        Fix #123
+ ci-runner-2     idle      -                -
+──────────────────────────────────────────────────────────
+ Projects: 3 active, 18 tasks (8 ready, 3 in-progress)
 ```
 
-In your tasks.yaml:
+---
+
+## Cross-Project Dependencies
+
+Sometimes tasks in one project depend on another project:
 
 ```yaml
+# projects/integration-tests/tasks.yaml
 tasks:
-  - id: heavy-analysis
-    title: "Analyze entire codebase"
-    requires: [high-memory]  # Only assigned to capable workers
+  - id: run-e2e
+    title: "Run E2E test suite"
+    depends_on:
+      - auth-refactor:deploy-staging    # Task in another project
+      - new-dashboard:deploy-staging
 ```
 
-### Handling Disconnections
+The orchestrator understands cross-project dependencies and won't start `run-e2e` until both deploy tasks complete.
 
-Workers automatically reconnect. If a worker dies mid-task:
+---
 
-1. Coordinator detects missing heartbeat (30s timeout)
-2. Task returns to queue with `ready_for_agent` status
-3. Another worker picks it up
-4. Session ID preserved—work resumes where it left off
+## Project States
 
-### Security
-
-Cluster communication is encrypted. Generate a cluster key:
+Projects can be paused or archived:
 
 ```bash
-bloom cluster init
-# Creates ~/.bloom/cluster-key
+# Pause a project (tasks won't be picked up)
+bloom project pause new-dashboard
 
-# Workers need the same key
-scp ~/.bloom/cluster-key worker-machine:~/.bloom/
+# Resume
+bloom project resume new-dashboard
+
+# Archive (moves to projects/.archive/)
+bloom project archive old-feature
 ```
 
-Or use environment variable:
-
 ```bash
-BLOOM_CLUSTER_KEY=xxx bloom cluster join ws://coord:9000
+bloom projects
+```
+
+```
+PROJECTS
+──────────────────────────────────────────────────────────
+ Name             Status    Tasks    Progress
+──────────────────────────────────────────────────────────
+ auth-refactor    active    5        ████░░░░░░ 40%
+ new-dashboard    paused    8        ██░░░░░░░░ 25%
+ bug-fixes        active    3        ██████████ 100%
 ```
 
 ---
@@ -291,130 +323,125 @@ BLOOM_CLUSTER_KEY=xxx bloom cluster join ws://coord:9000
 ### bloom.config.yaml
 
 ```yaml
-# Workspace-level settings
-cluster:
-  # Max concurrent agents per bloom run process
-  max_agents: 4
+orchestrator:
+  # Which projects to include by default
+  include:
+    - "*"           # All projects (default)
+  exclude:
+    - experiments/* # Skip experimental projects
 
-  # Task claim timeout (seconds)
-  claim_timeout: 300
+  # Project priority order
+  project_order:
+    - bug-fixes
+    - inbox
+    # Unspecified projects run in alphabetical order
 
-  # Heartbeat interval for cluster mode
-  heartbeat_interval: 10
+  # Concurrency limits
+  max_workers: 4
+  max_tasks_per_project: 2  # Don't let one project hog all workers
 
 inbox:
-  # Auto-create branches for inbox tasks
   auto_branch: true
   branch_prefix: "inbox/"
-
-  # Auto-cleanup merged inbox tasks
   auto_cleanup: true
-```
+  default_priority: normal
 
-### User Config (~/.bloom/config.yaml)
-
-```yaml
-# Default cluster to join
 cluster:
-  default_coordinator: ws://team-server:9000
-  auto_join: false  # Set true to join on `bloom run`
-
-# Worker identity
-worker:
-  name: "alice-macbook"  # Shows in dashboard
-  capabilities: [gpu, high-memory]
+  port: 9000
+  heartbeat_interval: 10
+  task_timeout: 3600
 ```
 
 ---
 
-## Common Workflows
+## Workflows
 
-### Solo Developer: Local Multi-Process
+### Solo Dev: Multiple Projects
 
 ```bash
-# Terminal 1: Run with 2 workers
-bloom run --workers 2
-
-# Terminal 2: Watch the dashboard
-bloom dashboard
+# Work on auth while bugs get fixed in parallel
+bloom run
 ```
 
-### Team: Shared Cluster
+### Team: Shared Workspace
 
 ```bash
-# Team lead starts coordinator (always-on server)
-bloom cluster start --port 9000 --daemon
+# On shared server
+bloom cluster start --daemon
 
-# Team members join
+# Team members connect
 bloom cluster join ws://team-server:9000
 
-# Everyone's bloom run contributes to shared work
-bloom run  # Joins cluster automatically if configured
+# Each person's machine contributes workers
+# All projects get worked on in parallel
 ```
 
-### CI/CD: Ephemeral Workers
+### CI: Per-Project Runners
 
 ```yaml
-# GitHub Actions
+# .github/workflows/bloom.yml
 jobs:
-  bloom-worker:
+  auth-refactor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: |
-          bloom cluster join ${{ secrets.BLOOM_COORDINATOR }}
-          bloom run --until-idle  # Exit when no tasks left
+      - run: bloom run --project auth-refactor --until-idle
+
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bloom run --project new-dashboard --until-idle
 ```
 
-### Quick Bug Fix While Project Runs
+### Quick Bug While Features Build
 
 ```bash
-# Project work running in background
+# Features building in background
 bloom run &
 
-# Quick inbox task
-bloom inbox add "Fix typo in README" --repo docs --priority high
+# Hot bug comes in
+bloom inbox add "URGENT: fix payment flow" --priority high
 
-# It gets picked up automatically by running workers
+# Gets picked up immediately by next available worker
 ```
 
 ---
 
-## Troubleshooting
+## Mental Model
 
-### "Task stuck in ready_for_agent"
-
-Check if workers are running:
-```bash
-bloom workers  # Local mode
-bloom cluster status  # Cluster mode
+```
+┌─────────────────────────────────────────────────────────┐
+│                    WORKSPACE                            │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
+│  │ Project1 │ │ Project2 │ │ Project3 │ │  Inbox   │   │
+│  │ tasks.yml│ │ tasks.yml│ │ tasks.yml│ │ inbox.yml│   │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘   │
+│       └────────────┴────────────┴────────────┘         │
+│                         ↓                               │
+│              ┌─────────────────────┐                   │
+│              │   Unified Queue     │                   │
+│              │ (priority ordered)  │                   │
+│              └─────────────────────┘                   │
+│                         ↓                               │
+│         ┌───────────────┼───────────────┐              │
+│         ↓               ↓               ↓              │
+│    ┌─────────┐    ┌─────────┐    ┌─────────┐          │
+│    │ Worker1 │    │ Worker2 │    │ Worker3 │          │
+│    └─────────┘    └─────────┘    └─────────┘          │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### "Multiple workers grabbed same task"
-
-This shouldn't happen with proper locking. Check coordinator logs:
-```bash
-bloom cluster logs
-```
-
-### "Worker can't connect to cluster"
-
-1. Check firewall allows port 9000
-2. Verify cluster key matches: `bloom cluster verify-key`
-3. Check coordinator is running: `bloom cluster ping ws://coord:9000`
-
-### "Session not resuming after worker switch"
-
-Sessions are agent-provider specific. If workers use different providers:
-```bash
-# Ensure all workers use same provider
-bloom cluster join ws://coord:9000 --agent claude
-```
+The key insight: **projects are task sources, workers are task consumers**. The orchestrator matches available workers to the highest-priority ready task across all sources.
 
 ---
 
-## What's Next
+## Migration from Single-Project Mode
 
-- [Inbox Deep Dive](./inbox.md) - Advanced inbox workflows
-- [Cluster Security](./cluster-security.md) - Hardening your cluster
-- [Custom Schedulers](./custom-schedulers.md) - Priority queues and scheduling policies
+If you're used to `cd project && bloom run`:
+
+| Old Way | New Way |
+|---------|---------|
+| `cd project && bloom run` | `bloom run --project name` |
+| Run one project at a time | Run all projects with `bloom run` |
+| Manual context switching | Automatic task scheduling |
+
+The old way still works—if you run `bloom run` from inside a project directory with no workspace config, it behaves as before.
