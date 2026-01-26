@@ -616,7 +616,11 @@ export class EventDrivenTUI {
 
   /**
    * Filter agent output to show only human-readable content.
-   * Filters out raw JSON streaming events from Claude API.
+   * Handles streaming JSON events from multiple agent formats:
+   * - Claude API: {"type": "assistant", "message": {"content": [...]}}
+   * - Claude streaming: {"type": "content_block_delta", "delta": {"text": "..."}}
+   * - OpenCode: {"type": "...", "part": {"type": "text|tool|step-finish|error", ...}}
+   * - Copilot/Goose: {"type": "tool_use|tool_result|result", ...}
    */
   private filterAgentOutput(data: string): string {
     // Split by lines and filter each line
@@ -632,20 +636,180 @@ export class EventDrivenTUI {
         continue;
       }
 
-      // Skip raw JSON streaming events from Claude API
+      // Handle raw JSON streaming events
       if (trimmed.startsWith('{"type":')) {
-        // Try to extract text content from assistant messages
         try {
           const parsed = JSON.parse(trimmed);
-          // Extract text from assistant content blocks
-          if (parsed.type === "assistant" && parsed.message?.content) {
-            for (const block of parsed.message.content) {
-              if (block.type === "text" && block.text) {
-                filteredLines.push(block.text);
+          const eventType = parsed.type as string | undefined;
+
+          // Handle OpenCode's nested part structure
+          const part = parsed.part as Record<string, unknown> | undefined;
+          if (part) {
+            const partType = part.type as string | undefined;
+
+            switch (partType) {
+              case "text": {
+                const text = part.text as string | undefined;
+                if (text) {
+                  filteredLines.push(text);
+                }
+                break;
               }
+
+              case "tool": {
+                const toolName = part.tool as string | undefined;
+                const state = part.state as { title?: string } | undefined;
+                const title = state?.title;
+                const displayName = title || toolName || "unknown";
+                filteredLines.push(chalk.cyan(`[tool: ${displayName}]`));
+                break;
+              }
+
+              case "step-finish": {
+                const cost = part.cost as number | undefined;
+                const tokens = part.tokens as { input?: number; output?: number; reasoning?: number } | undefined;
+
+                const parts: string[] = [];
+                if (tokens) {
+                  const totalTokens = (tokens.input || 0) + (tokens.output || 0) + (tokens.reasoning || 0);
+                  if (totalTokens > 0) {
+                    parts.push(chalk.dim(`[tokens: ${totalTokens}]`));
+                  }
+                }
+                if (cost !== undefined && cost > 0) {
+                  parts.push(`[cost: $${cost.toFixed(4)}]`);
+                }
+                if (parts.length > 0) {
+                  filteredLines.push(parts.join(" "));
+                }
+                break;
+              }
+
+              case "error": {
+                const errorMessage = (part.error as string) || (part.message as string) || "unknown error";
+                filteredLines.push(chalk.red(`[ERROR: ${errorMessage}]`));
+                break;
+              }
+
+              // step-start and other types are intentionally skipped to reduce noise
             }
+            continue;
           }
-          // Skip system, user, and other event types
+
+          // Handle events by type (Claude, Copilot, Goose, etc.)
+          switch (eventType) {
+            case "assistant":
+            case "message": {
+              // Direct string content
+              if (typeof parsed.content === "string") {
+                filteredLines.push(parsed.content);
+              }
+              // Message with content array (Claude API)
+              const message = parsed.message as
+                | { content?: Array<{ type: string; text?: string }> | string }
+                | undefined;
+              if (message?.content) {
+                if (typeof message.content === "string") {
+                  filteredLines.push(message.content);
+                } else if (Array.isArray(message.content)) {
+                  for (const block of message.content) {
+                    if (block.type === "text" && block.text) {
+                      filteredLines.push(block.text);
+                    }
+                  }
+                }
+              }
+              break;
+            }
+
+            case "content_block_delta": {
+              // Claude streaming text deltas
+              const delta = parsed.delta as { type?: string; text?: string } | undefined;
+              if (delta?.type === "text_delta" && delta.text) {
+                filteredLines.push(delta.text);
+              }
+              break;
+            }
+
+            case "text": {
+              // Simple text event
+              const text = parsed.text as string | undefined;
+              if (text) {
+                filteredLines.push(text);
+              }
+              break;
+            }
+
+            case "tool_use":
+            case "tool_call": {
+              const toolName = (parsed.tool_name || parsed.name || "unknown") as string;
+              filteredLines.push(chalk.cyan(`[tool: ${toolName}]`));
+              break;
+            }
+
+            case "tool_result":
+            case "tool_response": {
+              filteredLines.push(chalk.dim("[result]"));
+              break;
+            }
+
+            case "result":
+            case "done":
+            case "finish":
+            case "complete": {
+              // Completion events with cost/duration
+              const cost = (parsed.total_cost_usd ?? parsed.cost_usd) as number | undefined;
+              const duration = parsed.duration_ms as number | undefined;
+              const parts: string[] = [];
+              if (cost !== undefined) {
+                parts.push(`[cost: $${cost.toFixed(4)}]`);
+              }
+              if (duration !== undefined) {
+                parts.push(`[duration: ${(duration / 1000).toFixed(1)}s]`);
+              }
+              if (parts.length > 0) {
+                filteredLines.push(parts.join(" "));
+              }
+              break;
+            }
+
+            case "error": {
+              const errorObj = parsed.error as { message?: string } | undefined;
+              const errorMessage =
+                errorObj?.message || (parsed.content as string) || (parsed.message as string) || "unknown";
+              filteredLines.push(chalk.red(`[ERROR: ${errorMessage}]`));
+              break;
+            }
+
+            case "system": {
+              // System init events
+              const subtype = parsed.subtype as string | undefined;
+              if (subtype === "init") {
+                const parts: string[] = [];
+                if (parsed.session_id) {
+                  parts.push(`[session: ${parsed.session_id}]`);
+                }
+                if (parsed.model) {
+                  parts.push(`[model: ${parsed.model}]`);
+                }
+                if (parts.length > 0) {
+                  filteredLines.push(chalk.dim(parts.join(" ")));
+                }
+              }
+              break;
+            }
+
+            case "session": {
+              // Session ID events
+              const sessionId = parsed.session_id || parsed.sessionID || parsed.id;
+              if (sessionId) {
+                filteredLines.push(chalk.dim(`[session: ${sessionId}]`));
+              }
+              break;
+            }
+
+            // Skip user, system messages without init, and other metadata events
+          }
         } catch {
           // If JSON parsing fails, skip the line
         }
