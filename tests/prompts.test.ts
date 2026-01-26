@@ -174,7 +174,8 @@ describe("prompts", () => {
       expect(prompt).toContain("agent_name");
       expect(prompt).toContain("parallel");
       expect(prompt).toContain("sequential");
-      expect(prompt).toContain("Same name = Same agent");
+      expect(prompt).toContain("Same agent_name");
+      expect(prompt).toContain("merge conflicts");
     });
 
     it("should output tasks.yaml file", async () => {

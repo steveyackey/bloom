@@ -216,11 +216,20 @@ function handleEvent(event: OrchestratorEvent, log: Logger): void {
 
     // Branch cleanup
     case "git:cleanup":
+      if (event.worktreesRemoved.length > 0) {
+        log.info(`Removed worktrees: ${event.worktreesRemoved.join(", ")}`);
+      }
       if (event.deleted.length > 0) {
-        log.info(`Deleted merged branches: ${event.deleted.join(", ")}`);
+        log.info(`Deleted local branches: ${event.deleted.join(", ")}`);
+      }
+      if (event.remotesDeleted.length > 0) {
+        log.info(`Deleted remote branches: ${event.remotesDeleted.join(", ")}`);
       }
       for (const f of event.failed) {
         log.warn(`Failed to delete ${f.branch}: ${f.error}`);
+      }
+      for (const f of event.remotesFailed) {
+        log.warn(`Failed to delete remote ${f.branch}: ${f.error}`);
       }
       break;
 

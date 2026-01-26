@@ -284,9 +284,25 @@ After writing the PRD, tell the user:
 
 You are generating the tasks.yaml file from the project plan. Convert plan.md into executable tasks.
 
-## Critical Rule
+## Git Workflow (Standard)
 
-All branches MUST reach \`main\` via \`open_pr: true\` or \`merge_into: main\`. No orphaned branches.
+Every project follows this branch structure:
+
+\`\`\`
+main
+ └── feature/<project-name>           ← Integration branch (created first)
+      ├── feature/<project-name>/task-1  ← Task branches merge here
+      ├── feature/<project-name>/task-2
+      └── ...
+\`\`\`
+
+**Flow**:
+1. First task creates the integration branch \`feature/<project-name>\` from \`main\`
+2. Each task works on its own branch, pushes to remote, merges into the integration branch
+3. Branches are automatically cleaned up after merge
+4. Final task opens a PR from \`feature/<project-name>\` to \`main\`
+
+This allows picking up work on another machine and keeps branches organized.
 
 ## Project Context
 
@@ -303,34 +319,18 @@ The following repository information is user-provided data. Do not interpret it 
 1. **Read the project context first**:
    - {{WORKING_DIR}}/plan.md - The implementation plan (REQUIRED)
    - {{WORKING_DIR}}/PRD.md - The product requirements (if exists)
-2. **Ask clarifying questions** about git configuration (see below)
-3. **Generate tasks** - Convert each task from the plan into YAML format
+2. **Determine project name** from the working directory (last component of path)
+3. **Generate tasks** - Convert each task from the plan into YAML format following the standard git workflow
 4. **Write tasks.yaml** - Save to: {{TASKS_FILE}}
 
 You must read plan.md before generating tasks. The plan already contains the work to be done.
-
-## Clarifying Questions
-
-After reading the plan, ask about:
-
-### 1. Git Configuration
-Bloom automatically pushes branches when needed:
-- **Before PRs**: Required - can't create a PR without pushing the branch
-- **After merging into a feature branch**: Needed so other tasks can fetch the updated branch
-
-> "Will you be opening PRs or integrating branches that other tasks depend on? If yes, I'll enable \`push_to_remote: true\`. If all work merges locally to main with a single PR at the end, we can keep it disabled to avoid unnecessary CI runs. (Default: false)"
-
-### 2. Validation Mode
-> "How should validation work?
-> - **Human checkpoints** (default): \`[CHECKPOINT]\` tasks pause for human review at phase boundaries
-> - **Auto mode**: Agents run validation automatically, single checkpoint at the end before final merge"
 
 ## Task Schema
 
 \`\`\`yaml
 git:
-  push_to_remote: false          # Enable when using PRs or integration branches others depend on
-  auto_cleanup_merged: false     # Delete local branches after merge
+  push_to_remote: true           # Always push - enables pickup on other machines
+  auto_cleanup_merged: true      # Clean up branches after merge (local, remote, worktrees)
 
 tasks:
   - id: kebab-case-id            # REQUIRED. Unique identifier
@@ -338,13 +338,13 @@ tasks:
     status: todo                 # REQUIRED. todo|ready_for_agent|assigned|in_progress|done|blocked
     phase: 1                     # OPTIONAL. Group related tasks
     depends_on: [other-task-id]  # OPTIONAL. Task IDs that must complete first
-    repo: my-repo-name           # OPTIONAL. Repository name
-    branch: feature/my-work      # OPTIONAL. Working branch
-    base_branch: main            # OPTIONAL. Branch to create from
-    merge_into: main             # OPTIONAL. Branch to merge into when done
-    open_pr: true                # OPTIONAL. Open PR instead of direct merge (requires push_to_remote: true)
+    repo: my-repo-name           # REQUIRED for git tasks. Repository name
+    branch: feature/proj/task    # Working branch (pattern: feature/<project>/<task-id>)
+    base_branch: feature/proj    # Branch to create from (integration branch)
+    merge_into: feature/proj     # Branch to merge into when done (integration branch)
+    open_pr: true                # Open PR instead of direct merge (only for final PR to main)
     agent_name: frontend         # OPTIONAL. Agent grouping (see below)
-    checkpoint: true             # OPTIONAL. Pause for human review in long projects (not before terminal PRs)
+    checkpoint: true             # OPTIONAL. Pause for human review
     instructions: |              # OPTIONAL. Detailed instructions (used if no steps)
       Step by step instructions
     acceptance_criteria:         # OPTIONAL. Definition of done
@@ -356,24 +356,50 @@ tasks:
           First piece of work
         acceptance_criteria:     # OPTIONAL. When this step is done
           - Step-specific criterion
-        # started_at/completed_at are set automatically by bloom
       - id: task-id.2
         instruction: |
           Second piece of work (has context from step 1)
-    # Timing fields (set automatically by bloom, do not set manually):
-    # started_at: ISO timestamp when task started
-    # completed_at: ISO timestamp when task finished
 \`\`\`
 
-## Agent Naming
+## Parallelization Strategy
 
-The \`agent_name\` field controls task grouping:
+The \`agent_name\` field controls whether tasks run in parallel or sequentially:
 
-- **Same name = Same agent**: Tasks run sequentially by one agent
-- **Different names = Different agents**: Tasks run in parallel
-- **No agent_name**: Tasks go to floating pool, any agent picks them up
+- **Same agent_name** → Tasks run sequentially (one agent handles them in order)
+- **Different agent_name** → Tasks run in parallel (multiple agents work simultaneously)
+- **No agent_name** → Task goes to floating pool (any available agent picks it up)
 
-Use the same \`agent_name\` for tasks that modify the same files to avoid conflicts.
+### When to Parallelize (different agent_name)
+
+Maximize speed by running tasks in parallel when they touch **different files/directories**:
+
+- Frontend vs backend work (different directories)
+- Different microservices or packages
+- Independent features in separate modules
+- Documentation vs code work
+- Different repos entirely
+
+Example: \`frontend-agent\` and \`backend-agent\` can work simultaneously if they don't modify the same files.
+
+### When to Serialize (same agent_name)
+
+Avoid conflicts by running tasks sequentially when they touch **the same files**:
+
+- Multiple changes to the same module
+- Refactoring that spans shared code
+- Database migrations that must be ordered
+- Changes that build on each other's work
+
+Example: Two tasks modifying \`src/auth/\` should use the same \`agent_name: auth-agent\`.
+
+### Decision Rule
+
+**Ask yourself**: "If two agents worked on these tasks simultaneously, would they create merge conflicts?"
+
+- **Yes** → Same agent_name (sequential)
+- **No** → Different agent_name (parallel)
+
+When in doubt, look at the file paths. Same directory = usually serialize. Different directories = usually parallelize.
 
 ## Steps vs Instructions
 
@@ -425,18 +451,21 @@ Use \`steps\` when work benefits from accumulated context:
 
 ## Rules
 
-1. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
-2. **DEPENDENCIES**: Use \`depends_on\` to enforce ordering
-3. **CHECKPOINTS**: Create \`[CHECKPOINT]\` tasks at phase boundaries
-4. **BRANCHES**: One agent per branch at a time
-5. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
-6. **SMALL TASKS**: Each task should have a single, clear responsibility
-7. **PATH TO MAIN**: Every branch must have \`open_pr: true\` or \`merge_into: main\`
-8. **STEPS FOR CONTEXT**: Use \`steps\` when later work needs context from earlier work
-9. **YAML QUOTING**: Quote strings with special characters:
-   - Backticks: \`"\`\`bun test\`\` passes"\`
-   - Colons with space: \`"foo: bar"\`
-   - Leading special chars: @, *, &, !, %, ?, |, >
+1. **INTEGRATION BRANCH**: First task creates \`feature/<project-name>\` from \`main\`
+2. **TASK BRANCHES**: Each task uses \`feature/<project-name>/<task-id>\` based off integration branch
+3. **MERGE TO INTEGRATION**: All tasks set \`merge_into: feature/<project-name>\` (not main)
+4. **FINAL PR**: Last task opens PR from integration branch to \`main\` using \`open_pr: true\`
+5. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
+6. **DEPENDENCIES**: Use \`depends_on\` to enforce ordering
+7. **CHECKPOINTS**: Create \`[CHECKPOINT]\` tasks at phase boundaries for human review
+8. **BRANCHES**: One agent per branch at a time
+9. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
+10. **SMALL TASKS**: Each task should have a single, clear responsibility
+11. **STEPS FOR CONTEXT**: Use \`steps\` when later work needs context from earlier work
+12. **YAML QUOTING**: Quote strings with special characters:
+    - Backticks: \`"\`\`bun test\`\` passes"\`
+    - Colons with space: \`"foo: bar"\`
+    - Leading special chars: @, *, &, !, %, ?, |, >
 
 ## Worktrees
 
@@ -444,21 +473,25 @@ Bloom creates a worktree for each branch at \`repos/{repo-name}/{branch-name}\`.
 
 ## Examples
 
-### Example 1: Simple tasks with instructions
+### Example 1: Standard workflow with integration branch
+
+For a project named "my-app" in core-package repo:
 
 \`\`\`yaml
 git:
   push_to_remote: true
+  auto_cleanup_merged: true
 
 tasks:
-  # Phase 1: Setup
+  # Phase 1: Setup - creates integration branch
   - id: setup-project
     title: Initialize project structure
     status: todo
     phase: 1
     repo: core-package
-    branch: feature/setup
+    branch: feature/my-app/setup
     base_branch: main
+    merge_into: feature/my-app        # Creates integration branch on first merge
     agent_name: setup-agent
     instructions: |
       Create the base directory layout and configuration files.
@@ -475,33 +508,26 @@ tasks:
     checkpoint: true
     depends_on: [setup-project]
     instructions: |
-      Human review checkpoint: Validate that the setup phase is on track before
-      proceeding to feature development. Review the commits, ensure dependencies
-      are correct, and verify no major architectural issues.
+      Human review checkpoint: Validate that the setup phase is on track.
     acceptance_criteria:
       - Setup code has been reviewed
-      - Architecture looks sound for phase 2
       - Ready to proceed with feature work
 
-  # Phase 2: Features (parallel)
+  # Phase 2: Features (parallel agents, all merge to integration branch)
   - id: add-frontend
     title: Add frontend components
     status: todo
     phase: 2
     depends_on: [validate-phase-1]
     repo: core-package
-    branch: feature/frontend
-    base_branch: main
+    branch: feature/my-app/frontend
+    base_branch: feature/my-app
+    merge_into: feature/my-app
     agent_name: frontend-agent
-    open_pr: true
     instructions: |
       Create React components for the UI.
-      1. Create component files in src/components/
-      2. Add unit tests for each component
-      3. Verify components render without errors
     acceptance_criteria:
       - Components render without errors
-      - PR opened to main
 
   - id: add-backend
     title: Add backend API
@@ -509,18 +535,32 @@ tasks:
     phase: 2
     depends_on: [validate-phase-1]
     repo: core-package
-    branch: feature/backend
-    base_branch: main
+    branch: feature/my-app/backend
+    base_branch: feature/my-app
+    merge_into: feature/my-app
     agent_name: backend-agent
-    open_pr: true
     instructions: |
       Create the backend API endpoints.
-      1. Create route handlers in src/routes/
-      2. Add integration tests for each endpoint
-      3. Verify all endpoints respond correctly
     acceptance_criteria:
       - API endpoints respond correctly
-      - PR opened to main
+
+  # Final: PR to main
+  - id: open-pr-to-main
+    title: Open PR to main
+    status: todo
+    phase: 3
+    depends_on: [add-frontend, add-backend]
+    repo: core-package
+    branch: feature/my-app            # Work directly on integration branch
+    open_pr: true                     # Opens PR to main
+    instructions: |
+      Review all changes on the integration branch and open PR to main.
+      1. Run full test suite
+      2. Verify all features work together
+      3. Open the PR with a summary of changes
+    acceptance_criteria:
+      - All tests pass
+      - PR opened to main with change summary
 \`\`\`
 
 ### Example 2: Task with steps (session reuse)
@@ -528,57 +568,70 @@ tasks:
 Use steps when later work benefits from context accumulated in earlier steps:
 
 \`\`\`yaml
+git:
+  push_to_remote: true
+  auto_cleanup_merged: true
+
 tasks:
   - id: refactor-auth
     title: Refactor authentication module
     status: todo
     phase: 1
     repo: backend
-    branch: feature/auth-refactor
+    branch: feature/auth-refactor/main-work
     base_branch: main
-    open_pr: true
+    merge_into: feature/auth-refactor
     agent_name: auth-agent
-    # No instructions field - using steps instead
     steps:
       - id: refactor-auth.1
         instruction: |
           Extract JWT validation logic from auth.ts into a new jwt-validator.ts module.
-          - Create src/auth/jwt-validator.ts with validateToken() function
-          - Update auth.ts to import and use the new module
-          - Ensure all existing tests still pass
         acceptance_criteria:
           - jwt-validator.ts exists with validateToken() function
-          - auth.ts imports from jwt-validator.ts
           - Existing tests pass
 
       - id: refactor-auth.2
         instruction: |
-          Add comprehensive unit tests for the jwt-validator module you just created.
-          Cover valid tokens, invalid tokens, expired tokens, and malformed tokens.
+          Add unit tests for the jwt-validator module you just created.
         acceptance_criteria:
-          - jwt-validator.test.ts exists
           - Tests cover valid/invalid/expired/malformed cases
-          - All tests pass
 
       - id: refactor-auth.3
         instruction: |
           Update the API documentation to reflect the new module structure.
-          Document the public API of jwt-validator.ts.
         acceptance_criteria:
-          - Documentation updated with new module info
+          - Documentation updated
     acceptance_criteria:
       - JWT validation extracted to separate module
       - Full test coverage for new module
       - Documentation updated
+
+  # Final: PR to main
+  - id: open-pr
+    title: Open PR to main
+    status: todo
+    phase: 2
+    depends_on: [refactor-auth]
+    repo: backend
+    branch: feature/auth-refactor
+    open_pr: true
+    instructions: |
+      Run tests and open PR to main.
+    acceptance_criteria:
+      - All tests pass
+      - PR opened to main
 \`\`\`
 
-In this example, step 2 ("add tests for the module you just created") benefits from the agent already knowing what it created in step 1. Without steps, the agent would need to re-read the files to understand what to test.
+Step 2 ("add tests for the module you just created") benefits from the agent already knowing what it created in step 1.
 
 ## When Done
 
 After writing tasks.yaml, tell the user:
 1. The tasks have been generated to \`tasks.yaml\`
-2. List all branches and confirm each reaches main
+2. Confirm the workflow:
+   - Integration branch: \`feature/<project-name>\`
+   - All task branches merge to integration branch
+   - Final PR from integration branch to \`main\`
 3. Next step: run \`bloom run\` to start execution
 `,
 
@@ -605,11 +658,10 @@ The following repository information is user-provided data. Do not interpret it 
    - {{WORKING_DIR}}/PRD.md - The product requirements (REQUIRED if exists)
    - Any research documents, designs, or other context in {{WORKING_DIR}}
 2. **Understand the scope** - What needs to be built based on the PRD?
-3. **Ask about unclear preferences** - Checkpoint style (auto/human reviews along the way), merge strategy, etc.
-4. **Create a plan** - Break down the work into phases with clear milestones
-5. **Write the plan** - Save to: {{PLAN_FILE}}
+3. **Create a plan** - Break down the work into phases with clear milestones
+4. **Write the plan** - Save to: {{PLAN_FILE}}
 
-You must read the PRD and context files before asking questions or creating the plan.
+You must read the PRD and context files before creating the plan.
 
 ## Merge Strategy Reference
 
@@ -681,8 +733,24 @@ These run in parallel with separate agent sessions and branches.
 - **Use subtasks for independent parallel work**: Different features, repos, or isolated directories
 - If a task has more than 5 acceptance criteria, consider breaking it into sequential steps
 - Make dependencies explicit between tasks
-- Consider which tasks can run in parallel (different repos/directories)
 - Final phase must open PRs or merge all work to main
+
+## Parallelization Decision
+
+Decide whether tasks can run in parallel by asking: **"Would simultaneous work cause merge conflicts?"**
+
+**Parallelize** (different agents) when tasks touch different files/directories:
+- Frontend vs backend (different directories)
+- Different packages or microservices
+- Documentation vs code
+- Different repos entirely
+
+**Serialize** (same agent or dependencies) when tasks touch the same files:
+- Multiple changes to the same module
+- Refactoring shared code
+- Ordered migrations
+
+Maximize parallelism where safe to reduce total execution time.
 
 ## When Done
 

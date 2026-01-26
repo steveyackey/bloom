@@ -415,11 +415,16 @@ describe("Orchestrator Events", () => {
           targetBranch: "main",
           deleted: ["feature/a", "feature/b"],
           failed: [{ branch: "feature/c", error: "Protected branch" }],
+          worktreesRemoved: ["feature/a"],
+          remotesDeleted: ["feature/a", "feature/b"],
+          remotesFailed: [],
         };
 
         expect(event.deleted).toEqual(["feature/a", "feature/b"]);
         expect(event.failed).toHaveLength(1);
         expect(event.failed[0]?.branch).toBe("feature/c");
+        expect(event.worktreesRemoved).toEqual(["feature/a"]);
+        expect(event.remotesDeleted).toEqual(["feature/a", "feature/b"]);
       });
     });
 
