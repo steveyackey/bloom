@@ -57,7 +57,7 @@ export type TaskStep = z.infer<typeof TaskStepSchema>;
 // =============================================================================
 
 export const GitConfigSchema = z.object({
-  /** Push to remote after each task completes successfully (default: false) */
+  /** Push to remote after each task completes successfully (default: false). Enable ONLY when tasks need PRs - pushing triggers CI and costs resources. Required when any task has open_pr: true. */
   push_to_remote: z.boolean().default(false),
   /** Automatically delete local branches that have been merged (default: false) */
   auto_cleanup_merged: z.boolean().default(false),
@@ -82,7 +82,7 @@ export type Task = {
   base_branch?: string;
   /** Branch to merge working branch into when task completes. Same as `branch` means no merge needed */
   merge_into?: string;
-  /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default) */
+  /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default). Requires git.push_to_remote: true to push branch to remote. */
   open_pr?: boolean;
   /** Agent group name for this task (used for parallel execution grouping) */
   agent_name?: string;

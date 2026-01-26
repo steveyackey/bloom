@@ -317,7 +317,7 @@ After reading the plan, ask about:
 
 \`\`\`yaml
 git:
-  push_to_remote: false          # Push branches to remote after each task
+  push_to_remote: false          # Enable ONLY when tasks need PRs (triggers CI, costs resources)
   auto_cleanup_merged: false     # Delete local branches after merge
 
 tasks:
@@ -330,7 +330,7 @@ tasks:
     branch: feature/my-work      # OPTIONAL. Working branch
     base_branch: main            # OPTIONAL. Branch to create from
     merge_into: main             # OPTIONAL. Branch to merge into when done
-    open_pr: true                # OPTIONAL. Open PR instead of direct merge
+    open_pr: true                # OPTIONAL. Open PR instead of direct merge (requires push_to_remote: true)
     agent_name: frontend         # OPTIONAL. Agent grouping (see below)
     checkpoint: true             # OPTIONAL. Pause for human review in long projects (not before terminal PRs)
     instructions: |              # OPTIONAL. Detailed instructions (used if no steps)

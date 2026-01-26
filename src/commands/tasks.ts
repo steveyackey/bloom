@@ -512,6 +512,39 @@ export async function cmdValidate(): Promise<void> {
   }
   checkCheckpoints(tasksFile.tasks);
 
+  // Validate push/PR configuration
+  // Rule 1: Tasks with open_pr must have push_to_remote enabled
+  const tasksWithPR: string[] = [];
+  function findPRTasks(tasks: Task[]) {
+    for (const task of tasks) {
+      if (task.open_pr) {
+        tasksWithPR.push(task.id);
+      }
+      findPRTasks(task.subtasks);
+    }
+  }
+  findPRTasks(tasksFile.tasks);
+
+  if (tasksWithPR.length > 0 && !tasksFile.git?.push_to_remote) {
+    hasErrors = true;
+    console.error(
+      chalk.red(`ERROR: Tasks with open_pr require git.push_to_remote: true to push branches to remote.`)
+    );
+    console.error(chalk.red(`  Tasks requiring push: ${tasksWithPR.join(", ")}`));
+    console.error(chalk.red(`  Add 'git.push_to_remote: true' to your tasks.yaml`));
+  }
+
+  // Rule 2: Warn if push_to_remote is enabled but no tasks create PRs
+  // This may be intentional (integration branch pattern) but is often wasteful
+  if (tasksFile.git?.push_to_remote && tasksWithPR.length === 0) {
+    console.log(
+      chalk.yellow(
+        "WARNING: git.push_to_remote is enabled but no tasks have open_pr: true. " +
+          "Pushing triggers CI and costs resources. Consider disabling unless using integration branch pattern."
+      )
+    );
+  }
+
   if (hasErrors) {
     console.log(`\n${chalk.red.bold("Validation FAILED")}`);
     process.exit(1);
