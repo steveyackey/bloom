@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.4](https://github.com/steveyackey/bloom/compare/bloom-v0.3.3...bloom-v0.3.4) (2026-01-26)
+
+
+### Features
+
+* consolidate prompts to embedded-only, remove prompts/ folder ([a53e67c](https://github.com/steveyackey/bloom/commit/a53e67c28df42fb6e8d834b4c07e064f94935546))
+* consolidate workspace templates to embedded, remove template/ folder ([9f97305](https://github.com/steveyackey/bloom/commit/9f97305f949bb50b71eaad9b80e07cc3b465ce0b))
+
+
+### Bug Fixes
+
+* update create.test.ts to use embedded templates ([e0c14d5](https://github.com/steveyackey/bloom/commit/e0c14d5798b69fda2f4260cc8758757f629c5b5a))
+
 ## [0.3.3](https://github.com/steveyackey/bloom/compare/bloom-v0.3.2...bloom-v0.3.3) (2026-01-25)
 
 
