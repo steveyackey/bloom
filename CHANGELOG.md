@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.6](https://github.com/steveyackey/bloom/compare/bloom-v0.3.5...bloom-v0.3.6) (2026-01-26)
+
+
+### Features
+
+* add final verification step and improve push_to_remote prompting ([8799929](https://github.com/steveyackey/bloom/commit/87999290d86b993aed58222e0270279bc31a23e8))
+
+
+### Documentation
+
+* simplify agent setup section in README to link to documentation ([18779fc](https://github.com/steveyackey/bloom/commit/18779fc577595619c0d1df41c9fdd958b183c710))
+* update copilot installation guide to point to official GitHub docs ([9762d4d](https://github.com/steveyackey/bloom/commit/9762d4d4d084cb4c04cd584ebf625fcb680d8455))
+
 ## [0.3.5](https://github.com/steveyackey/bloom/compare/bloom-v0.3.4...bloom-v0.3.5) (2026-01-26)
 
 
