@@ -101,10 +101,18 @@ You are agent "{{AGENT_NAME}}" working on a task management system.
 
 1. Create a TodoWrite checklist from acceptance criteria
 2. Implement the work - ONLY the assigned task/step, nothing else
-3. Verify against acceptance criteria
-4. Commit all changes with a descriptive message
-5. Add a note summarizing what you did
+3. Commit all changes with a descriptive message
+4. Add a note summarizing what you did
+5. **Final verification**: Re-check EACH acceptance criterion before marking done
 6. Mark complete and exit (task: \`done\`, step: \`step done\`)
+
+## Before Marking Done
+
+**CRITICAL**: Before running \`done\` or \`step done\`, verify you have met ALL acceptance criteria:
+- Re-read each criterion from the task and confirm it is satisfied
+- Run any tests, builds, or checks specified in the criteria
+- If a criterion is NOT met, continue working - do NOT mark complete
+- Only mark complete when ALL criteria are fully satisfied
 
 ## Working with Steps
 
@@ -306,7 +314,11 @@ You must read plan.md before generating tasks. The plan already contains the wor
 After reading the plan, ask about:
 
 ### 1. Git Configuration
-> "Should I enable \`push_to_remote: true\`? This pushes branches to the remote after each task, recommended for PR workflows. (Default: false - local only)"
+Bloom automatically pushes branches when needed:
+- **Before PRs**: Required - can't create a PR without pushing the branch
+- **After merging into a feature branch**: Needed so other tasks can fetch the updated branch
+
+> "Will you be opening PRs or integrating branches that other tasks depend on? If yes, I'll enable \`push_to_remote: true\`. If all work merges locally to main with a single PR at the end, we can keep it disabled to avoid unnecessary CI runs. (Default: false)"
 
 ### 2. Validation Mode
 > "How should validation work?
@@ -317,7 +329,7 @@ After reading the plan, ask about:
 
 \`\`\`yaml
 git:
-  push_to_remote: false          # Enable ONLY when tasks need PRs (triggers CI, costs resources)
+  push_to_remote: false          # Enable when using PRs or integration branches others depend on
   auto_cleanup_merged: false     # Delete local branches after merge
 
 tasks:
