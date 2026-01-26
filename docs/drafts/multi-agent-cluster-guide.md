@@ -20,7 +20,7 @@ my-workspace/
 └─ inbox.yaml              # Ad-hoc tasks
 ```
 
-**The new model**: `bloom run` pulls tasks from ALL projects (and inbox) in the workspace.
+**The new model**: `bloom run` pulls tasks from ALL **runnable** projects (and inbox) in the workspace.
 
 ---
 
@@ -33,6 +33,189 @@ my-workspace/
 | `bloom run --inbox-only` | Inbox only | Just ad-hoc tasks |
 | `bloom run --workers 3` | Workspace, parallel | More compute |
 | `bloom cluster start` | Distributed | Multi-machine |
+
+---
+
+## Project Lifecycle & The Registry
+
+Not every project is ready to run. Projects move through a lifecycle:
+
+```
+┌─────────┐    ┌──────────┐    ┌─────────┐    ┌────────┐    ┌────────┐
+│  draft  │ →  │ planning │ →  │  ready  │ →  │ active │ →  │  done  │
+└─────────┘    └──────────┘    └─────────┘    └────────┘    └────────┘
+     │                              │              │             │
+     └──────────────────────────────┴──────────────┴─────────────┘
+                                    ↓
+                              ┌──────────┐
+                              │ archived │
+                              └──────────┘
+```
+
+| State | Has tasks.yaml? | Picked up by `bloom run`? | Description |
+|-------|-----------------|---------------------------|-------------|
+| `draft` | No | No | Just created, has PRD.md only |
+| `planning` | No | No | Being refined/planned |
+| `ready` | Yes | **No** | Tasks generated, awaiting review |
+| `active` | Yes | **Yes** | Approved for execution |
+| `paused` | Yes | No | Temporarily stopped |
+| `done` | Yes | No | All tasks completed |
+| `archived` | Yes | No | Moved to `.archive/` |
+
+### The Project Registry
+
+Instead of scanning hundreds of directories, bloom maintains a lightweight registry:
+
+```
+my-workspace/
+├─ bloom.config.yaml
+├─ .bloom/
+│  └─ registry.yaml      # ← Project index
+├─ projects/
+│  ├─ auth-refactor/
+│  ├─ new-dashboard/
+│  └─ ...hundreds more...
+└─ projects/.archive/
+   └─ ...old projects...
+```
+
+```yaml
+# .bloom/registry.yaml (auto-maintained)
+projects:
+  auth-refactor:
+    state: active
+    tasks_file: projects/auth-refactor/tasks.yaml
+    task_count: 5
+    ready_count: 2
+    updated_at: 2025-01-26T10:30:00Z
+
+  new-dashboard:
+    state: ready          # Not picked up - needs activation
+    tasks_file: projects/new-dashboard/tasks.yaml
+    task_count: 8
+    ready_count: 8
+    updated_at: 2025-01-26T09:15:00Z
+
+  old-feature:
+    state: archived
+    # No tasks_file - we don't even track the path
+
+  experimental-idea:
+    state: draft
+    # No tasks yet
+
+inbox:
+  state: active
+  tasks_file: inbox.yaml
+  task_count: 3
+  ready_count: 3
+```
+
+### How the Registry Works
+
+1. **Creation**: `bloom create` adds project with state `draft`
+2. **Planning**: `bloom plan` / `bloom refine` keeps it in `planning`
+3. **Generation**: `bloom generate` creates tasks.yaml, sets state to `ready`
+4. **Activation**: `bloom activate <project>` sets state to `active`
+5. **Completion**: When all tasks done, auto-transitions to `done`
+6. **Archive**: `bloom archive <project>` moves to `.archive/` and updates registry
+
+### Activating Projects
+
+After `bloom generate`, tasks exist but aren't run automatically:
+
+```bash
+bloom generate
+# → tasks.yaml created, state = ready
+
+bloom projects
+```
+
+```
+PROJECTS
+──────────────────────────────────────────────────────────
+ Name             State     Tasks    Ready
+──────────────────────────────────────────────────────────
+ auth-refactor    active    5        2        ← Will run
+ new-dashboard    ready     8        8        ← Needs activation
+ bug-fixes        active    3        1        ← Will run
+ old-cleanup      done      10       0        ← Complete
+```
+
+```bash
+# Review the generated tasks first
+bloom show --project new-dashboard
+
+# Then activate when ready
+bloom activate new-dashboard
+# → state = active, now included in bloom run
+```
+
+### Batch Activation
+
+```bash
+# Activate multiple
+bloom activate new-dashboard experimental-feature
+
+# Activate all ready projects
+bloom activate --all-ready
+
+# Activate with auto-run
+bloom activate new-dashboard --run
+```
+
+### Why Require Activation?
+
+1. **Review gate**: See generated tasks before agents start working
+2. **Controlled rollout**: Bring projects online when you're ready
+3. **Resource management**: Don't overwhelm workers with 50 projects at once
+4. **Safety**: Prevents accidental execution of draft work
+
+### Scale: The Registry is the Index
+
+With hundreds of projects, `bloom run` only:
+
+1. Reads `registry.yaml` (one small file)
+2. Filters to `state: active` projects (typically <10)
+3. Loads only those `tasks.yaml` files
+4. Ignores `.archive/` entirely
+
+```bash
+# Even with 500 projects, this is instant:
+bloom run
+
+# Because it only loads:
+# - registry.yaml (index)
+# - 5 active project task files
+# - inbox.yaml
+```
+
+### Registry Maintenance
+
+The registry is updated automatically, but you can also:
+
+```bash
+# Rebuild from filesystem (if registry is corrupted/stale)
+bloom registry rebuild
+
+# Show registry stats
+bloom registry status
+```
+
+```
+REGISTRY STATUS
+──────────────────────────────────────────────────────────
+ Total projects:     247
+ Draft:              12
+ Planning:           8
+ Ready:              5      ← Review these
+ Active:             4      ← Running
+ Paused:             3
+ Done:               89
+ Archived:           126    ← Not loaded
+
+ Last updated: 2 minutes ago
+```
 
 ---
 
@@ -287,19 +470,28 @@ The orchestrator understands cross-project dependencies and won't start `run-e2e
 
 ---
 
-## Project States
+## Managing Project States
 
-Projects can be paused or archived:
+See [Project Lifecycle](#project-lifecycle--the-registry) for the full state machine. Common operations:
 
 ```bash
-# Pause a project (tasks won't be picked up)
-bloom project pause new-dashboard
+# Activate a project (ready → active)
+bloom activate new-dashboard
 
-# Resume
-bloom project resume new-dashboard
+# Pause an active project
+bloom pause new-dashboard
 
-# Archive (moves to projects/.archive/)
-bloom project archive old-feature
+# Resume a paused project
+bloom resume new-dashboard
+
+# Mark complete (all tasks done → done)
+bloom complete auth-refactor
+
+# Archive (any state → archived, moves to .archive/)
+bloom archive old-feature
+
+# Reopen archived project
+bloom unarchive old-feature
 ```
 
 ```bash
@@ -309,11 +501,17 @@ bloom projects
 ```
 PROJECTS
 ──────────────────────────────────────────────────────────
- Name             Status    Tasks    Progress
+ Name             State     Tasks    Progress
 ──────────────────────────────────────────────────────────
  auth-refactor    active    5        ████░░░░░░ 40%
- new-dashboard    paused    8        ██░░░░░░░░ 25%
+ new-dashboard    ready     8        ░░░░░░░░░░ 0%   ← needs activation
  bug-fixes        active    3        ██████████ 100%
+ old-cleanup      done      10       ██████████ 100%
+```
+
+```bash
+# See all states including archived
+bloom projects --all
 ```
 
 ---
@@ -409,28 +607,42 @@ bloom inbox add "URGENT: fix payment flow" --priority high
 ## Mental Model
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    WORKSPACE                            │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
-│  │ Project1 │ │ Project2 │ │ Project3 │ │  Inbox   │   │
-│  │ tasks.yml│ │ tasks.yml│ │ tasks.yml│ │ inbox.yml│   │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘   │
-│       └────────────┴────────────┴────────────┘         │
-│                         ↓                               │
-│              ┌─────────────────────┐                   │
-│              │   Unified Queue     │                   │
-│              │ (priority ordered)  │                   │
-│              └─────────────────────┘                   │
-│                         ↓                               │
-│         ┌───────────────┼───────────────┐              │
-│         ↓               ↓               ↓              │
-│    ┌─────────┐    ┌─────────┐    ┌─────────┐          │
-│    │ Worker1 │    │ Worker2 │    │ Worker3 │          │
-│    └─────────┘    └─────────┘    └─────────┘          │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         WORKSPACE                               │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │                    .bloom/registry.yaml                   │  │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐  │  │
+│  │  │proj-1  │ │proj-2  │ │proj-3  │ │proj-4  │ │inbox   │  │  │
+│  │  │active  │ │ready   │ │active  │ │archived│ │active  │  │  │
+│  │  └───┬────┘ └────────┘ └───┬────┘ └────────┘ └───┬────┘  │  │
+│  └──────┼─────────────────────┼─────────────────────┼───────┘  │
+│         │                     │                     │          │
+│         ↓ load                ↓ load                ↓ load     │
+│  ┌────────────┐        ┌────────────┐        ┌────────────┐   │
+│  │ tasks.yaml │        │ tasks.yaml │        │ inbox.yaml │   │
+│  │ (5 tasks)  │        │ (3 tasks)  │        │ (2 tasks)  │   │
+│  └─────┬──────┘        └─────┬──────┘        └─────┬──────┘   │
+│        └─────────────────────┴─────────────────────┘          │
+│                              ↓                                 │
+│                 ┌─────────────────────┐                       │
+│                 │   Unified Queue     │ (10 tasks from        │
+│                 │ (priority ordered)  │  3 active sources)    │
+│                 └─────────────────────┘                       │
+│                              ↓                                 │
+│            ┌─────────────────┼─────────────────┐              │
+│            ↓                 ↓                 ↓              │
+│       ┌─────────┐       ┌─────────┐       ┌─────────┐        │
+│       │ Worker1 │       │ Worker2 │       │ Worker3 │        │
+│       └─────────┘       └─────────┘       └─────────┘        │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-The key insight: **projects are task sources, workers are task consumers**. The orchestrator matches available workers to the highest-priority ready task across all sources.
+Key insights:
+- **Registry is the index**: Only `active` projects are loaded
+- **Projects are task sources**: Each contributes to unified queue
+- **Workers are task consumers**: Pull from queue regardless of project
+- **Archived/ready/draft projects are ignored**: Zero overhead
 
 ---
 
