@@ -31,28 +31,36 @@ Unlike other tools, Bloom enables planning across multiple repositories in a sin
 
 ```yaml
 git:
-  push_to_remote: false          # Only enable when creating PRs (avoids triggering CI unnecessarily)
-  auto_cleanup_merged: true
+  push_to_remote: true           # Push branches for pickup on other machines
+  auto_cleanup_merged: true      # Clean up branches after merge
 
 tasks:
+  # All tasks merge to integration branch, final task opens PR to main
   - id: api-models
     repo: backend
-    branch: feature/auth
+    branch: feature/auth/api-models
     base_branch: main
-    merge_into: main
+    merge_into: feature/auth       # Integration branch
 
   - id: shared-types
     repo: shared-types
-    branch: feature/auth
-    base_branch: main
+    branch: feature/auth/types
+    base_branch: feature/auth
+    merge_into: feature/auth
     depends_on: [api-models]
 
   - id: frontend-integration
     repo: frontend
-    branch: feature/auth
-    base_branch: main
-    merge_into: main
+    branch: feature/auth/frontend
+    base_branch: feature/auth
+    merge_into: feature/auth
     depends_on: [shared-types]
+
+  - id: open-pr
+    repo: backend                  # Any repo with the integration branch
+    branch: feature/auth
+    open_pr: true                  # Opens PR to main
+    depends_on: [frontend-integration]
 ```
 
 ## Explore Across Repositories
@@ -406,8 +414,8 @@ To find your PowerShell profile location, run `echo $PROFILE` in PowerShell.
 ```yaml
 # Top-level git configuration
 git:
-  push_to_remote: false          # Enable ONLY when creating PRs (triggers CI, costs resources)
-  auto_cleanup_merged: false     # Delete local branches after merge
+  push_to_remote: true           # Push branches (enables pickup on other machines)
+  auto_cleanup_merged: true      # Clean up branches/worktrees after merge
 
 tasks:
   - id: kebab-case-id
@@ -416,11 +424,11 @@ tasks:
     phase: 1                        # Group related tasks
     depends_on: [other-task-id]     # Must complete first
     repo: repo-name                 # Repository name (from bloom repo list)
-    branch: feature/my-work         # Working branch for this task
-    base_branch: main               # Branch to create from (default: repo's default)
-    merge_into: main                # Branch to merge into when done
-    open_pr: true                   # Create GitHub PR instead of auto-merge
-    agent_name: claude-code         # Assign to specific agent
+    branch: feature/proj/task       # Working branch (pattern: feature/<project>/<task>)
+    base_branch: feature/proj       # Branch to create from (integration branch)
+    merge_into: feature/proj        # Merge into integration branch when done
+    open_pr: true                   # Create GitHub PR (only for final PR to main)
+    agent_name: backend-agent       # Group tasks by agent (same = sequential, different = parallel)
     checkpoint: true                # Requires human approval before downstream tasks
     instructions: |                 # Detailed instructions
       Multi-line instructions
@@ -451,77 +459,66 @@ Steps reuse the same agent session, preserving context between steps. Git operat
 
 ## Git Workflow
 
-Bloom manages git branches automatically to enable parallel agent work without conflicts.
+Bloom uses an **integration branch workflow** by default. All task branches merge to a project integration branch, which then opens a PR to main.
+
+### Default Workflow
+
+```
+main
+ └── feature/<project-name>              ← Integration branch
+      ├── feature/<project-name>/task-1  ← Task branches merge here
+      ├── feature/<project-name>/task-2
+      └── ...
+```
+
+1. **First task** creates the integration branch from `main`
+2. **Each task** branches off integration, pushes to remote, merges back
+3. **Branches are cleaned up** after merge (local, remote, and worktrees)
+4. **Final task** opens a PR from integration branch to `main`
+
+This workflow allows picking up work on another machine and keeps the repository clean.
+
+### Example
+
+```yaml
+git:
+  push_to_remote: true
+  auto_cleanup_merged: true
+
+tasks:
+  - id: setup
+    repo: my-app
+    branch: feature/my-project/setup
+    base_branch: main
+    merge_into: feature/my-project     # Creates integration branch
+
+  - id: implement
+    repo: my-app
+    branch: feature/my-project/implement
+    base_branch: feature/my-project
+    merge_into: feature/my-project
+    depends_on: [setup]
+
+  - id: open-pr
+    repo: my-app
+    branch: feature/my-project
+    open_pr: true                       # PR to main
+    depends_on: [implement]
+```
 
 ### How It Works
 
 1. **Lazy Worktree Creation**: Worktrees are created only when an agent picks up a task
 2. **Auto Pull**: Before creating a worktree, Bloom pulls the latest from the base branch
 3. **Post-Task Validation**: After task completion, Bloom checks for uncommitted changes
-4. **Auto Push**: If `push_to_remote: true`, Bloom pushes completed work
-5. **Auto Cleanup**: If `auto_cleanup_merged: true`, merged branches are deleted
-
-### Branching Patterns
-
-**Pattern 1: Feature Branch with Merge**
-```yaml
-- id: implement-feature
-  repo: my-app
-  branch: feature/new-feature
-  base_branch: main
-  merge_into: main
-```
-Agent creates branch from `main`, does work, merges back to `main`.
-
-**Pattern 2: Sequential Tasks on Same Branch**
-```yaml
-- id: task-1
-  repo: my-app
-  branch: feature/big-feature
-  base_branch: main
-  # No merge - intermediate task
-
-- id: task-2
-  depends_on: [task-1]
-  repo: my-app
-  branch: feature/big-feature
-  merge_into: main  # Only final task merges
-```
-
-**Pattern 3: Work on Existing Branch**
-```yaml
-- id: add-component
-  repo: my-app
-  branch: develop
-  # No base_branch - branch exists
-  # No merge_into - no merge needed
-```
-
-**Pattern 4: PR-Based Workflow (Recommended for main/master)**
-```yaml
-- id: implement-feature
-  repo: my-app
-  branch: feature/new-feature
-  base_branch: main
-  merge_into: main      # PR targets main
-  open_pr: true         # Creates PR instead of auto-merge
-```
-Agent works on feature branch, orchestrator creates GitHub PR for code review.
-
-### When to Use Which
-
-| Pattern | Use When |
-|---------|----------|
-| Pattern 1 (Auto-merge) | Internal tools, automation, solo projects |
-| Pattern 4 (PR-based) | Production code, team projects, code review required |
-| Pattern 2 (Sequential) | Large features requiring multiple tasks on same branch |
-| Pattern 3 (Existing) | Hotfixes or work on existing branches |
+4. **Auto Push**: Branches are pushed to remote (enables pickup on other machines)
+5. **Auto Cleanup**: After merge, worktrees, local branches, and remote branches are deleted
 
 ### Git Configuration
 
 Set in `tasks.yaml`:
-- `push_to_remote: true` - Push to remote after each task. **Enable ONLY when tasks create PRs** - pushing triggers CI and costs resources. Required when any task has `open_pr: true`.
-- `auto_cleanup_merged: true` - Delete local branches that have been merged
+- `push_to_remote: true` - Push branches to remote after each task (default for generated tasks)
+- `auto_cleanup_merged: true` - Clean up merged branches, worktrees, and remote branches
 
 ## Key Concepts
 
