@@ -57,7 +57,7 @@ export type TaskStep = z.infer<typeof TaskStepSchema>;
 // =============================================================================
 
 export const GitConfigSchema = z.object({
-  /** Push to remote after each task completes successfully (default: false) */
+  /** Push to remote after each task completes successfully (default: false). Enable ONLY when tasks need PRs - pushing triggers CI and costs resources. Required when any task has open_pr: true. */
   push_to_remote: z.boolean().default(false),
   /** Automatically delete local branches that have been merged (default: false) */
   auto_cleanup_merged: z.boolean().default(false),
@@ -82,7 +82,7 @@ export type Task = {
   base_branch?: string;
   /** Branch to merge working branch into when task completes. Same as `branch` means no merge needed */
   merge_into?: string;
-  /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default) */
+  /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default). Requires git.push_to_remote: true to push branch to remote. */
   open_pr?: boolean;
   /** Agent group name for this task (used for parallel execution grouping) */
   agent_name?: string;
@@ -104,7 +104,7 @@ export type Task = {
   subtasks: Task[];
   /** Points to a validation task that verifies this task's work (e.g. run tests, lint) */
   validation_task_id?: string;
-  /** If true, this task requires human approval before downstream tasks can proceed */
+  /** If true, this task requires human approval before downstream tasks can proceed. Use for mid-project validation in long workflows, not before terminal PR tasks (PRs are already review gates). */
   checkpoint?: boolean;
   /** Claude session ID for resuming interrupted work (shared across all steps) */
   session_id?: string;

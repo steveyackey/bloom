@@ -317,7 +317,7 @@ After reading the plan, ask about:
 
 \`\`\`yaml
 git:
-  push_to_remote: false          # Push branches to remote after each task
+  push_to_remote: false          # Enable ONLY when tasks need PRs (triggers CI, costs resources)
   auto_cleanup_merged: false     # Delete local branches after merge
 
 tasks:
@@ -330,9 +330,9 @@ tasks:
     branch: feature/my-work      # OPTIONAL. Working branch
     base_branch: main            # OPTIONAL. Branch to create from
     merge_into: main             # OPTIONAL. Branch to merge into when done
-    open_pr: true                # OPTIONAL. Open PR instead of direct merge
+    open_pr: true                # OPTIONAL. Open PR instead of direct merge (requires push_to_remote: true)
     agent_name: frontend         # OPTIONAL. Agent grouping (see below)
-    checkpoint: true             # OPTIONAL. Pause for human review
+    checkpoint: true             # OPTIONAL. Pause for human review in long projects (not before terminal PRs)
     instructions: |              # OPTIONAL. Detailed instructions (used if no steps)
       Step by step instructions
     acceptance_criteria:         # OPTIONAL. Definition of done
@@ -457,24 +457,19 @@ tasks:
       - tsconfig.json configured
 
   - id: validate-phase-1
-    title: "[CHECKPOINT] Validate phase 1"
+    title: "[CHECKPOINT] Review phase 1 setup"
     status: todo
     phase: 1
     checkpoint: true
     depends_on: [setup-project]
-    repo: core-package
-    branch: feature/setup
-    open_pr: true
-    agent_name: setup-agent
     instructions: |
-      Validate the setup phase and open a PR.
-      1. Run bun install and verify it succeeds
-      2. Run tsc --noEmit and verify no type errors
-      3. Push branch and open PR to main
+      Human review checkpoint: Validate that the setup phase is on track before
+      proceeding to feature development. Review the commits, ensure dependencies
+      are correct, and verify no major architectural issues.
     acceptance_criteria:
-      - "\`bun install\` succeeds"
-      - "\`tsc --noEmit\` passes"
-      - PR opened to main
+      - Setup code has been reviewed
+      - Architecture looks sound for phase 2
+      - Ready to proceed with feature work
 
   # Phase 2: Features (parallel)
   - id: add-frontend

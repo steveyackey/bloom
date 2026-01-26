@@ -31,7 +31,7 @@ Unlike other tools, Bloom enables planning across multiple repositories in a sin
 
 ```yaml
 git:
-  push_to_remote: true
+  push_to_remote: false          # Only enable when creating PRs (avoids triggering CI unnecessarily)
   auto_cleanup_merged: true
 
 tasks:
@@ -406,7 +406,7 @@ To find your PowerShell profile location, run `echo $PROFILE` in PowerShell.
 ```yaml
 # Top-level git configuration
 git:
-  push_to_remote: false          # Push branches to remote after each task
+  push_to_remote: false          # Enable ONLY when creating PRs (triggers CI, costs resources)
   auto_cleanup_merged: false     # Delete local branches after merge
 
 tasks:
@@ -520,7 +520,7 @@ Agent works on feature branch, orchestrator creates GitHub PR for code review.
 ### Git Configuration
 
 Set in `tasks.yaml`:
-- `push_to_remote: true` - Push to remote after each task completes
+- `push_to_remote: true` - Push to remote after each task. **Enable ONLY when tasks create PRs** - pushing triggers CI and costs resources. Required when any task has `open_pr: true`.
 - `auto_cleanup_merged: true` - Delete local branches that have been merged
 
 ## Key Concepts
