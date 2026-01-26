@@ -610,7 +610,7 @@ bloom config models opencode -d -s        # Discover and save to config
 Each agent has its own CLI and configuration requirements:
 
 - **Claude**: `npm install -g @anthropic-ai/claude-code` - Uses Anthropic API key
-- **Copilot**: `gh extension install github/gh-copilot` - Uses GitHub authentication
+- **Copilot**: See [GitHub's installation guide](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli) - Uses GitHub authentication
 - **Codex**: `npm install -g @openai/codex` - Uses OpenAI API key
 - **Goose**: `brew install block-goose-cli` or curl installer - Extensible via MCP
 - **OpenCode**: `go install github.com/sst/opencode@latest` - Multi-provider support
