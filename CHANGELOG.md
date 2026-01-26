@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.7](https://github.com/steveyackey/bloom/compare/bloom-v0.3.6...bloom-v0.3.7) (2026-01-26)
+
+
+### Bug Fixes
+
+* handle streaming events for all agents in TUI dashboard ([d2bc5bd](https://github.com/steveyackey/bloom/commit/d2bc5bd9e241f4a49f2ad2bc2cfcbd45d40e113b))
+
 ## [0.3.6](https://github.com/steveyackey/bloom/compare/bloom-v0.3.5...bloom-v0.3.6) (2026-01-26)
 
 
