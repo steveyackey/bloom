@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.5](https://github.com/steveyackey/bloom/compare/bloom-v0.3.4...bloom-v0.3.5) (2026-01-26)
+
+
+### Bug Fixes
+
+* add validation for push_to_remote and open_pr configuration ([077251e](https://github.com/steveyackey/bloom/commit/077251ed80263d09bb9f1fdab9b5f721e8a376b3))
+* add validation for redundant checkpoint patterns ([105453f](https://github.com/steveyackey/bloom/commit/105453f70d226f33020cd9a9faab35f35775ec5e))
+
 ## [0.3.4](https://github.com/steveyackey/bloom/compare/bloom-v0.3.3...bloom-v0.3.4) (2026-01-26)
 
 
