@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.8](https://github.com/steveyackey/bloom/compare/bloom-v0.3.7...bloom-v0.3.8) (2026-01-26)
+
+
+### Features
+
+* auto-cleanup merged branches, worktrees, and remote branches ([0dfecee](https://github.com/steveyackey/bloom/commit/0dfecee1e7be049b079857f3d48134863175d697))
+* default to integration branch workflow with auto-cleanup ([341846a](https://github.com/steveyackey/bloom/commit/341846a2440b6b76889d734055def50ff89bc263))
+* let agent decide parallelization strategy ([5550d53](https://github.com/steveyackey/bloom/commit/5550d53fca62b9878605855549003f9e22a3c890))
+
+
+### Documentation
+
+* update README with integration branch workflow ([b73677e](https://github.com/steveyackey/bloom/commit/b73677ef0fa8b4f4f40b11156787ccc5f5a8c2fc))
+
 ## [0.3.7](https://github.com/steveyackey/bloom/compare/bloom-v0.3.6...bloom-v0.3.7) (2026-01-26)
 
 
