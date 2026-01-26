@@ -4,19 +4,35 @@ GitHub Copilot is GitHub's AI coding assistant, offering multi-model support and
 
 ## Prerequisites
 
-1. **GitHub Account**: With active Copilot subscription (Individual, Business, or Enterprise)
-2. **GitHub CLI**: Install the `gh` command-line tool
-3. **Copilot Extension**: Install the Copilot CLI extension
+Before using Copilot with Bloom, ensure you have:
+
+- **Active GitHub Copilot Subscription**: Individual, Business, or Enterprise plan
+  - Check your subscription at [github.com/features/copilot/plans](https://github.com/features/copilot/plans)
+  - For organization/enterprise accounts: Ask your administrator to enable Copilot access
 
 ## Installation
 
-See the official [GitHub Copilot CLI documentation](https://docs.github.com/copilot/concepts/agents/about-copilot-cli) for installation instructions.
+Follow the official [GitHub Copilot CLI installation guide](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli) for your platform:
 
-After installation, verify it's working:
+- **macOS/Linux**: Homebrew, install script, or npm
+- **Windows**: WinGet or npm
+- **All platforms**: Direct binary download available
+
+After installation, verify it works:
 
 ```bash
-gh copilot --version
+copilot --version
 ```
+
+## Authentication
+
+Copilot CLI requires GitHub authentication. On first launch, Copilot will prompt you to authenticate. You can also manually authenticate:
+
+```bash
+copilot /login
+```
+
+Alternatively, use a fine-grained personal access token with "Copilot Requests" permission by setting the `GH_TOKEN` or `GITHUB_TOKEN` environment variable.
 
 ## Configuration
 
