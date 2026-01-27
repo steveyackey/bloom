@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.9](https://github.com/steveyackey/bloom/compare/bloom-v0.3.8...bloom-v0.3.9) (2026-01-27)
+
+
+### Documentation
+
+* add AGENTS.md as synced copy of CLAUDE.md ([24ec057](https://github.com/steveyackey/bloom/commit/24ec057e02b69896b56d09f93e46860af74fbc4b))
+
 ## [0.3.8](https://github.com/steveyackey/bloom/compare/bloom-v0.3.7...bloom-v0.3.8) (2026-01-26)
 
 
