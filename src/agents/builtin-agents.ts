@@ -241,7 +241,7 @@ export const cursorAgent: AgentDefinition = {
 
   interactive: {
     base_args: [],
-    prompt: { flag: "-p" },
+    prompt: "positional",
     prepend_system_prompt: true, // Cursor doesn't have a system prompt flag
   },
 
