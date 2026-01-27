@@ -765,7 +765,13 @@ export class EventDrivenTUI {
               // Cursor sends subtype "completed" for tool results
               const subtype = parsed.subtype as string | undefined;
               if (subtype === "completed") {
-                filteredLines.push(chalk.dim("[result]"));
+                const content = parsed.content as string | undefined;
+                if (content) {
+                  const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+                  filteredLines.push(chalk.dim(truncated));
+                } else {
+                  filteredLines.push(chalk.dim("[result]"));
+                }
                 break;
               }
               const toolName = extractToolName(parsed);
@@ -775,7 +781,13 @@ export class EventDrivenTUI {
 
             case "tool_result":
             case "tool_response": {
-              filteredLines.push(chalk.dim("[result]"));
+              const content = parsed.content as string | undefined;
+              if (content) {
+                const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+                filteredLines.push(chalk.dim(truncated));
+              } else {
+                filteredLines.push(chalk.dim("[result]"));
+              }
               break;
             }
 

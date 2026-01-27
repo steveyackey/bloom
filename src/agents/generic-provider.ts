@@ -548,7 +548,13 @@ export class GenericAgentProvider implements Agent {
         // Cursor sends subtype "completed" for tool results
         const subtype = event.subtype as string | undefined;
         if (subtype === "completed") {
-          process.stdout.write(`${chalk.dim("[result]")}\n`);
+          const content = event.content as string | undefined;
+          if (content) {
+            const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+            process.stdout.write(`${chalk.dim(truncated)}\n`);
+          } else {
+            process.stdout.write(`${chalk.dim("[result]")}\n`);
+          }
           break;
         }
         const toolName = extractToolName(event);
@@ -557,9 +563,16 @@ export class GenericAgentProvider implements Agent {
       }
 
       case "tool_result":
-      case "tool_response":
-        process.stdout.write(`${chalk.dim("[result]")}\n`);
+      case "tool_response": {
+        const content = event.content as string | undefined;
+        if (content) {
+          const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+          process.stdout.write(`${chalk.dim(truncated)}\n`);
+        } else {
+          process.stdout.write(`${chalk.dim("[result]")}\n`);
+        }
         break;
+      }
 
       case "result":
       case "done":
