@@ -457,7 +457,7 @@ Use \`steps\` when work benefits from accumulated context:
 4. **FINAL PR**: Last task opens PR from integration branch to \`main\` using \`open_pr: true\`
 5. **PHASES**: Group related tasks into numbered phases (1, 2, 3...)
 6. **DEPENDENCIES**: Use \`depends_on\` to enforce ordering
-7. **CHECKPOINTS**: Create \`[CHECKPOINT]\` tasks at phase boundaries for human review
+7. **CHECKPOINTS**: Create \`[CHECKPOINT]\` tasks at phase boundaries for human review. Do NOT use unless asked
 8. **BRANCHES**: One agent per branch at a time
 9. **ACCEPTANCE CRITERIA**: Every task needs clear, testable criteria
 10. **SMALL TASKS**: Each task should have a single, clear responsibility
