@@ -14,6 +14,32 @@ import type { AgentDefinition, PromptStyle } from "./schema";
 const logger = createLogger("generic-provider");
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Extract tool name from various agent event formats.
+ * - Claude/standard: { tool_name: "Read" } or { name: "Read" }
+ * - Cursor: { tool_call: { readToolCall: { args: {...} } } } → "read"
+ */
+function extractToolName(event: Record<string, unknown>): string {
+  // Standard fields
+  if (event.tool_name) return event.tool_name as string;
+  if (event.name) return event.name as string;
+
+  // Cursor nested tool_call object: key is e.g. "readToolCall"
+  const toolCall = event.tool_call as Record<string, unknown> | undefined;
+  if (toolCall && typeof toolCall === "object") {
+    const key = Object.keys(toolCall)[0];
+    if (key) {
+      return key.replace(/ToolCall$/i, "");
+    }
+  }
+
+  return "unknown";
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -519,15 +545,34 @@ export class GenericAgentProvider implements Agent {
 
       case "tool_use":
       case "tool_call": {
-        const toolName = (event.tool_name || event.name || "unknown") as string;
+        // Cursor sends subtype "completed" for tool results
+        const subtype = event.subtype as string | undefined;
+        if (subtype === "completed") {
+          const content = event.content as string | undefined;
+          if (content) {
+            const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+            process.stdout.write(`${chalk.dim(truncated)}\n`);
+          } else {
+            process.stdout.write(`${chalk.dim("[result]")}\n`);
+          }
+          break;
+        }
+        const toolName = extractToolName(event);
         process.stdout.write(`\n${chalk.cyan(`[tool: ${toolName}]`)}\n`);
         break;
       }
 
       case "tool_result":
-      case "tool_response":
-        process.stdout.write(`${chalk.dim("[result]")}\n`);
+      case "tool_response": {
+        const content = event.content as string | undefined;
+        if (content) {
+          const truncated = content.length > 200 ? `${content.slice(0, 200)}...` : content;
+          process.stdout.write(`${chalk.dim(truncated)}\n`);
+        } else {
+          process.stdout.write(`${chalk.dim("[result]")}\n`);
+        }
         break;
+      }
 
       case "result":
       case "done":
@@ -744,7 +789,7 @@ export class GenericAgentProvider implements Agent {
               }
             } else if (blockType === "tool_use" || blockType === "tool_call" || blockType === "toolUse") {
               // Tool use block
-              const toolName = (block.name || block.tool_name || "unknown") as string;
+              const toolName = extractToolName(block as Record<string, unknown>);
               process.stdout.write(`\n${chalk.cyan(`[tool: ${toolName}]`)}\n`);
             } else if (blockType === "tool_result" || blockType === "tool_response" || blockType === "toolResponse") {
               // Tool response block (usually in user role messages)

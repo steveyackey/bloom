@@ -19,6 +19,7 @@ Bloom trusts each agent to know its own capabilities. Agents inject their own sy
 | [Codex](./codex.md) | `codex` | OpenAI | Structured output, exploratory work |
 | [Goose](./goose.md) | `goose` | Multi-provider | Extensible automation via MCP |
 | [OpenCode](./opencode.md) | `opencode` | Multi-provider | Code intelligence via LSP |
+| [Cursor](./cursor.md) | `agent` | Cursor | IDE-style development, cloud execution |
 
 ## Configuration
 
@@ -65,7 +66,7 @@ agent:
 
 ### Agent Names
 
-Valid agent names: `claude`, `copilot`, `codex`, `goose`, `opencode`
+Valid agent names: `claude`, `copilot`, `codex`, `goose`, `opencode`, `cursor`
 
 ### Configuration Commands
 
@@ -115,6 +116,7 @@ Each agent has its own installation process. See their official documentation:
 | Codex | [OpenAI Codex CLI](https://github.com/openai/codex) |
 | Goose | [Goose Docs](https://block.github.io/goose/) |
 | OpenCode | [OpenCode Docs](https://opencode.ai/) |
+| Cursor | [Cursor CLI Docs](https://cursor.com/docs/cli/headless) |
 
 ## Troubleshooting
 
@@ -133,6 +135,7 @@ If you get "command not found" errors:
 - **Codex**: Check `OPENAI_API_KEY` environment variable
 - **Goose**: Run `goose configure` to set up provider
 - **OpenCode**: Verify provider-specific API keys are set
+- **Cursor**: Run `agent login` or check `CURSOR_API_KEY` environment variable
 
 ### Model Not Found
 
@@ -141,6 +144,7 @@ When specifying models:
 - **Copilot**: Use provider-qualified names (e.g., `claude-3.5-sonnet`)
 - **Codex**: Use OpenAI model names
 - **OpenCode**: Use `provider/model` format (e.g., `anthropic/claude-sonnet-4`)
+- **Cursor**: Use model names as shown in Cursor settings (e.g., `gpt-4o`, `claude-3.5-sonnet`)
 
 ## Architecture
 
@@ -155,15 +159,15 @@ Bloom uses a provider abstraction layer to support multiple agents:
 │  Agent Factory  │  ← Reads ~/.bloom/config.yaml
 └────────┬────────┘
          │
-    ┌────┴────┬────────┬────────┬─────────┐
-    ▼         ▼        ▼        ▼         ▼
-┌───────┐ ┌───────┐ ┌─────┐ ┌─────┐ ┌────────┐
-│Claude │ │Copilot│ │Codex│ │Goose│ │OpenCode│
-└───┬───┘ └───┬───┘ └──┬──┘ └──┬──┘ └───┬────┘
-    │         │        │       │        │
-    ▼         ▼        ▼       ▼        ▼
-  claude    copilot  codex   goose   opencode
-   CLI       CLI      CLI     CLI      CLI
+    ┌────┴────┬────────┬────────┬─────────┬────────┐
+    ▼         ▼        ▼        ▼         ▼        ▼
+┌───────┐ ┌───────┐ ┌─────┐ ┌─────┐ ┌────────┐ ┌──────┐
+│Claude │ │Copilot│ │Codex│ │Goose│ │OpenCode│ │Cursor│
+└───┬───┘ └───┬───┘ └──┬──┘ └──┬──┘ └───┬────┘ └──┬───┘
+    │         │        │       │        │         │
+    ▼         ▼        ▼       ▼        ▼         ▼
+  claude    copilot  codex   goose   opencode   agent
+   CLI       CLI      CLI     CLI      CLI       CLI
 ```
 
 Each provider implements the `Agent` interface:

@@ -53,6 +53,7 @@ const sidebars: SidebarsConfig = {
         'agents/codex',
         'agents/goose',
         'agents/opencode',
+        'agents/cursor',
       ],
     },
     {

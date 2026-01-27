@@ -256,6 +256,11 @@ export async function listAgentModels(name: string): Promise<string[] | null> {
         return parseCopilotModels(output);
       }
 
+      // Parse cursor's "models" output format (lines like "model-id - Model Name")
+      if (name === "cursor") {
+        return parseCursorModels(output);
+      }
+
       // Default: parse as lines
       return output.split("\n").filter((line) => line.trim());
     }
@@ -295,6 +300,21 @@ function parseCopilotModels(output: string): string[] {
     }
   }
 
+  return models;
+}
+
+/**
+ * Parse models from cursor's `agent models` output.
+ * Looks for lines like: "model-id - Model Name" or "model-id - Model Name  (default)"
+ */
+function parseCursorModels(output: string): string[] {
+  const models: string[] = [];
+  for (const line of output.split("\n")) {
+    const match = line.match(/^(\S+)\s+-\s+/);
+    if (match?.[1]) {
+      models.push(match[1]);
+    }
+  }
   return models;
 }
 
