@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.10](https://github.com/steveyackey/bloom/compare/bloom-v0.3.9...bloom-v0.3.10) (2026-01-27)
+
+
+### Features
+
+* add cursor agent discovery, availability, and model support ([dbbf495](https://github.com/steveyackey/bloom/commit/dbbf4956ec1248ff5e72fa54cc1f3d2f930aedfe))
+* add Cursor CLI agent support ([c75183f](https://github.com/steveyackey/bloom/commit/c75183fecab8db79ef4b5a36d1d80e663686e5b7))
+
+
+### Bug Fixes
+
+* display tool result content instead of bare [result] ([30553ce](https://github.com/steveyackey/bloom/commit/30553ce7289019d99410a5f49c49792cf1373a73))
+* parse cursor tool_call events to extract tool names ([2397d31](https://github.com/steveyackey/bloom/commit/2397d314ac9583c40943a3eefb2a27c1c4cc15a4))
+* update agent factory tests for cursor agent and fix formatting ([0e0fb4c](https://github.com/steveyackey/bloom/commit/0e0fb4c719758078f787c26c8dc4086ea93099b2))
+* use positional prompt for cursor interactive mode ([45ce9ab](https://github.com/steveyackey/bloom/commit/45ce9ab8c33ee61ef985f5dd63944fb52d6f58d8))
+
 ## [0.3.9](https://github.com/steveyackey/bloom/compare/bloom-v0.3.8...bloom-v0.3.9) (2026-01-27)
 
 
