@@ -261,6 +261,7 @@ export const cursorAgent: AgentDefinition = {
     session_id_field: "session_id",
   },
 
+  models_command: ["models"],
   model_required_for_streaming: false,
 };
 

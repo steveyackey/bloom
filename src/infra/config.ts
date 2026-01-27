@@ -75,7 +75,7 @@ export type PerAgentConfig = z.infer<typeof BaseAgentConfigSchema> & {
 // Known Agent Names (for validation warnings)
 // =============================================================================
 
-export const KNOWN_AGENTS = ["claude", "copilot", "codex", "goose", "opencode"] as const;
+export const KNOWN_AGENTS = ["claude", "copilot", "codex", "goose", "opencode", "cursor"] as const;
 export type KnownAgentName = (typeof KNOWN_AGENTS)[number];
 
 // =============================================================================

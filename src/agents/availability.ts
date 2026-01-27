@@ -40,6 +40,7 @@ const agentCliConfig: Record<string, { command: string; checkArgs: string[] }> =
   claude: { command: "claude", checkArgs: ["--version"] },
   goose: { command: "goose", checkArgs: ["version"] },
   opencode: { command: "opencode", checkArgs: ["--version"] },
+  cursor: { command: "agent", checkArgs: ["--version"] },
 };
 
 /**
@@ -66,6 +67,11 @@ const agentModels: Record<string, { models: string[]; default?: string }> = {
     // OpenCode requires explicit model selection in provider/model format
     models: ["opencode/grok-code", "anthropic/claude-3.5-sonnet", "openai/gpt-4"],
     default: "opencode/grok-code",
+  },
+  cursor: {
+    // Cursor supports many models; use `agent models` to discover available ones
+    models: ["auto", "opus-4.5-thinking", "sonnet-4.5-thinking", "opus-4.5", "sonnet-4.5", "gpt-5.2"],
+    default: "auto",
   },
 };
 
