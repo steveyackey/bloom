@@ -23,7 +23,15 @@ export type AgentName = BuiltinAgentName | string;
  * List of built-in agent names (for backward compatibility).
  * Use getRegisteredAgentNames() to include custom agents.
  */
-export const REGISTERED_AGENTS: BuiltinAgentName[] = ["claude", "copilot", "codex", "goose", "opencode", "cursor", "test"];
+export const REGISTERED_AGENTS: BuiltinAgentName[] = [
+  "claude",
+  "copilot",
+  "codex",
+  "goose",
+  "opencode",
+  "cursor",
+  "test",
+];
 
 // Re-export from loader for convenience
 export {
