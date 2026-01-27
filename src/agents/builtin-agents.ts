@@ -224,6 +224,47 @@ export const opencodeAgent: AgentDefinition = {
 };
 
 // =============================================================================
+// Cursor
+// =============================================================================
+
+export const cursorAgent: AgentDefinition = {
+  command: "agent",
+  version: ["--version"],
+  docs: "https://cursor.com/docs/cli/headless",
+  description: "Cursor's AI coding agent CLI for IDE-style development",
+
+  flags: {
+    model: ["--model"],
+    resume: ["--resume"],
+    approval_bypass: ["--force"],
+  },
+
+  interactive: {
+    base_args: [],
+    prompt: { flag: "-p" },
+    prepend_system_prompt: true, // Cursor doesn't have a system prompt flag
+  },
+
+  streaming: {
+    base_args: ["-p", "--output-format", "stream-json"],
+    prompt: "positional",
+    prepend_system_prompt: true, // Cursor doesn't have a system prompt flag
+  },
+
+  env: {
+    inject: {},
+    required: [], // Can use CURSOR_API_KEY or browser auth
+  },
+
+  output: {
+    format: "stream-json",
+    session_id_field: "session_id",
+  },
+
+  model_required_for_streaming: false,
+};
+
+// =============================================================================
 // Test Agent (for e2e testing without LLM)
 // =============================================================================
 
@@ -279,5 +320,6 @@ export const BUILTIN_AGENTS: Record<string, AgentDefinition> = {
   codex: codexAgent,
   goose: gooseAgent,
   opencode: opencodeAgent,
+  cursor: cursorAgent,
   test: testAgent,
 };

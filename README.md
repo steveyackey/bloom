@@ -541,16 +541,18 @@ Bloom supports multiple AI agents, allowing you to choose the best tool for your
 | **Codex** | `codex` | Structured output | Session forking, output schema enforcement |
 | **Goose** | `goose` | Extensible automation | MCP extensions, browser automation, scheduling |
 | **OpenCode** | `opencode` | Code intelligence | Native LSP support, multi-provider |
+| **Cursor** | `agent` | IDE-style development | Cloud agent, headless mode, multi-model |
 
 ### Agent Capabilities
 
-| Feature | Claude | Copilot | Codex | Goose | OpenCode |
-|---------|--------|---------|-------|-------|----------|
-| Web Search | Yes | Yes | Yes | No | No |
-| Session Fork | No | No | Yes | No | No |
-| MCP Extensions | No | No | No | Yes | No |
-| LSP Integration | No | No | No | No | Yes |
-| Human Questions | Yes | No | No | Yes | No |
+| Feature | Claude | Copilot | Codex | Goose | OpenCode | Cursor |
+|---------|--------|---------|-------|-------|----------|--------|
+| Web Search | Yes | Yes | Yes | No | No | No |
+| Session Fork | No | No | Yes | No | No | No |
+| MCP Extensions | No | No | No | Yes | No | No |
+| LSP Integration | No | No | No | No | Yes | No |
+| Human Questions | Yes | No | No | Yes | No | No |
+| Cloud Execution | No | No | No | No | No | Yes |
 
 ### Quick Configuration
 
@@ -579,7 +581,7 @@ agent:
       - openai/gpt-4o
 ```
 
-**Available agents**: `claude`, `copilot`, `codex`, `goose`, `opencode`
+**Available agents**: `claude`, `copilot`, `codex`, `goose`, `opencode`, `cursor`
 
 ### Agent Configuration Commands
 
@@ -611,3 +613,4 @@ Each agent has its own CLI and configuration requirements. See the [Agent Docume
 - **Codex** - Uses OpenAI API key
 - **Goose** - Extensible via MCP
 - **OpenCode** - Multi-provider support
+- **Cursor** - Uses Cursor account or API key
