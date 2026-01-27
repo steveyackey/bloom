@@ -18,6 +18,26 @@ import type { AgentPane, PaneType, QuestionDisplay, TasksSummary, ViewMode } fro
 // Maximum lines to keep per pane (prevents unbounded memory growth)
 const MAX_OUTPUT_LINES = 2000;
 
+/**
+ * Extract tool name from various agent event formats.
+ * - Claude/standard: { tool_name: "Read" } or { name: "Read" }
+ * - Cursor: { tool_call: { readToolCall: { args: {...} } } } → "read"
+ */
+function extractToolName(event: Record<string, unknown>): string {
+  if (event.tool_name) return event.tool_name as string;
+  if (event.name) return event.name as string;
+
+  const toolCall = event.tool_call as Record<string, unknown> | undefined;
+  if (toolCall && typeof toolCall === "object") {
+    const key = Object.keys(toolCall)[0];
+    if (key) {
+      return key.replace(/ToolCall$/i, "");
+    }
+  }
+
+  return "unknown";
+}
+
 // =============================================================================
 // TUI Class
 // =============================================================================
@@ -742,7 +762,13 @@ export class EventDrivenTUI {
 
             case "tool_use":
             case "tool_call": {
-              const toolName = (parsed.tool_name || parsed.name || "unknown") as string;
+              // Cursor sends subtype "completed" for tool results
+              const subtype = parsed.subtype as string | undefined;
+              if (subtype === "completed") {
+                filteredLines.push(chalk.dim("[result]"));
+                break;
+              }
+              const toolName = extractToolName(parsed);
               filteredLines.push(chalk.cyan(`[tool: ${toolName}]`));
               break;
             }
