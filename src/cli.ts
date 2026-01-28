@@ -11,8 +11,10 @@ import {
   registerAgentCommands,
   registerConfigCommands,
   registerCreateCommand,
+  registerDaemonCommands,
   registerEnterCommand,
   registerGenerateCommand,
+  registerInboxCommand,
   registerInitCommand,
   registerInterjectCommands,
   registerPlanCommand,
@@ -20,6 +22,7 @@ import {
   registerQuestionCommands,
   registerRefineCommand,
   registerRepoCommands,
+  registerResearchCommand,
   registerRunCommand,
   registerSetupCommand,
   registerTaskCommands,
@@ -133,8 +136,10 @@ const cli = Clerc.create()
 registerAgentCommands(cli);
 registerConfigCommands(cli);
 registerCreateCommand(cli);
+registerDaemonCommands(cli);
 registerEnterCommand(cli);
 registerGenerateCommand(cli);
+registerInboxCommand(cli);
 registerInitCommand(cli);
 registerInterjectCommands(cli);
 registerPlanCommand(cli);
@@ -142,6 +147,7 @@ registerPromptCommands(cli);
 registerQuestionCommands(cli);
 registerRefineCommand(cli);
 registerRepoCommands(cli);
+registerResearchCommand(cli);
 registerRunCommand(cli);
 registerSetupCommand(cli);
 registerTaskCommands(cli);

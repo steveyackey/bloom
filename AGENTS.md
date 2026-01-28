@@ -50,7 +50,10 @@ CLI commands are organized by top-level command name in `src/cli/`. Each file is
 | `questions.ts` | `questions` (alias: `qs`), `questions-dashboard` (alias: `qd`), `ask`, `answer`, `wait-answer`, `clear-answered` | `--all/-a`, `--task/-t`, `--type`, `--choices/-c`, `--on-yes`, `--on-no`, `--add-note` |
 | `refine.ts` | `refine` | `--agent/-a` |
 | `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
-| `run.ts` | `run` | `--agent/-a` |
+| `daemon.ts` | `start`, `stop`, `status` | `--foreground`, `--maxAgents`, `--maxPerWorkspace`, `--force`, `--timeout`, `--json` |
+| `inbox.ts` | `inbox [instruction...]` | `--repo/-r`, `--priority/-p`, `--agent/-a` |
+| `research.ts` | `research [question...]` | `--output/-o`, `--agent/-a`, `--follow` |
+| `run.ts` | `run` | `--agent/-a`, `--noDaemon`, `--follow` |
 | `setup.ts` | `setup` | |
 | `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset`, `step done`, `step start`, `step show`, `step list` | `--stuck/-s` |
 | `update.ts` | `update` | |
@@ -83,6 +86,23 @@ Key files for agent management:
 - `docs/docs/agents/` - Agent documentation pages
 
 When changing agent support, update ADDING_NEW_AGENTS.md if the process changes.
+
+## Daemon Mode
+
+Bloom supports a machine-wide daemon mode (disabled by default). One daemon per machine, manages a global task queue across multiple workspaces.
+
+Key files:
+- `src/daemon/` - Daemon core (server, client, queue, pool, scheduler, protocol, state)
+- `src/daemon/entry.ts` - Background process entry point
+- `src/cli/daemon.ts` - `bloom start`, `bloom stop`, `bloom status`
+- `src/cli/inbox.ts` - `bloom inbox` (quick ad-hoc tasks)
+- `src/cli/research.ts` - `bloom research` (read-only investigation)
+
+Design doc: `docs/design/DAEMON_MODE.md`
+
+IPC: JSON-RPC 2.0 over Unix domain socket (`~/.bloom/daemon/daemon.sock`).
+State: `~/.bloom/daemon/state.json` (queue persistence across restarts).
+Config: `daemon` section in `~/.bloom/config.yaml`.
 
 ## Logging Standards
 

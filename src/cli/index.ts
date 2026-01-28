@@ -10,8 +10,10 @@
 export { registerAgentCommands } from "./agent";
 export { registerConfigCommands } from "./config";
 export { registerCreateCommand } from "./create";
+export { registerDaemonCommands } from "./daemon";
 export { registerEnterCommand } from "./enter";
 export { registerGenerateCommand } from "./generate";
+export { registerInboxCommand } from "./inbox";
 export { registerInitCommand } from "./init";
 export { registerInterjectCommands } from "./interject";
 export { registerPlanCommand } from "./plan";
@@ -19,6 +21,7 @@ export { registerPromptCommands } from "./prompt";
 export { registerQuestionCommands } from "./questions";
 export { registerRefineCommand } from "./refine";
 export { registerRepoCommands } from "./repo";
+export { registerResearchCommand } from "./research";
 export { registerRunCommand } from "./run";
 export { registerSetupCommand } from "./setup";
 export { registerTaskCommands } from "./task";
