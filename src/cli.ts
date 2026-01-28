@@ -12,6 +12,7 @@ import {
   registerConfigCommands,
   registerCreateCommand,
   registerDaemonCommands,
+  registerDashboardCommand,
   registerEnterCommand,
   registerGenerateCommand,
   registerInboxCommand,
@@ -137,6 +138,7 @@ registerAgentCommands(cli);
 registerConfigCommands(cli);
 registerCreateCommand(cli);
 registerDaemonCommands(cli);
+registerDashboardCommand(cli);
 registerEnterCommand(cli);
 registerGenerateCommand(cli);
 registerInboxCommand(cli);

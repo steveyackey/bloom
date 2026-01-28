@@ -206,6 +206,31 @@ Research question: {instruction}
 Report your findings clearly and concisely.
 ```
 
+### `bloom dashboard`
+
+Web dashboard for monitoring daemon task queue status. Uses the same design
+aesthetic as `bloom view` (dark industrial palette, Outfit + JetBrains Mono fonts).
+
+```
+bloom dashboard                # Open dashboard (port 3100)
+bloom dashboard --port 8080    # Custom port
+bloom dashboard --no-open      # Don't auto-open browser
+```
+
+**Features:**
+- Overview cards: active agents, queued tasks, completed today, failed count
+- Agent pool visualization: slot status (busy/idle), provider, workspace, duration
+- Task queue: active, queued, and completed/failed entries with source, priority, workspace
+- Details panel: click any entry for full info (instruction, timestamps, workspace, priority)
+- Real-time updates: polls daemon every 2 seconds, pushes updates via SSE
+- Works even when daemon is offline (shows offline state with start instructions)
+
+**Architecture:**
+- HTTP server via `Bun.serve` on port 3100 (default)
+- Polls daemon IPC every 2s for status updates
+- Single-page inline HTML/CSS/JS (same pattern as `bloom view`)
+- SSE for live browser updates
+
 ## IPC Protocol
 
 JSON-RPC 2.0 over IPC (Unix domain socket on Linux/macOS, named pipe on Windows).
@@ -379,9 +404,13 @@ src/
 │   ├── state.ts               # State persistence (load/save)
 │   ├── scheduler.ts           # Queue → Pool assignment logic
 │   ├── entry.ts               # Background process entry point
-│   └── index.ts               # Module exports
+│   ├── index.ts               # Module exports
+│   └── dashboard/
+│       ├── server.ts          # Dashboard HTTP server (Bun.serve)
+│       └── ui.ts              # Inline HTML/CSS/JS dashboard UI
 ├── cli/
 │   ├── daemon.ts              # bloom start / stop / status commands
+│   ├── dashboard.ts           # bloom dashboard command
 │   ├── inbox.ts               # bloom inbox command
 │   └── research.ts            # bloom research command
 ```
@@ -461,7 +490,6 @@ src/
 
 ## Future Considerations
 
-- **Web dashboard**: Daemon could also serve HTTP for `bloom view` integration
 - **Remote daemon**: Replace Unix socket with TCP for remote machine orchestration
 - **Task dependencies across workspaces**: Global dependency graph
 - **Resource monitoring**: CPU/memory-aware scheduling

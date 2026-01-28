@@ -11,6 +11,7 @@ export { registerAgentCommands } from "./agent";
 export { registerConfigCommands } from "./config";
 export { registerCreateCommand } from "./create";
 export { registerDaemonCommands } from "./daemon";
+export { registerDashboardCommand } from "./dashboard";
 export { registerEnterCommand } from "./enter";
 export { registerGenerateCommand } from "./generate";
 export { registerInboxCommand } from "./inbox";
