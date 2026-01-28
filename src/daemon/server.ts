@@ -1,10 +1,11 @@
 // =============================================================================
 // Daemon Server
 // =============================================================================
-// The main daemon process. Listens on a Unix domain socket for IPC.
+// The main daemon process. Listens on a Unix domain socket (or Windows named pipe) for IPC.
 
 import { createServer, type Server, type Socket } from "node:net";
 import { createLogger } from "../infra/logger";
+import { registerShutdownHandlers } from "./platform";
 import { type AgentPool, activeSlotCount, createPool, getSlotInfos } from "./pool";
 import {
   createErrorResponse,
@@ -317,9 +318,11 @@ export async function startDaemon(config: DaemonConfig = {}): Promise<void> {
       // Start scheduler
       scheduler = startScheduler(pool, state, broadcastEvent);
 
-      // Handle signals
-      process.on("SIGTERM", () => shutdown(false, 300));
-      process.on("SIGINT", () => shutdown(false, 30));
+      // Handle signals (cross-platform: SIGTERM+SIGINT on Unix, SIGINT+SIGHUP on Windows)
+      registerShutdownHandlers(
+        () => shutdown(false, 300),
+        () => shutdown(false, 30)
+      );
 
       resolve();
     });

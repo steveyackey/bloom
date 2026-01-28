@@ -11,23 +11,34 @@ multiple bloom workspaces. One daemon per machine. Disabled by default.
 ┌──────────────────────────────────────────────────────────┐
 │                    Machine (single daemon)                │
 │                                                          │
-│  ┌─────────────┐    Unix Socket IPC    ┌──────────────┐  │
-│  │  bloom CLI   │◄───────────────────►│   bloomd      │  │
-│  │  (any cwd)   │  ~/.bloom/daemon.sock│  (daemon)     │  │
-│  └─────────────┘                       │               │  │
-│                                        │  ┌──────────┐ │  │
-│  ┌─────────────┐                       │  │  Agent    │ │  │
-│  │  bloom CLI   │◄────────────────────►│  │  Pool     │ │  │
-│  │  (workspace2)│                      │  │  (N slots)│ │  │
-│  └─────────────┘                       │  └──────────┘ │  │
-│                                        │               │  │
-│                                        │  ┌──────────┐ │  │
-│                                        │  │  Task     │ │  │
-│                                        │  │  Queue    │ │  │
-│                                        │  └──────────┘ │  │
-│                                        └──────────────┘  │
+│  ┌─────────────┐      IPC Transport      ┌────────────┐ │
+│  │  bloom CLI   │◄──────────────────────►│  bloomd     │ │
+│  │  (any cwd)   │  socket / named pipe   │  (daemon)   │ │
+│  └─────────────┘                         │             │ │
+│                                          │ ┌──────────┐│ │
+│  ┌─────────────┐                         │ │  Agent   ││ │
+│  │  bloom CLI   │◄──────────────────────►│ │  Pool    ││ │
+│  │  (workspace2)│                        │ │  (N slot)││ │
+│  └─────────────┘                         │ └──────────┘│ │
+│                                          │ ┌──────────┐│ │
+│                                          │ │  Task    ││ │
+│                                          │ │  Queue   ││ │
+│                                          │ └──────────┘│ │
+│                                          └─────────────┘ │
 └──────────────────────────────────────────────────────────┘
 ```
+
+### Cross-Platform IPC Transport
+
+| Platform | Transport | Path |
+|----------|-----------|------|
+| Linux | Unix domain socket | `~/.bloom/daemon/daemon.sock` |
+| macOS | Unix domain socket | `~/.bloom/daemon/daemon.sock` |
+| Windows | Named pipe | `\\.\pipe\bloom-daemon` |
+
+Node's `net` module handles both transparently — `net.createServer().listen(path)` and `net.connect(path)` work with both Unix sockets and Windows named pipes.
+
+All platform-specific code is centralized in `src/daemon/platform.ts`.
 
 ## Daemon Process
 
@@ -36,15 +47,16 @@ multiple bloom workspaces. One daemon per machine. Disabled by default.
 | File | Purpose |
 |------|---------|
 | `daemon.pid` | PID of running daemon (used for liveness checks) |
-| `daemon.sock` | Unix domain socket for IPC |
+| `daemon.sock` | Unix domain socket for IPC (Linux/macOS only; Windows uses named pipe) |
 | `daemon.log` | Rolling log output |
 | `state.json` | Persisted queue state (survives restarts) |
 
 **Lifecycle:**
 1. `bloom start` forks daemon to background (or `--foreground` for debugging)
 2. Daemon creates PID file, opens socket, loads persisted state
-3. Runs until `bloom stop` or SIGTERM
+3. Runs until `bloom stop` or SIGTERM (Unix) / SIGHUP (Windows)
 4. Graceful shutdown: finishes active tasks (with configurable timeout), persists state
+5. No sudo/admin privileges required on any platform
 
 ## CLI Commands
 
@@ -196,7 +208,7 @@ Report your findings clearly and concisely.
 
 ## IPC Protocol
 
-JSON-RPC 2.0 over Unix domain socket (`~/.bloom/daemon.sock`).
+JSON-RPC 2.0 over IPC (Unix domain socket on Linux/macOS, named pipe on Windows).
 
 ### Requests
 
@@ -358,6 +370,7 @@ daemon:
 ```
 src/
 ├── daemon/
+│   ├── platform.ts            # Cross-platform abstractions (IPC, signals, process liveness)
 │   ├── server.ts              # Daemon process entry point + socket server
 │   ├── client.ts              # IPC client (used by CLI commands)
 │   ├── queue.ts               # Task queue with persistence
@@ -365,7 +378,8 @@ src/
 │   ├── protocol.ts            # JSON-RPC types and serialization
 │   ├── state.ts               # State persistence (load/save)
 │   ├── scheduler.ts           # Queue → Pool assignment logic
-│   └── inbox.ts               # Inbox/research task creation
+│   ├── entry.ts               # Background process entry point
+│   └── index.ts               # Module exports
 ├── cli/
 │   ├── daemon.ts              # bloom start / stop / status commands
 │   ├── inbox.ts               # bloom inbox command
@@ -404,11 +418,12 @@ src/
 
 ## Key Design Decisions
 
-### Why Unix Domain Socket (not HTTP/REST)?
-- No port conflicts, no auth needed
-- Natural per-machine scope (socket file = single daemon)
+### Why IPC (Unix Socket / Named Pipe) instead of HTTP/REST?
+- No port conflicts, no auth needed, no privileged ports
+- Natural per-machine scope (socket file / named pipe = single daemon)
 - Lower overhead than HTTP for local IPC
-- File permissions provide access control
+- File permissions provide access control (Unix); named pipes are user-scoped (Windows)
+- Node's `net` module transparently supports both transports
 
 ### Why JSON-RPC 2.0?
 - Simple, well-specified protocol

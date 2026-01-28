@@ -2,10 +2,12 @@
 // CLI: bloom start / bloom stop / bloom status
 // =============================================================================
 
+import { join } from "node:path";
 import chalk from "chalk";
 import type { Clerc } from "clerc";
 import type { AgentSlotInfo, StatusResult } from "../daemon";
 import { connectToDaemon, getDaemonDir, isDaemonRunning, readPid } from "../daemon";
+import { buildDaemonSpawnArgs, shortPath } from "../daemon/platform";
 
 // =============================================================================
 // Register Commands
@@ -56,15 +58,16 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
         });
         // startDaemon blocks until shutdown
       } else {
-        // Fork to background
+        // Fork to background (cross-platform)
         const daemonEntry = new URL("../daemon/entry.ts", import.meta.url).pathname;
-        const args: string[] = [];
-        if (maxAgents) args.push("--max-agents", String(maxAgents));
-        if (maxPerWorkspace) args.push("--max-per-workspace", String(maxPerWorkspace));
+        const extraArgs: string[] = [];
+        if (maxAgents) extraArgs.push("--max-agents", String(maxAgents));
+        if (maxPerWorkspace) extraArgs.push("--max-per-workspace", String(maxPerWorkspace));
 
-        const proc = Bun.spawn(["bun", "run", daemonEntry, ...args], {
+        const spawnArgs = buildDaemonSpawnArgs(daemonEntry, extraArgs);
+        const proc = Bun.spawn(spawnArgs.command, {
           stdio: ["ignore", "ignore", "ignore"],
-          env: { ...process.env },
+          env: spawnArgs.env,
         });
 
         // Give daemon a moment to start
@@ -73,9 +76,9 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
         const pid = await readPid();
         if (pid) {
           console.log(`${chalk.green("Daemon started")} (pid: ${pid})`);
-          console.log(`  Log: ${getDaemonDir()}/daemon.log`);
+          console.log(`  Log: ${join(getDaemonDir(), "daemon.log")}`);
         } else {
-          console.log(`${chalk.red("Failed to start daemon")}. Check ${getDaemonDir()}/daemon.log`);
+          console.log(`${chalk.red("Failed to start daemon")}. Check ${join(getDaemonDir(), "daemon.log")}`);
           process.exit(1);
         }
 
@@ -219,14 +222,4 @@ function formatDuration(seconds: number): string {
   const min = Math.floor(seconds / 60);
   const sec = seconds % 60;
   return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
-}
-
-function shortPath(path: string): string {
-  const home = process.env.HOME ?? "";
-  if (home && path.startsWith(home)) {
-    return `~${path.slice(home.length)}`;
-  }
-  // Just return last 2 segments
-  const parts = path.split("/");
-  return parts.slice(-2).join("/");
 }

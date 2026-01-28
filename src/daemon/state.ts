@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { getBloomHome } from "../infra/config";
+import { getIpcPath, ipcPathNeedsCleanup, isProcessRunning } from "./platform";
 import type { QueueEntry } from "./queue";
 
 // =============================================================================
@@ -25,7 +26,7 @@ export function getPidPath(): string {
 }
 
 export function getSocketPath(): string {
-  return join(getDaemonDir(), "daemon.sock");
+  return getIpcPath(getDaemonDir());
 }
 
 export function getLogPath(): string {
@@ -136,6 +137,7 @@ export async function writePid(pid: number): Promise<void> {
 
 /**
  * Read daemon PID. Returns null if not running or PID file missing.
+ * Uses platform-appropriate liveness check (signal 0 on Unix, tasklist on Windows).
  */
 export async function readPid(): Promise<number | null> {
   const path = getPidPath();
@@ -146,15 +148,14 @@ export async function readPid(): Promise<number | null> {
     const pid = parseInt(content.trim(), 10);
     if (Number.isNaN(pid)) return null;
 
-    // Check if process is actually running
-    try {
-      process.kill(pid, 0); // Signal 0 = check existence
+    // Cross-platform process liveness check
+    if (isProcessRunning(pid)) {
       return pid;
-    } catch {
-      // Process not running, clean up stale PID file
-      removePid();
-      return null;
     }
+
+    // Process not running, clean up stale PID file
+    removePid();
+    return null;
   } catch {
     return null;
   }
@@ -171,9 +172,11 @@ export function removePid(): void {
 }
 
 /**
- * Remove socket file.
+ * Remove socket file (Unix only — Windows named pipes are auto-cleaned by the OS).
  */
 export function removeSocket(): void {
+  if (!ipcPathNeedsCleanup()) return;
+
   const path = getSocketPath();
   if (existsSync(path)) {
     unlinkSync(path);

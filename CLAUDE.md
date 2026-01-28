@@ -11,6 +11,17 @@ We use release-please with this config:
 
 Always update README.md when adding new commands, changing CLI behavior, or modifying project structure.
 
+## Cross-Platform Requirements
+
+Everything MUST work on Linux, macOS, and Windows without requiring sudo/admin privileges. All daemon, IPC, and process management code uses platform abstractions from `src/daemon/platform.ts`:
+
+- **IPC**: Unix domain sockets on Linux/macOS, named pipes (`\\.\pipe\bloom-daemon`) on Windows
+- **Process liveness**: `kill(pid, 0)` on Unix, `tasklist` on Windows
+- **Signals**: SIGTERM+SIGINT on Unix, SIGINT+SIGHUP on Windows
+- **Paths**: `~/.bloom/` on all platforms (via `$HOME` or `%USERPROFILE%`); use `node:path.join()` not string concatenation with `/`
+
+No privileged ports, no system-level services, no root/admin required.
+
 ## Documentation & Website Maintenance
 
 When making changes to bloom:
