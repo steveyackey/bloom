@@ -123,12 +123,42 @@ export type AgentSection = z.infer<typeof AgentSectionSchema> & {
 };
 
 // =============================================================================
+// Daemon Configuration Schema
+// =============================================================================
+
+/**
+ * Daemon configuration section in config.yaml.
+ *
+ * Example:
+ * ```yaml
+ * daemon:
+ *   enabled: false
+ *   maxAgents: 3
+ *   maxPerWorkspace: 2
+ *   gracefulShutdownTimeout: 300
+ *   logRetention: 7
+ *   autoStart: false
+ * ```
+ */
+const DaemonSectionSchema = z.object({
+  enabled: z.boolean().default(false),
+  maxAgents: z.number().min(1).max(32).default(3),
+  maxPerWorkspace: z.number().min(1).max(16).default(2),
+  gracefulShutdownTimeout: z.number().min(0).default(300),
+  logRetention: z.number().min(1).default(7),
+  autoStart: z.boolean().default(false),
+});
+
+export type DaemonSection = z.infer<typeof DaemonSectionSchema>;
+
+// =============================================================================
 // User Config Schema
 // =============================================================================
 
 const UserConfigSchema = z.object({
   gitProtocol: z.enum(["ssh", "https"]).default("ssh"),
   agent: AgentSectionSchema.optional(),
+  daemon: DaemonSectionSchema.optional(),
 });
 
 export type UserConfig = z.infer<typeof UserConfigSchema>;
@@ -661,4 +691,29 @@ export function extractRepoInfo(url: string): { host: string; owner: string; rep
   }
 
   return null;
+}
+
+// =============================================================================
+// Daemon Config Helpers
+// =============================================================================
+
+/**
+ * Get daemon configuration with defaults.
+ */
+export function getDaemonConfig(config: UserConfig): DaemonSection {
+  return {
+    enabled: config.daemon?.enabled ?? false,
+    maxAgents: config.daemon?.maxAgents ?? 3,
+    maxPerWorkspace: config.daemon?.maxPerWorkspace ?? 2,
+    gracefulShutdownTimeout: config.daemon?.gracefulShutdownTimeout ?? 300,
+    logRetention: config.daemon?.logRetention ?? 7,
+    autoStart: config.daemon?.autoStart ?? false,
+  };
+}
+
+/**
+ * Check if daemon mode is enabled in user config.
+ */
+export function isDaemonEnabled(config: UserConfig): boolean {
+  return config.daemon?.enabled ?? false;
 }
