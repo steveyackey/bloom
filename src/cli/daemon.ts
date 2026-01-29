@@ -60,12 +60,25 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
         // startDaemon blocks until shutdown
       } else {
         // Fork to background (cross-platform)
-        const daemonEntry = new URL("../daemon/entry.ts", import.meta.url).pathname;
+        // Detect if running from compiled binary (execPath won't end with 'bun')
+        const isCompiled = !process.execPath.endsWith("bun");
+
         const extraArgs: string[] = [];
         if (maxAgents) extraArgs.push("--max-agents", String(maxAgents));
         if (maxPerWorkspace) extraArgs.push("--max-per-workspace", String(maxPerWorkspace));
 
-        const spawnArgs = buildDaemonSpawnArgs(daemonEntry, extraArgs);
+        let spawnArgs: { command: string[]; env: Record<string, string | undefined> };
+        if (isCompiled) {
+          // Compiled binary: spawn self with --_daemon-entry flag
+          spawnArgs = {
+            command: [process.execPath, "--_daemon-entry", ...extraArgs],
+            env: { ...process.env },
+          };
+        } else {
+          // Development: spawn bun with entry.ts
+          const daemonEntry = new URL("../daemon/entry.ts", import.meta.url).pathname;
+          spawnArgs = buildDaemonSpawnArgs(daemonEntry, extraArgs);
+        }
 
         // Use Node's spawn with detached:true to properly daemonize
         // Bun.spawn doesn't support detached mode, causing the child to receive

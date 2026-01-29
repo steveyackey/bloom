@@ -3,6 +3,21 @@
 // Bloom CLI Entry Point
 // =============================================================================
 
+// Handle special daemon entry mode (used by compiled binary to spawn daemon)
+// Must be checked before Clerc initialization
+if (process.argv.includes("--_daemon-entry")) {
+  // Remove the flag and run daemon entry directly
+  const idx = process.argv.indexOf("--_daemon-entry");
+  process.argv.splice(idx, 1);
+
+  // Import daemon entry - it starts the server which keeps the process alive.
+  // Block forever after import to prevent the rest of cli.ts from running.
+  await import("./daemon/entry");
+  // Keep the process alive - the server is running but we need to prevent
+  // the rest of this module from executing and calling cli.parse()
+  await new Promise(() => {}); // Never resolves
+}
+
 import { resolve } from "node:path";
 import chalk from "chalk";
 import { Clerc, completionsPlugin, friendlyErrorPlugin, helpPlugin, notFoundPlugin, versionPlugin } from "clerc";
