@@ -68,6 +68,8 @@ export interface TaskGetResult {
   stepInfo?: StepInfo;
   /** True if there are more steps after the current one */
   hasMoreSteps?: boolean;
+  /** True if task is done_pending_merge and only needs merge processing (skip agent work) */
+  mergeOnly?: boolean;
 }
 
 // =============================================================================
@@ -86,8 +88,14 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     return { available: false };
   }
 
-  updateTaskStatus(tasksData.tasks, task.id, "in_progress", agentName);
-  await saveTasks(tasksFile, tasksData);
+  // Check if this is a merge-only resumption (task was interrupted during merge)
+  const mergeOnly = task.status === "done_pending_merge";
+
+  // Only update status to in_progress for non-merge-only tasks
+  if (!mergeOnly) {
+    updateTaskStatus(tasksData.tasks, task.id, "in_progress", agentName);
+    await saveTasks(tasksFile, tasksData);
+  }
 
   const taskCli = `bloom -f "${tasksFile}"`;
   const gitConfig = tasksData.git;
@@ -169,6 +177,7 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     agent: task.agent, // Per-task agent provider override
     stepInfo,
     hasMoreSteps,
+    mergeOnly, // True if resuming from done_pending_merge (skip agent work, go to merge)
   };
 }
 

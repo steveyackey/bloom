@@ -102,8 +102,10 @@ export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
     for (const task of taskList) {
       const isReady = task.status === "todo" || task.status === "ready_for_agent";
       const isResumable = task.status === "in_progress" && agentName && task.agent_name === agentName;
+      // done_pending_merge tasks need to resume for merge-only processing
+      const needsMerge = task.status === "done_pending_merge" && agentName && task.agent_name === agentName;
 
-      if (!isReady && !isResumable) {
+      if (!isReady && !isResumable && !needsMerge) {
         findAvailable(task.subtasks);
         continue;
       }

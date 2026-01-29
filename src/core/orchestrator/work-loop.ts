@@ -271,6 +271,70 @@ export async function runAgentWorkLoop(
         });
       }
 
+      // Handle merge-only resumption (task interrupted during merge phase)
+      // Skip agent work and go directly to push/merge handling
+      if (taskResult.mergeOnly) {
+        onEvent({
+          type: "log",
+          level: "info",
+          message: `Resuming merge-only task ${taskResult.taskId} (was done_pending_merge)`,
+        });
+
+        // Go directly to merge handling
+        if (taskResult.gitInfo) {
+          // Push source branch if configured (may have been interrupted before push)
+          if (taskResult.gitConfig?.push_to_remote && taskResult.gitInfo.branch) {
+            pushBranchToRemote(taskResult.gitInfo, onEvent);
+          }
+
+          // Create PR if open_pr is configured
+          if (taskResult.gitInfo.openPR && taskResult.gitInfo.prBase && taskResult.repo) {
+            createPullRequest(taskResult.gitInfo, taskResult.taskId!, taskResult.title!, taskResult.prompt, onEvent);
+          }
+
+          // Auto merge into target branch if configured
+          if (taskResult.gitInfo.mergeInto && taskResult.repo) {
+            await handleMerge(
+              {
+                taskId: taskResult.taskId!,
+                taskTitle: taskResult.title!,
+                repo: taskResult.repo,
+                gitInfo: taskResult.gitInfo,
+                gitConfig: taskResult.gitConfig,
+                prompt: taskResult.prompt,
+                bloomDir,
+                tasksFile,
+                agentName,
+              },
+              agent,
+              systemPrompt,
+              currentSessionId,
+              onEvent
+            );
+          }
+
+          // Auto cleanup merged branches if configured
+          if (taskResult.gitConfig?.auto_cleanup_merged && taskResult.gitInfo.mergeInto && taskResult.repo) {
+            await cleanupMergedBranchesForTask(
+              {
+                taskId: taskResult.taskId!,
+                taskTitle: taskResult.title!,
+                repo: taskResult.repo,
+                gitInfo: taskResult.gitInfo,
+                gitConfig: taskResult.gitConfig,
+                bloomDir,
+                tasksFile,
+                agentName,
+              },
+              onEvent
+            );
+          }
+        }
+
+        await Bun.sleep(1000);
+        continue; // Skip the regular agent work loop
+      }
+
       // Step execution loop - keeps running until all steps complete or failure
       let stepLoopComplete = false;
       let result: Awaited<ReturnType<typeof agent.run>>;
