@@ -14,12 +14,12 @@ export interface DashboardOptions {
 export async function cmdDashboard(options: DashboardOptions): Promise<void> {
   const running = await isDaemonRunning();
 
-  console.log(chalk.blue("Starting Bloom Dashboard..."));
+  console.log(chalk.blue("Starting Bloom Queue..."));
   if (!running) {
     console.log(
       chalk.yellow("Daemon is not running.") +
-        chalk.gray(" Dashboard will show offline state until you run ") +
-        chalk.cyan("bloom start")
+        chalk.gray(" Queue view will show offline state until you run ") +
+        chalk.cyan("bloom daemon start")
     );
   }
 

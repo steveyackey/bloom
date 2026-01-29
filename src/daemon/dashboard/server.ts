@@ -7,7 +7,7 @@ import { connectToDaemon } from "../client";
 import type { StatusResult } from "../protocol";
 import { renderDashboardHTML } from "./ui";
 
-const log = createLogger("daemon-dashboard");
+const log = createLogger("daemon-queue");
 
 export interface DashboardOptions {
   port: number;
@@ -151,7 +151,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<v
   });
 
   const url = `http://localhost:${server.port}`;
-  log.info(`Bloom Dashboard running at ${url}`);
+  log.info(`Bloom Queue running at ${url}`);
   log.info("Press Ctrl+C to stop");
 
   // Open browser if requested
@@ -167,7 +167,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<v
 
   // Graceful shutdown
   const shutdown = () => {
-    log.info("Shutting down dashboard...");
+    log.info("Shutting down queue viewer...");
     clearInterval(pollInterval);
     server.stop();
     process.exit(0);

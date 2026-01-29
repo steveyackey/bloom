@@ -1,5 +1,5 @@
 // =============================================================================
-// Bloom Dashboard Command - Web dashboard for daemon task queue
+// Bloom Queue Command - Web dashboard for daemon task queue
 // =============================================================================
 
 import type { Clerc } from "clerc";
@@ -7,8 +7,8 @@ import { cmdDashboard } from "../commands/dashboard";
 
 export function registerDashboardCommand(cli: ReturnType<typeof Clerc.create>): void {
   cli
-    .command("dashboard", "Open web dashboard for daemon task queue", {
-      alias: "dash",
+    .command("queue", "Open web dashboard for daemon task queue", {
+      alias: "q",
       flags: {
         port: {
           type: Number,
@@ -23,7 +23,7 @@ export function registerDashboardCommand(cli: ReturnType<typeof Clerc.create>): 
       },
       help: { group: "monitor" },
     })
-    .on("dashboard", async (ctx) => {
+    .on("queue", async (ctx) => {
       const { port, open } = ctx.flags as { port: number; open: boolean };
       await cmdDashboard({ port, open });
     });

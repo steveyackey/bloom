@@ -1,5 +1,5 @@
 // =============================================================================
-// CLI: bloom start / bloom stop / bloom status
+// CLI: bloom daemon start / bloom daemon stop / bloom daemon status
 // =============================================================================
 
 import { join } from "node:path";
@@ -15,10 +15,10 @@ import { buildDaemonSpawnArgs, shortPath } from "../daemon/platform";
 
 export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): void {
   // =========================================================================
-  // bloom start
+  // bloom daemon start
   // =========================================================================
   cli
-    .command("start", "Start the bloom daemon", {
+    .command("daemon start", "Start the bloom daemon", {
       flags: {
         foreground: {
           description: "Run in foreground (for debugging)",
@@ -36,7 +36,7 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
       },
       help: { group: "system" },
     })
-    .on("start", async (ctx) => {
+    .on("daemon start", async (ctx) => {
       const { foreground, maxAgents, maxPerWorkspace } = ctx.flags;
 
       // Check if already running
@@ -88,10 +88,10 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
     });
 
   // =========================================================================
-  // bloom stop
+  // bloom daemon stop
   // =========================================================================
   cli
-    .command("stop", "Stop the bloom daemon", {
+    .command("daemon stop", "Stop the bloom daemon", {
       flags: {
         force: {
           description: "Force immediate shutdown",
@@ -105,7 +105,7 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
       },
       help: { group: "system" },
     })
-    .on("stop", async (ctx) => {
+    .on("daemon stop", async (ctx) => {
       const { force, timeout } = ctx.flags;
 
       const client = await connectToDaemon();
@@ -130,10 +130,10 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
     });
 
   // =========================================================================
-  // bloom status
+  // bloom daemon status
   // =========================================================================
   cli
-    .command("status", "Show daemon status", {
+    .command("daemon status", "Show daemon status", {
       flags: {
         json: {
           description: "Output as JSON",
@@ -143,7 +143,7 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
       },
       help: { group: "system" },
     })
-    .on("status", async (ctx) => {
+    .on("daemon status", async (ctx) => {
       const { json: jsonOutput } = ctx.flags;
 
       const client = await connectToDaemon();
@@ -152,7 +152,7 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
           console.log(JSON.stringify({ running: false }));
         } else {
           console.log(`${chalk.dim("Daemon:")} ${chalk.red("not running")}`);
-          console.log(`  Start with: ${chalk.cyan("bloom start")}`);
+          console.log(`  Start with: ${chalk.cyan("bloom daemon start")}`);
         }
         return;
       }

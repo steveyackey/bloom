@@ -12,7 +12,7 @@ export function renderDashboardHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bloom Dashboard</title>
+  <title>Bloom Queue</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -27,7 +27,7 @@ export function renderDashboardHTML(): string {
             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
             <circle cx="12" cy="12" r="4" fill="currentColor"/>
           </svg>
-          <span class="logo-text">bloom dashboard</span>
+          <span class="logo-text">bloom queue</span>
         </div>
       </div>
       <div class="header-center">
@@ -948,7 +948,7 @@ function renderOverview() {
         '</svg>' +
         '<p style="font-size: 15px; font-weight: 500; color: var(--text-secondary);">Daemon not running</p>' +
         '<p>Start the daemon to see task queue status.</p>' +
-        '<p>Run <code>bloom start</code> to begin.</p>' +
+        '<p>Run <code>bloom daemon start</code> to begin.</p>' +
       '</div>';
     return;
   }

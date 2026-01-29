@@ -61,8 +61,8 @@ CLI commands are organized by top-level command name in `src/cli/`. Each file is
 | `questions.ts` | `questions` (alias: `qs`), `questions-dashboard` (alias: `qd`), `ask`, `answer`, `wait-answer`, `clear-answered` | `--all/-a`, `--task/-t`, `--type`, `--choices/-c`, `--on-yes`, `--on-no`, `--add-note` |
 | `refine.ts` | `refine` | `--agent/-a` |
 | `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
-| `daemon.ts` | `start`, `stop`, `status` | `--foreground`, `--maxAgents`, `--maxPerWorkspace`, `--force`, `--timeout`, `--json` |
-| `dashboard.ts` | `dashboard` (alias: `dash`) | `--port`, `--open` |
+| `daemon.ts` | `daemon start`, `daemon stop`, `daemon status` | `--foreground`, `--maxAgents`, `--maxPerWorkspace`, `--force`, `--timeout`, `--json` |
+| `dashboard.ts` | `queue` (alias: `q`) | `--port`, `--open` |
 | `inbox.ts` | `inbox [instruction...]` | `--repo/-r`, `--priority/-p`, `--agent/-a` |
 | `research.ts` | `research [question...]` | `--output/-o`, `--agent/-a`, `--follow` |
 | `run.ts` | `run` | `--agent/-a`, `--noDaemon`, `--follow` |
@@ -107,8 +107,8 @@ Key files:
 - `src/daemon/` - Daemon core (server, client, queue, pool, scheduler, protocol, state)
 - `src/daemon/dashboard/` - Web dashboard (server, UI) for daemon task queue monitoring
 - `src/daemon/entry.ts` - Background process entry point
-- `src/cli/daemon.ts` - `bloom start`, `bloom stop`, `bloom status`
-- `src/cli/dashboard.ts` - `bloom dashboard` (web UI for daemon queue)
+- `src/cli/daemon.ts` - `bloom daemon start`, `bloom daemon stop`, `bloom daemon status`
+- `src/cli/dashboard.ts` - `bloom queue` (web UI for daemon queue)
 - `src/cli/inbox.ts` - `bloom inbox` (quick ad-hoc tasks)
 - `src/cli/research.ts` - `bloom research` (read-only investigation)
 

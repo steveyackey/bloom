@@ -60,14 +60,14 @@ All platform-specific code is centralized in `src/daemon/platform.ts`.
 
 ## CLI Commands
 
-### `bloom start`
+### `bloom daemon start`
 
 Starts the daemon process.
 
 ```
-bloom start                    # Start in background (default)
-bloom start --foreground       # Run in foreground (for debugging)
-bloom start --max-agents 4     # Override max concurrent agents
+bloom daemon start                    # Start in background (default)
+bloom daemon start --foreground       # Run in foreground (for debugging)
+bloom daemon start --max-agents 4     # Override max concurrent agents
 ```
 
 **Behavior:**
@@ -76,14 +76,14 @@ bloom start --max-agents 4     # Override max concurrent agents
 - Forks to background, writes PID file, opens socket
 - Prints: "Daemon started (pid: 12345)"
 
-### `bloom stop`
+### `bloom daemon stop`
 
 Stops the daemon process.
 
 ```
-bloom stop                     # Graceful shutdown (wait for active tasks)
-bloom stop --force             # Immediate shutdown (SIGKILL)
-bloom stop --timeout 60        # Custom grace period (seconds, default: 300)
+bloom daemon stop                     # Graceful shutdown (wait for active tasks)
+bloom daemon stop --force             # Immediate shutdown (SIGKILL)
+bloom daemon stop --timeout 60        # Custom grace period (seconds, default: 300)
 ```
 
 **Behavior:**
@@ -93,14 +93,14 @@ bloom stop --timeout 60        # Custom grace period (seconds, default: 300)
 - Persists queue state, removes PID file and socket
 - If `--force`, sends SIGKILL immediately
 
-### `bloom status`
+### `bloom daemon status`
 
 Shows daemon status and activity.
 
 ```
-bloom status                   # Overview
-bloom status --json            # Machine-readable output
-bloom status --watch           # Live updating (like htop)
+bloom daemon status                   # Overview
+bloom daemon status --json            # Machine-readable output
+bloom daemon status --watch           # Live updating (like htop)
 ```
 
 **Output:**
@@ -206,15 +206,16 @@ Research question: {instruction}
 Report your findings clearly and concisely.
 ```
 
-### `bloom dashboard`
+### `bloom queue`
 
 Web dashboard for monitoring daemon task queue status. Uses the same design
 aesthetic as `bloom view` (dark industrial palette, Outfit + JetBrains Mono fonts).
 
 ```
-bloom dashboard                # Open dashboard (port 3100)
-bloom dashboard --port 8080    # Custom port
-bloom dashboard --no-open      # Don't auto-open browser
+bloom queue                    # Open queue viewer (port 3100)
+bloom queue --port 8080        # Custom port
+bloom queue --no-open          # Don't auto-open browser
+bloom q                        # Short alias
 ```
 
 **Features:**
@@ -410,7 +411,7 @@ src/
 │       └── ui.ts              # Inline HTML/CSS/JS dashboard UI
 ├── cli/
 │   ├── daemon.ts              # bloom start / stop / status commands
-│   ├── dashboard.ts           # bloom dashboard command
+│   ├── dashboard.ts           # bloom queue command (web UI for queue)
 │   ├── inbox.ts               # bloom inbox command
 │   └── research.ts            # bloom research command
 ```

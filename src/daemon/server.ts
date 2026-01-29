@@ -108,19 +108,17 @@ async function handleRequest(request: JsonRpcRequest, socket: Socket): Promise<v
             pending: counts.queued,
             active: counts.active,
             completedToday: state.stats.totalCompleted,
-            entries: getEntries(state)
-              .filter((e) => e.status === "queued" || e.status === "active")
-              .map((e) => ({
-                id: e.id,
-                source: e.source,
-                workspace: e.workspace,
-                taskId: e.taskRef?.taskId,
-                instruction: e.inlineTask?.instruction,
-                priority: e.priority,
-                status: e.status,
-                enqueuedAt: e.enqueuedAt,
-                startedAt: e.startedAt,
-              })),
+            entries: getEntries(state).map((e) => ({
+              id: e.id,
+              source: e.source,
+              workspace: e.workspace,
+              taskId: e.taskRef?.taskId,
+              instruction: e.inlineTask?.instruction,
+              priority: e.priority,
+              status: e.status,
+              enqueuedAt: e.enqueuedAt,
+              startedAt: e.startedAt,
+            })),
           },
         };
         socket.write(encode(createResponse(request.id, result)));
