@@ -16,10 +16,6 @@ const logPath = getLogPath();
 writeFileSync(logPath, `[${new Date().toISOString()}] Daemon starting...\n`);
 
 // Override console methods to write to log file
-const originalLog = console.log;
-const originalError = console.error;
-const originalWarn = console.warn;
-
 function writeToLog(prefix: string, args: unknown[]): void {
   const timestamp = new Date().toISOString();
   const message = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
