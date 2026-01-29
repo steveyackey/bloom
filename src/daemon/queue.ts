@@ -2,10 +2,10 @@
 // Daemon Task Queue
 // =============================================================================
 // Global priority queue for tasks across all workspaces.
-// Persists to disk on every mutation.
+// Uses JSONL Write-Ahead Log for O(1) persistence operations.
 
 import type { DaemonState } from "./state";
-import { saveState } from "./state";
+import { walEnqueue, walUpdate } from "./state";
 
 // =============================================================================
 // Types
@@ -78,6 +78,7 @@ export function parsePriority(input?: string): number {
 
 /**
  * Add an entry to the queue. Returns the entry ID.
+ * Uses O(1) WAL append instead of full state rewrite.
  */
 export async function enqueue(
   state: DaemonState,
@@ -91,9 +92,8 @@ export async function enqueue(
     status: "queued",
   };
 
-  state.queue.push(fullEntry);
-  state.stats.totalEnqueued++;
-  await saveState(state);
+  // O(1) WAL append
+  walEnqueue(state, fullEntry);
   return id;
 }
 
@@ -105,9 +105,13 @@ export async function dequeue(state: DaemonState, entryId: string): Promise<bool
   const entry = state.queue.find((e) => e.id === entryId);
   if (!entry || entry.status !== "queued") return false;
 
-  entry.status = "cancelled";
-  entry.completedAt = new Date().toISOString();
-  await saveState(state);
+  const changes = {
+    status: "cancelled" as const,
+    completedAt: new Date().toISOString(),
+  };
+
+  // O(1) WAL update
+  walUpdate(state, entryId, changes);
   return true;
 }
 
@@ -146,10 +150,14 @@ export async function markActive(state: DaemonState, entryId: string, slotId: nu
   const entry = state.queue.find((e) => e.id === entryId);
   if (!entry) return;
 
-  entry.status = "active";
-  entry.startedAt = new Date().toISOString();
-  entry.assignedSlot = slotId;
-  await saveState(state);
+  const changes = {
+    status: "active" as const,
+    startedAt: new Date().toISOString(),
+    assignedSlot: slotId,
+  };
+
+  // O(1) WAL update
+  walUpdate(state, entryId, changes);
 }
 
 /**
@@ -159,12 +167,15 @@ export async function markDone(state: DaemonState, entryId: string, result?: str
   const entry = state.queue.find((e) => e.id === entryId);
   if (!entry) return;
 
-  entry.status = "done";
-  entry.completedAt = new Date().toISOString();
-  entry.assignedSlot = undefined;
-  entry.result = result;
-  state.stats.totalCompleted++;
-  await saveState(state);
+  const changes = {
+    status: "done" as const,
+    completedAt: new Date().toISOString(),
+    assignedSlot: undefined,
+    result,
+  };
+
+  // O(1) WAL update with stats increment
+  walUpdate(state, entryId, changes, "completed");
 }
 
 /**
@@ -174,12 +185,15 @@ export async function markFailed(state: DaemonState, entryId: string, error: str
   const entry = state.queue.find((e) => e.id === entryId);
   if (!entry) return;
 
-  entry.status = "failed";
-  entry.completedAt = new Date().toISOString();
-  entry.assignedSlot = undefined;
-  entry.error = error;
-  state.stats.totalFailed++;
-  await saveState(state);
+  const changes = {
+    status: "failed" as const,
+    completedAt: new Date().toISOString(),
+    assignedSlot: undefined,
+    error,
+  };
+
+  // O(1) WAL update with stats increment
+  walUpdate(state, entryId, changes, "failed");
 }
 
 /**

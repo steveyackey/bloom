@@ -1,13 +1,15 @@
 // =============================================================================
 // Daemon State Persistence
 // =============================================================================
-// Persists queue state to ~/.bloom/daemon/state.json so tasks survive restarts.
+// Persists queue state using JSONL Write-Ahead Log for high-throughput operations.
+// Provides O(1) appends instead of O(n) full-file rewrites.
 
-import { existsSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { getBloomHome } from "../infra/config";
 import { getIpcPath, ipcPathNeedsCleanup, isProcessRunning } from "./platform";
 import type { QueueEntry } from "./queue";
+import { StateWal } from "./state-wal";
 
 // =============================================================================
 // Paths
@@ -18,7 +20,7 @@ export function getDaemonDir(): string {
 }
 
 export function getStatePath(): string {
-  return join(getDaemonDir(), "state.json");
+  return join(getDaemonDir(), "state.jsonl");
 }
 
 export function getPidPath(): string {
@@ -34,7 +36,7 @@ export function getLogPath(): string {
 }
 
 // =============================================================================
-// State Schema
+// State Schema (for compatibility)
 // =============================================================================
 
 export interface DaemonState {
@@ -47,20 +49,11 @@ export interface DaemonState {
     startedAt: string;
     lastActivity?: string;
   };
+  /** Internal: WAL instance for persistence */
+  _wal?: StateWal;
 }
 
-function createEmptyState(): DaemonState {
-  return {
-    version: 1,
-    queue: [],
-    stats: {
-      totalEnqueued: 0,
-      totalCompleted: 0,
-      totalFailed: 0,
-      startedAt: new Date().toISOString(),
-    },
-  };
-}
+// Note: createEmptyState was removed - WAL handles state initialization now
 
 // =============================================================================
 // State I/O
@@ -74,53 +67,109 @@ export function ensureDaemonDir(): void {
 }
 
 /**
- * Load persisted state. Returns empty state if file doesn't exist.
+ * Load persisted state from WAL. Returns empty state if no WAL exists.
  * On load, active tasks are reset to queued (agent died with daemon).
  */
 export async function loadState(): Promise<DaemonState> {
-  const path = getStatePath();
-  if (!existsSync(path)) {
-    return createEmptyState();
-  }
+  const daemonDir = getDaemonDir();
+  ensureDaemonDir();
 
-  try {
-    const content = await Bun.file(path).text();
-    const state = JSON.parse(content) as DaemonState;
+  const wal = new StateWal(daemonDir);
+  await wal.load(daemonDir);
 
-    // Reset active tasks to queued (daemon restarted, agents are gone)
-    for (const entry of state.queue) {
-      if (entry.status === "active") {
-        entry.status = "queued";
-        entry.assignedSlot = undefined;
-        entry.startedAt = undefined;
-      }
-    }
+  // Create state object with WAL reference
+  const stats = wal.getStats();
+  const state: DaemonState = {
+    version: 1,
+    queue: wal.getAll(),
+    stats,
+    _wal: wal,
+  };
 
-    // Remove completed/failed/cancelled entries older than 24h
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    state.queue = state.queue.filter((entry) => {
-      if (entry.status === "queued" || entry.status === "active") return true;
-      const completedAt = entry.completedAt ? new Date(entry.completedAt).getTime() : 0;
-      return completedAt > cutoff;
-    });
+  return state;
+}
 
-    return state;
-  } catch {
-    return createEmptyState();
+/**
+ * Persist state changes. With WAL, this is a no-op as changes are
+ * written incrementally via walEnqueue/walUpdate.
+ * Kept for backward compatibility during transition.
+ * @deprecated Use walEnqueue/walUpdate instead
+ */
+export async function saveState(_state: DaemonState): Promise<void> {
+  // No-op: WAL handles persistence incrementally
+  // This function is kept for backward compatibility with existing code
+  // that may call saveState() directly.
+
+  // If WAL exists, just ensure it's flushed
+  if (_state._wal) {
+    await _state._wal.flush();
   }
 }
 
 /**
- * Persist state to disk. Uses atomic write (temp file + rename).
+ * Add an entry to the WAL (O(1) append).
  */
-export async function saveState(state: DaemonState): Promise<void> {
-  ensureDaemonDir();
-  const path = getStatePath();
-  const tmpPath = `${path}.tmp`;
+export function walEnqueue(state: DaemonState, entry: QueueEntry): void {
+  if (state._wal) {
+    state._wal.enqueue(entry);
+  }
+  // Also update in-memory queue
+  state.queue.push(entry);
+  state.stats.totalEnqueued++;
+}
 
-  state.stats.lastActivity = new Date().toISOString();
-  await Bun.write(tmpPath, JSON.stringify(state, null, 2));
-  renameSync(tmpPath, path);
+/**
+ * Update an entry in the WAL (O(1) append).
+ */
+export function walUpdate(
+  state: DaemonState,
+  id: string,
+  changes: Partial<QueueEntry>,
+  statsIncrement?: "completed" | "failed"
+): void {
+  if (state._wal) {
+    state._wal.update(id, changes, statsIncrement);
+  }
+
+  // Also update in-memory
+  const entry = state.queue.find((e) => e.id === id);
+  if (entry) {
+    Object.assign(entry, changes);
+    if (statsIncrement === "completed") {
+      state.stats.totalCompleted++;
+    } else if (statsIncrement === "failed") {
+      state.stats.totalFailed++;
+    }
+  }
+}
+
+/**
+ * Flush WAL to disk (ensure all writes are persisted).
+ */
+export async function flushState(state: DaemonState): Promise<void> {
+  if (state._wal) {
+    await state._wal.flush();
+  }
+}
+
+/**
+ * Compact WAL if needed (remove old completed entries).
+ */
+export async function compactState(state: DaemonState): Promise<void> {
+  if (state._wal?.needsCompaction()) {
+    await state._wal.compact();
+    // Update in-memory queue after compaction
+    state.queue = state._wal.getAll();
+  }
+}
+
+/**
+ * Close the WAL (flush and cleanup).
+ */
+export async function closeState(state: DaemonState): Promise<void> {
+  if (state._wal) {
+    await state._wal.close();
+  }
 }
 
 // =============================================================================
