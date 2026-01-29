@@ -11,6 +11,17 @@ We use release-please with this config:
 
 Always update README.md when adding new commands, changing CLI behavior, or modifying project structure.
 
+## Cross-Platform Requirements
+
+Everything MUST work on Linux, macOS, and Windows without requiring sudo/admin privileges. All daemon, IPC, and process management code uses platform abstractions from `src/daemon/platform.ts`:
+
+- **IPC**: Unix domain sockets on Linux/macOS, named pipes (`\\.\pipe\bloom-daemon`) on Windows
+- **Process liveness**: `kill(pid, 0)` on Unix, `tasklist` on Windows
+- **Signals**: SIGTERM+SIGINT on Unix, SIGINT+SIGHUP on Windows
+- **Paths**: `~/.bloom/` on all platforms (via `$HOME` or `%USERPROFILE%`); use `node:path.join()` not string concatenation with `/`
+
+No privileged ports, no system-level services, no root/admin required.
+
 ## Documentation & Website Maintenance
 
 When making changes to bloom:
@@ -50,7 +61,11 @@ CLI commands are organized by top-level command name in `src/cli/`. Each file is
 | `questions.ts` | `questions` (alias: `qs`), `questions-dashboard` (alias: `qd`), `ask`, `answer`, `wait-answer`, `clear-answered` | `--all/-a`, `--task/-t`, `--type`, `--choices/-c`, `--on-yes`, `--on-no`, `--add-note` |
 | `refine.ts` | `refine` | `--agent/-a` |
 | `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
-| `run.ts` | `run` | `--agent/-a` |
+| `daemon.ts` | `daemon start`, `daemon stop`, `daemon status` | `--foreground`, `--maxAgents`, `--maxPerWorkspace`, `--force`, `--timeout`, `--json` |
+| `dashboard.ts` | `queue` (alias: `q`) | `--port`, `--open` |
+| `inbox.ts` | `inbox [instruction...]` | `--repo/-r`, `--priority/-p`, `--agent/-a` |
+| `research.ts` | `research [question...]` | `--output/-o`, `--agent/-a`, `--follow` |
+| `run.ts` | `run` | `--agent/-a`, `--noDaemon`, `--follow` |
 | `setup.ts` | `setup` | |
 | `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset`, `step done`, `step start`, `step show`, `step list` | `--stuck/-s` |
 | `update.ts` | `update` | |
@@ -83,6 +98,25 @@ Key files for agent management:
 - `docs/docs/agents/` - Agent documentation pages
 
 When changing agent support, update ADDING_NEW_AGENTS.md if the process changes.
+
+## Daemon Mode
+
+Bloom supports a machine-wide daemon mode (disabled by default). One daemon per machine, manages a global task queue across multiple workspaces.
+
+Key files:
+- `src/daemon/` - Daemon core (server, client, queue, pool, scheduler, protocol, state)
+- `src/daemon/dashboard/` - Web dashboard (server, UI) for daemon task queue monitoring
+- `src/daemon/entry.ts` - Background process entry point
+- `src/cli/daemon.ts` - `bloom daemon start`, `bloom daemon stop`, `bloom daemon status`
+- `src/cli/dashboard.ts` - `bloom queue` (web UI for daemon queue)
+- `src/cli/inbox.ts` - `bloom inbox` (quick ad-hoc tasks)
+- `src/cli/research.ts` - `bloom research` (read-only investigation)
+
+Design doc: `docs/design/DAEMON_MODE.md`
+
+IPC: JSON-RPC 2.0 over Unix domain socket (`~/.bloom/daemon/daemon.sock`).
+State: `~/.bloom/daemon/state.json` (queue persistence across restarts).
+Config: `daemon` section in `~/.bloom/config.yaml`.
 
 ## Logging Standards
 
