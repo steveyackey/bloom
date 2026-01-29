@@ -103,7 +103,7 @@ export function registerResearchCommand(cli: ReturnType<typeof Clerc.create>): v
           // Wait indefinitely (event handlers will exit)
           await new Promise(() => {});
         } else {
-          console.log(`  ${chalk.dim("Check progress:")} ${chalk.cyan("bloom status")}`);
+          console.log(`  ${chalk.dim("Check progress:")} ${chalk.cyan("bloom daemon status")}`);
           client.disconnect();
         }
       } catch (err) {

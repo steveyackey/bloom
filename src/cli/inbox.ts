@@ -83,7 +83,7 @@ export function registerInboxCommand(cli: ReturnType<typeof Clerc.create>): void
         console.log(`${chalk.green("Task queued")} [${chalk.dim(result.entryId.slice(0, 8))}]`);
         console.log(`  ${chalk.dim("Instruction:")} ${instruction}`);
         if (repo) console.log(`  ${chalk.dim("Repo:")} ${repo}`);
-        console.log(`  ${chalk.dim("Check progress:")} ${chalk.cyan("bloom status")}`);
+        console.log(`  ${chalk.dim("Check progress:")} ${chalk.cyan("bloom daemon status")}`);
       } catch (err) {
         console.error(`${chalk.red("Error submitting task:")} ${err}`);
         process.exit(1);

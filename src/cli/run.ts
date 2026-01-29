@@ -74,7 +74,7 @@ export function registerRunCommand(cli: Clerc): Clerc {
                 });
                 await new Promise(() => {});
               } else {
-                console.log(`  ${chalk.dim("Check progress:")} ${chalk.cyan("bloom status")}`);
+                console.log(`  ${chalk.dim("Check progress:")} ${chalk.cyan("bloom daemon status")}`);
                 client.disconnect();
               }
               return;
