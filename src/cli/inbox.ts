@@ -50,7 +50,7 @@ export function registerInboxCommand(cli: ReturnType<typeof Clerc.create>): void
       // Connect to daemon
       const client = await connectToDaemon();
       if (!client) {
-        console.error(`${chalk.red("Daemon is not running.")} Start it with: ${chalk.cyan("bloom start")}`);
+        console.error(`${chalk.red("Daemon is not running.")} Start it with: ${chalk.cyan("bloom daemon start")}`);
         process.exit(1);
       }
 

@@ -52,9 +52,9 @@ All platform-specific code is centralized in `src/daemon/platform.ts`.
 | `state.json` | Persisted queue state (survives restarts) |
 
 **Lifecycle:**
-1. `bloom start` forks daemon to background (or `--foreground` for debugging)
+1. `bloom daemon start` forks daemon to background (or `--foreground` for debugging)
 2. Daemon creates PID file, opens socket, loads persisted state
-3. Runs until `bloom stop` or SIGTERM (Unix) / SIGHUP (Windows)
+3. Runs until `bloom daemon stop` or SIGTERM (Unix) / SIGHUP (Windows)
 4. Graceful shutdown: finishes active tasks (with configurable timeout), persists state
 5. No sudo/admin privileges required on any platform
 
@@ -410,7 +410,7 @@ src/
 │       ├── server.ts          # Dashboard HTTP server (Bun.serve)
 │       └── ui.ts              # Inline HTML/CSS/JS dashboard UI
 ├── cli/
-│   ├── daemon.ts              # bloom start / stop / status commands
+│   ├── daemon.ts              # bloom daemon start/stop/status commands
 │   ├── dashboard.ts           # bloom queue command (web UI for queue)
 │   ├── inbox.ts               # bloom inbox command
 │   └── research.ts            # bloom research command
@@ -483,7 +483,7 @@ src/
 
 | Scenario | Behavior |
 |----------|----------|
-| Daemon crashes | PID file becomes stale; next `bloom start` cleans up |
+| Daemon crashes | PID file becomes stale; next `bloom daemon start` cleans up |
 | Agent crashes | Slot released, task reset to `queued`, retry with backoff |
 | Socket connection lost | CLI reconnects (3 retries, then falls back to foreground) |
 | Workspace deleted | Tasks for that workspace marked `cancelled` |

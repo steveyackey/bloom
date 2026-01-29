@@ -2,6 +2,7 @@
 // CLI: bloom daemon start / bloom daemon stop / bloom daemon status
 // =============================================================================
 
+import { spawn } from "node:child_process";
 import { join } from "node:path";
 import chalk from "chalk";
 import type { Clerc } from "clerc";
@@ -65,10 +66,19 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
         if (maxPerWorkspace) extraArgs.push("--max-per-workspace", String(maxPerWorkspace));
 
         const spawnArgs = buildDaemonSpawnArgs(daemonEntry, extraArgs);
-        const proc = Bun.spawn(spawnArgs.command, {
+
+        // Use Node's spawn with detached:true to properly daemonize
+        // Bun.spawn doesn't support detached mode, causing the child to receive
+        // signals when the parent exits
+        const [cmd, ...args] = spawnArgs.command;
+        const proc = spawn(cmd, args, {
+          detached: true,
           stdio: ["ignore", "ignore", "ignore"],
-          env: spawnArgs.env,
+          env: spawnArgs.env as NodeJS.ProcessEnv,
         });
+
+        // Detach immediately so parent can exit cleanly
+        proc.unref();
 
         // Give daemon a moment to start
         await Bun.sleep(1000);
@@ -81,9 +91,6 @@ export function registerDaemonCommands(cli: ReturnType<typeof Clerc.create>): vo
           console.log(`${chalk.red("Failed to start daemon")}. Check ${join(getDaemonDir(), "daemon.log")}`);
           process.exit(1);
         }
-
-        // Detach from child
-        proc.unref();
       }
     });
 
