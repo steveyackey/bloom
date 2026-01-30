@@ -12,7 +12,10 @@
     "lint": "bun --filter @bloom/cli lint",
     "fix": "bun --filter @bloom/cli fix",
     "typecheck": "bun --filter @bloom/cli typecheck",
-    "validate": "bun --filter @bloom/cli validate",
+    "validate": "bun run validate:cli && bun run validate:web && bun run validate:docs",
+    "validate:cli": "bun --filter @bloom/cli validate",
+    "validate:web": "bun --filter @bloom/web validate",
+    "validate:docs": "bun --filter @bloom/docs validate",
     "prepare": "bun scripts/install-hooks.ts"
   },
   "version": "0.3.10"
