@@ -1256,3 +1256,221 @@ export async function waitForMergeLock(
     await Bun.sleep(pollInterval);
   }
 }
+
+// =============================================================================
+// Reset Command - Remove all non-default worktrees and branches
+// =============================================================================
+
+export interface ResetPreview {
+  success: boolean;
+  defaultBranch: string;
+  worktreesToRemove: Array<{ branch: string; path: string; hasUncommittedChanges?: boolean }>;
+  branchesToDelete: string[];
+  remoteBranchesToDelete: string[];
+  error?: string;
+}
+
+export interface ResetResult {
+  success: boolean;
+  defaultBranch: string;
+  worktreesRemoved: string[];
+  branchesDeleted: string[];
+  remoteBranchesDeleted: string[];
+  failed: Array<{ item: string; error: string }>;
+  error?: string;
+}
+
+/**
+ * Reset a repository to a clean state by removing all worktrees and branches
+ * except the default branch.
+ *
+ * @param repoName - Name of the repository to reset
+ * @param options.dryRun - If true, only preview what would be removed
+ * @param options.deleteRemote - If true, also delete remote branches (default: true)
+ * @returns Preview or result of the reset operation
+ */
+export async function resetRepo(
+  repoName: string,
+  options?: { dryRun?: boolean; bloomDir?: string; deleteRemote?: boolean }
+): Promise<ResetPreview & ResetResult> {
+  // Allow bloomDir override for testing, otherwise use BLOOM_DIR from context
+  const { dryRun = false, deleteRemote = true } = options || {};
+
+  // Import BLOOM_DIR dynamically to avoid circular dependency
+  const { BLOOM_DIR } = await import("../commands/context");
+  const bloomDir = options?.bloomDir || BLOOM_DIR;
+
+  // Load repo config to get default branch
+  const reposFile = await loadReposFile(bloomDir);
+  const repo = reposFile.repos.find((r) => r.name === repoName);
+
+  if (!repo) {
+    return {
+      success: false,
+      defaultBranch: "",
+      worktreesToRemove: [],
+      branchesToDelete: [],
+      remoteBranchesToDelete: [],
+      worktreesRemoved: [],
+      branchesDeleted: [],
+      remoteBranchesDeleted: [],
+      failed: [],
+      error: `Repository '${repoName}' not found in config`,
+    };
+  }
+
+  const bareRepoPath = getBareRepoPath(bloomDir, repoName);
+  if (!existsSync(bareRepoPath)) {
+    return {
+      success: false,
+      defaultBranch: repo.defaultBranch,
+      worktreesToRemove: [],
+      branchesToDelete: [],
+      remoteBranchesToDelete: [],
+      worktreesRemoved: [],
+      branchesDeleted: [],
+      remoteBranchesDeleted: [],
+      failed: [],
+      error: `Bare repository not found at ${bareRepoPath}`,
+    };
+  }
+
+  const defaultBranch = repo.defaultBranch;
+
+  // Get all worktrees
+  const worktrees = await listWorktrees(bloomDir, repoName);
+
+  // Find worktrees to remove (all except default branch)
+  const worktreesToRemove = worktrees.filter((wt) => wt.branch !== defaultBranch);
+
+  // Check for uncommitted changes in worktrees
+  const worktreesWithStatus = worktreesToRemove.map((wt) => {
+    const status = getWorktreeStatus(wt.path);
+    return {
+      branch: wt.branch,
+      path: wt.path,
+      hasUncommittedChanges: status.hasUncommittedChanges || status.hasUntrackedFiles,
+    };
+  });
+
+  // Get all local branches
+  const branchListResult = runGit(["branch", "--list"], bareRepoPath);
+  const allBranches = branchListResult.success
+    ? branchListResult.output
+        .split("\n")
+        .map((line) => line.trim().replace(/^[*+] /, ""))
+        .filter((branch) => branch.length > 0)
+    : [];
+
+  // Find branches to delete (all except default branch)
+  // We only want branches that don't have a worktree (worktrees are removed separately)
+  const worktreeBranches = new Set(worktrees.map((wt) => wt.branch));
+  const branchesToDelete = allBranches.filter((branch) => branch !== defaultBranch && !worktreeBranches.has(branch));
+
+  // Also include branches that have worktrees to be removed
+  const worktreeBranchesToDelete = worktreesToRemove.map((wt) => wt.branch);
+  const allBranchesToDelete = [...branchesToDelete, ...worktreeBranchesToDelete];
+
+  // Get remote branches to delete (only branches that exist on remote and are not the default)
+  const remoteBranchesToDelete: string[] = [];
+  if (deleteRemote) {
+    for (const branch of allBranchesToDelete) {
+      const exists = branchExists(bareRepoPath, branch);
+      if (exists.remote) {
+        remoteBranchesToDelete.push(branch);
+      }
+    }
+  }
+
+  // If dry-run, return preview
+  if (dryRun) {
+    return {
+      success: true,
+      defaultBranch,
+      worktreesToRemove: worktreesWithStatus,
+      branchesToDelete: allBranchesToDelete,
+      remoteBranchesToDelete,
+      worktreesRemoved: [],
+      branchesDeleted: [],
+      remoteBranchesDeleted: [],
+      failed: [],
+    };
+  }
+
+  // Perform the actual reset
+  const worktreesRemoved: string[] = [];
+  const branchesDeleted: string[] = [];
+  const remoteBranchesDeleted: string[] = [];
+  const failed: Array<{ item: string; error: string }> = [];
+
+  // Remove worktrees first (force removal even with uncommitted changes)
+  for (const wt of worktreesToRemove) {
+    // Check worktree status for better error messages
+    const status = getWorktreeStatus(wt.path);
+
+    // Try normal removal first
+    const result = await removeWorktree(bloomDir, repoName, wt.branch);
+
+    if (!result.success) {
+      // Provide more helpful error messages based on the issue
+      let errorMsg = result.error || "Unknown error";
+
+      if (status.hasUncommittedChanges || status.hasUntrackedFiles) {
+        // The worktree has uncommitted changes - force removal already tried in removeWorktree
+        errorMsg = `Worktree has uncommitted changes (${status.modifiedFiles.length} modified, ${status.untrackedFiles.length} untracked). Force removal failed: ${errorMsg}`;
+      } else if (errorMsg.includes("locked")) {
+        errorMsg =
+          "Worktree is locked. Run 'git worktree unlock' manually or remove the .git/worktrees/<branch>/locked file.";
+      }
+
+      failed.push({ item: `worktree:${wt.branch}`, error: errorMsg });
+    } else {
+      worktreesRemoved.push(wt.branch);
+    }
+  }
+
+  // Delete local branches (including those whose worktrees were just removed)
+  for (const branch of allBranchesToDelete) {
+    // Skip if worktree removal failed (branch still has worktree)
+    if (failed.some((f) => f.item === `worktree:${branch}`)) {
+      continue;
+    }
+
+    const result = deleteLocalBranch(bareRepoPath, branch, { force: true });
+    if (result.success) {
+      branchesDeleted.push(branch);
+    } else {
+      failed.push({ item: `branch:${branch}`, error: result.error || "Unknown error" });
+    }
+  }
+
+  // Delete remote branches
+  if (deleteRemote) {
+    for (const branch of remoteBranchesToDelete) {
+      // Only try to delete remote if local deletion succeeded
+      if (!branchesDeleted.includes(branch)) {
+        continue;
+      }
+
+      const result = deleteRemoteBranch(bareRepoPath, branch);
+      if (result.success) {
+        remoteBranchesDeleted.push(branch);
+      } else {
+        // Remote deletion failures are less critical - add to failed but don't stop
+        failed.push({ item: `remote:${branch}`, error: result.error || "Unknown error" });
+      }
+    }
+  }
+
+  return {
+    success: true,
+    defaultBranch,
+    worktreesToRemove: worktreesWithStatus,
+    branchesToDelete: allBranchesToDelete,
+    remoteBranchesToDelete,
+    worktreesRemoved,
+    branchesDeleted,
+    remoteBranchesDeleted,
+    failed,
+  };
+}
