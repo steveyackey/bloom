@@ -1,0 +1,6 @@
+{
+  "name": "@bloom/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bloom CLI - Multi-agent task orchestrator"
+}

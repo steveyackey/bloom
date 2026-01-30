@@ -2,6 +2,9 @@
   "name": "bloom",
   "private": true,
   "description": "Multi-agent task orchestrator with YAML-based task management",
+  "workspaces": [
+    "apps/*"
+  ],
   "bin": {
     "bloom": "./src/cli.ts"
   },
