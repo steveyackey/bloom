@@ -1256,3 +1256,154 @@ export async function waitForMergeLock(
     await Bun.sleep(pollInterval);
   }
 }
+
+// =============================================================================
+// Reset Command - Remove all non-default worktrees and branches
+// =============================================================================
+
+export interface ResetPreview {
+  success: boolean;
+  defaultBranch: string;
+  worktreesToRemove: Array<{ branch: string; path: string }>;
+  branchesToDelete: string[];
+  error?: string;
+}
+
+export interface ResetResult {
+  success: boolean;
+  defaultBranch: string;
+  worktreesRemoved: string[];
+  branchesDeleted: string[];
+  failed: Array<{ item: string; error: string }>;
+  error?: string;
+}
+
+/**
+ * Reset a repository to a clean state by removing all worktrees and branches
+ * except the default branch.
+ *
+ * @param repoName - Name of the repository to reset
+ * @param options.dryRun - If true, only preview what would be removed
+ * @returns Preview or result of the reset operation
+ */
+export async function resetRepo(
+  repoName: string,
+  options?: { dryRun?: boolean; bloomDir?: string }
+): Promise<ResetPreview & ResetResult> {
+  // Allow bloomDir override for testing, otherwise use BLOOM_DIR from context
+  const { dryRun = false } = options || {};
+
+  // Import BLOOM_DIR dynamically to avoid circular dependency
+  const { BLOOM_DIR } = await import("../commands/context");
+  const bloomDir = options?.bloomDir || BLOOM_DIR;
+
+  // Load repo config to get default branch
+  const reposFile = await loadReposFile(bloomDir);
+  const repo = reposFile.repos.find((r) => r.name === repoName);
+
+  if (!repo) {
+    return {
+      success: false,
+      defaultBranch: "",
+      worktreesToRemove: [],
+      branchesToDelete: [],
+      worktreesRemoved: [],
+      branchesDeleted: [],
+      failed: [],
+      error: `Repository '${repoName}' not found in config`,
+    };
+  }
+
+  const bareRepoPath = getBareRepoPath(bloomDir, repoName);
+  if (!existsSync(bareRepoPath)) {
+    return {
+      success: false,
+      defaultBranch: repo.defaultBranch,
+      worktreesToRemove: [],
+      branchesToDelete: [],
+      worktreesRemoved: [],
+      branchesDeleted: [],
+      failed: [],
+      error: `Bare repository not found at ${bareRepoPath}`,
+    };
+  }
+
+  const defaultBranch = repo.defaultBranch;
+
+  // Get all worktrees
+  const worktrees = await listWorktrees(bloomDir, repoName);
+
+  // Find worktrees to remove (all except default branch)
+  const worktreesToRemove = worktrees.filter((wt) => wt.branch !== defaultBranch);
+
+  // Get all local branches
+  const branchListResult = runGit(["branch", "--list"], bareRepoPath);
+  const allBranches = branchListResult.success
+    ? branchListResult.output
+        .split("\n")
+        .map((line) => line.trim().replace(/^[*+] /, ""))
+        .filter((branch) => branch.length > 0)
+    : [];
+
+  // Find branches to delete (all except default branch)
+  // We only want branches that don't have a worktree (worktrees are removed separately)
+  const worktreeBranches = new Set(worktrees.map((wt) => wt.branch));
+  const branchesToDelete = allBranches.filter((branch) => branch !== defaultBranch && !worktreeBranches.has(branch));
+
+  // Also include branches that have worktrees to be removed
+  const worktreeBranchesToDelete = worktreesToRemove.map((wt) => wt.branch);
+
+  // If dry-run, return preview
+  if (dryRun) {
+    return {
+      success: true,
+      defaultBranch,
+      worktreesToRemove: worktreesToRemove.map((wt) => ({ branch: wt.branch, path: wt.path })),
+      branchesToDelete: [...branchesToDelete, ...worktreeBranchesToDelete],
+      worktreesRemoved: [],
+      branchesDeleted: [],
+      failed: [],
+    };
+  }
+
+  // Perform the actual reset
+  const worktreesRemoved: string[] = [];
+  const branchesDeleted: string[] = [];
+  const failed: Array<{ item: string; error: string }> = [];
+
+  // Remove worktrees first
+  for (const wt of worktreesToRemove) {
+    const result = await removeWorktree(bloomDir, repoName, wt.branch);
+    if (result.success) {
+      worktreesRemoved.push(wt.branch);
+    } else {
+      failed.push({ item: `worktree:${wt.branch}`, error: result.error || "Unknown error" });
+    }
+  }
+
+  // Delete branches (including those whose worktrees were just removed)
+  const allBranchesToDelete = [...branchesToDelete, ...worktreeBranchesToDelete];
+  for (const branch of allBranchesToDelete) {
+    // Skip if worktree removal failed (branch still has worktree)
+    if (failed.some((f) => f.item === `worktree:${branch}`)) {
+      continue;
+    }
+
+    const result = deleteLocalBranch(bareRepoPath, branch, { force: true });
+    if (result.success) {
+      branchesDeleted.push(branch);
+    } else {
+      failed.push({ item: `branch:${branch}`, error: result.error || "Unknown error" });
+    }
+  }
+
+  return {
+    success: true,
+    defaultBranch,
+    worktreesToRemove: worktreesToRemove.map((wt) => ({ branch: wt.branch, path: wt.path })),
+    branchesToDelete: allBranchesToDelete,
+    worktreesRemoved,
+    branchesDeleted,
+    failed,
+  };
+}

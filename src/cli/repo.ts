@@ -14,6 +14,7 @@ import {
   listWorktrees,
   removeRepo,
   removeWorktree,
+  resetRepo,
   syncRepos,
 } from "../infra/git";
 
@@ -184,6 +185,131 @@ export function registerRepoCommands(cli: Clerc): Clerc {
           console.error(chalk.red(`Failed: ${result.error}`));
           process.exit(1);
         }
+      })
+
+      // =========================================================================
+      // repo reset - Reset repository to clean state
+      // =========================================================================
+      .command("repo reset", "Remove all non-default worktrees and branches", {
+        parameters: [
+          {
+            key: "<repo>",
+            description: "Repository name",
+            completions: {
+              handler: repoNameCompletions,
+            },
+          },
+        ],
+        flags: {
+          "dry-run": {
+            type: Boolean,
+            alias: "n",
+            description: "Preview what will be deleted without making changes",
+          },
+          force: {
+            type: Boolean,
+            alias: "f",
+            description: "Skip confirmation prompt",
+          },
+        },
+        help: { group: "repo" },
+      })
+      .on("repo reset", async (ctx) => {
+        const { repo } = ctx.parameters;
+        const { "dry-run": dryRun, force } = ctx.flags;
+
+        // Get preview of what will be reset
+        const preview = await resetRepo(repo, { dryRun: true });
+
+        if (!preview.success) {
+          console.error(chalk.red(`Failed: ${preview.error}`));
+          process.exit(1);
+        }
+
+        // Check if there's anything to clean up
+        if (preview.worktreesToRemove.length === 0 && preview.branchesToDelete.length === 0) {
+          console.log(chalk.dim(`Repository ${chalk.cyan(repo)} is already clean.`));
+          console.log(chalk.dim(`Only the default branch ${chalk.yellow(preview.defaultBranch)} exists.`));
+          return;
+        }
+
+        // Show what will be deleted
+        console.log(chalk.bold(`\nReset preview for ${chalk.cyan(repo)}:\n`));
+
+        if (preview.worktreesToRemove.length > 0) {
+          console.log(chalk.bold("Worktrees to remove:"));
+          for (const wt of preview.worktreesToRemove) {
+            console.log(`  ${chalk.red("✗")} ${chalk.yellow(wt.branch)} ${chalk.dim(`(${wt.path})`)}`);
+          }
+          console.log();
+        }
+
+        if (preview.branchesToDelete.length > 0) {
+          console.log(chalk.bold("Branches to delete:"));
+          for (const branch of preview.branchesToDelete) {
+            console.log(`  ${chalk.red("✗")} ${chalk.yellow(branch)}`);
+          }
+          console.log();
+        }
+
+        console.log(chalk.bold("Preserved:"));
+        console.log(`  ${chalk.green("✓")} ${chalk.yellow(preview.defaultBranch)} ${chalk.dim("(default branch)")}`);
+        console.log();
+
+        // If dry-run, stop here
+        if (dryRun) {
+          console.log(chalk.dim("Dry-run mode: no changes made."));
+          console.log(chalk.dim(`Run without ${chalk.cyan("-n")} to apply changes.`));
+          return;
+        }
+
+        // Confirm unless --force is set
+        if (!force) {
+          const readline = await import("node:readline");
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const answer = await new Promise<string>((resolve) => {
+            rl.question(chalk.yellow("Proceed with reset? [y/N] "), (ans) => {
+              rl.close();
+              resolve(ans);
+            });
+          });
+
+          if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
+            console.log(chalk.dim("Reset cancelled."));
+            return;
+          }
+        }
+
+        // Perform the actual reset
+        console.log(chalk.dim("\nResetting repository..."));
+        const result = await resetRepo(repo, { dryRun: false });
+
+        if (!result.success) {
+          console.error(chalk.red(`\nFailed: ${result.error}`));
+          process.exit(1);
+        }
+
+        // Report results
+        console.log();
+        if (result.worktreesRemoved.length > 0) {
+          console.log(chalk.green(`Removed ${result.worktreesRemoved.length} worktree(s)`));
+        }
+        if (result.branchesDeleted.length > 0) {
+          console.log(chalk.green(`Deleted ${result.branchesDeleted.length} branch(es)`));
+        }
+        if (result.failed.length > 0) {
+          console.log(chalk.yellow(`\nFailed to remove ${result.failed.length} item(s):`));
+          for (const f of result.failed) {
+            console.log(`  ${chalk.red("✗")} ${f.item}: ${chalk.dim(f.error)}`);
+          }
+        }
+        console.log(
+          chalk.green(`\nRepository ${chalk.cyan(repo)} has been reset to ${chalk.yellow(result.defaultBranch)}.`)
+        );
       })
 
       // =========================================================================

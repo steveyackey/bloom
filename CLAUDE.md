@@ -49,7 +49,7 @@ CLI commands are organized by top-level command name in `src/cli/`. Each file is
 | `prompt.ts` | `prompt compile <agent>` | `--task/-t`, `--prompt/-p` |
 | `questions.ts` | `questions` (alias: `qs`), `questions-dashboard` (alias: `qd`), `ask`, `answer`, `wait-answer`, `clear-answered` | `--all/-a`, `--task/-t`, `--type`, `--choices/-c`, `--on-yes`, `--on-no`, `--add-note` |
 | `refine.ts` | `refine` | `--agent/-a` |
-| `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo worktree add/remove/list` | `--name`, `--create` |
+| `repo.ts` | `repo clone`, `repo create`, `repo list`, `repo sync`, `repo remove`, `repo reset`, `repo worktree add/remove/list` | `--name`, `--create`, `--dry-run/-n`, `--force/-f` |
 | `run.ts` | `run` | `--agent/-a` |
 | `setup.ts` | `setup` | |
 | `task.ts` | `list`, `show`, `dashboard`, `validate`, `next`, `ready`, `start`, `done`, `block`, `todo`, `assign`, `note`, `reset`, `step done`, `step start`, `step show`, `step list` | `--stuck/-s` |
