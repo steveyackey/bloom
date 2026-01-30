@@ -11,17 +11,40 @@ We use release-please with this config:
 
 Always update README.md when adding new commands, changing CLI behavior, or modifying project structure.
 
+## Monorepo Structure
+
+This project uses a Bun workspace monorepo:
+
+```
+bloom/
+├── apps/
+│   ├── cli/          # @bloom/cli - Main CLI application
+│   ├── web/          # @bloom/web - Landing page (use-bloom.dev)
+│   └── docs/         # @bloom/docs - Docusaurus site (docs.use-bloom.dev)
+├── docs/             # Internal documentation (ARCHITECTURE.md, AGENTS.md, etc.)
+├── scripts/          # Build and development scripts
+└── package.json      # Workspace root
+```
+
+**Workspace commands** (from root):
+- `bun run validate` - Validate all apps
+- `bun run validate:cli` - Validate CLI only
+- `bun run validate:web` - Validate web only
+- `bun run validate:docs` - Validate docs only
+- `bun run bloom` - Run CLI commands
+
 ## Documentation & Website Maintenance
 
 When making changes to bloom:
 - **README.md**: Update for any new commands, CLI behavior changes, or project structure modifications
-- **docs/**: Update the Docusaurus documentation site (docs.use-bloom.dev) with detailed guides and API references
-- **web/**: Update the landing page (use-bloom.dev) for any changes to installation instructions or major feature announcements
+- **apps/docs/**: Update the Docusaurus documentation site (docs.use-bloom.dev) with detailed guides and API references
+- **apps/web/**: Update the landing page (use-bloom.dev) for any changes to installation instructions or major feature announcements
+- **docs/**: Internal documentation (architecture, design docs, investigations)
 
 Installation changes must be reflected in:
 1. README.md (quick start)
-2. docs/ (detailed installation guide)
-3. web/ landing page (all platform instructions: macOS, Linux, Windows)
+2. apps/docs/ (detailed installation guide)
+3. apps/web/ landing page (all platform instructions: macOS, Linux, Windows)
 
 ## Key Definitions
 
@@ -34,7 +57,7 @@ Flow: init workspace → clone repos → create project → refine PRD → plan 
 
 ## CLI Commands
 
-CLI commands are organized by top-level command name in `src/cli/`. Each file is named after the command it implements:
+CLI commands are organized by top-level command name in `apps/cli/src/cli/`. Each file is named after the command it implements:
 
 | File | Commands | Flags |
 |------|----------|-------|
@@ -59,12 +82,12 @@ CLI commands are organized by top-level command name in `src/cli/`. Each file is
 **Global flags** (all commands): `--file/-f`, `--logLevel/-l`, `--verbose/-v`, `--quiet/-q`
 
 **Adding a new top-level command:**
-1. Create `src/cli/<command>.ts`
+1. Create `apps/cli/src/cli/<command>.ts`
 2. Export `register<Command>Command(cli: Clerc)`
-3. Add export to `src/cli/index.ts`
-4. Register in `src/cli.ts`
+3. Add export to `apps/cli/src/cli/index.ts`
+4. Register in `apps/cli/src/cli.ts`
 
-Entry point: `src/cli.ts` (Clerc setup + command registration)
+Entry point: `apps/cli/src/cli.ts` (Clerc setup + command registration)
 
 ## TUI Colors
 
@@ -72,38 +95,38 @@ Use `chalk` for all terminal colors. For xterm.js cell rendering, use helper met
 
 ## Agent Providers
 
-When adding or modifying agent providers, refer to `ADDING_NEW_AGENTS.md` for the complete checklist and implementation guide.
+When adding or modifying agent providers, refer to `docs/ADDING_NEW_AGENTS.md` for the complete checklist and implementation guide.
 
 Key files for agent management:
-- `src/agents/` - Provider implementations
-- `src/agents/capabilities.ts` - Agent capabilities registry
-- `src/agents/factory.ts` - Agent creation factory
-- `src/agents/availability.ts` - CLI availability checking
-- `src/user-config.ts` - User configuration schemas
-- `docs/docs/agents/` - Agent documentation pages
+- `apps/cli/src/agents/` - Provider implementations
+- `apps/cli/src/agents/capabilities.ts` - Agent capabilities registry
+- `apps/cli/src/agents/factory.ts` - Agent creation factory
+- `apps/cli/src/agents/availability.ts` - CLI availability checking
+- `apps/cli/src/user-config.ts` - User configuration schemas
+- `apps/docs/docs/agents/` - Agent documentation pages
 
-When changing agent support, update ADDING_NEW_AGENTS.md if the process changes.
+When changing agent support, update docs/ADDING_NEW_AGENTS.md if the process changes.
 
 ## Logging Standards
 
-Based on ARCHITECTURE.md, follow these rules for logging and console output:
+Based on docs/ARCHITECTURE.md, follow these rules for logging and console output:
 
 **Use `console.log/error` for direct user output in:**
-- `src/cli/*.ts` - CLI command handlers showing results to users
-- `src/commands/*.ts` - Command implementations with user-facing output (task lists, status displays, etc.)
+- `apps/cli/src/cli/*.ts` - CLI command handlers showing results to users
+- `apps/cli/src/commands/*.ts` - Command implementations with user-facing output (task lists, status displays, etc.)
 
-**Use the structured logger (`src/infra/logger.ts`) in:**
-- `src/adapters/cli/` - Event handlers converting orchestrator events to output
-- `src/infra/*.ts` - Infrastructure layer (use logger for all status/debug messages)
-- `src/core/*.ts` - Core business logic (emit events, never write to stdout)
-- `src/agents/*.ts` - Agent providers
-- `src/services/*.ts` - Service layer (return data to callers, don't print directly)
+**Use the structured logger (`apps/cli/src/infra/logger.ts`) in:**
+- `apps/cli/src/adapters/cli/` - Event handlers converting orchestrator events to output
+- `apps/cli/src/infra/*.ts` - Infrastructure layer (use logger for all status/debug messages)
+- `apps/cli/src/core/*.ts` - Core business logic (emit events, never write to stdout)
+- `apps/cli/src/agents/*.ts` - Agent providers
+- `apps/cli/src/services/*.ts` - Service layer (return data to callers, don't print directly)
 
 **Key principles:**
 1. Core layer must be I/O-free - emit events, don't write to stdout
 2. Infrastructure layer should return results, not print status messages
 3. Only CLI/command layers should produce user-facing console output
-4. Use `createLogger("context")` from `src/infra/logger.ts` for structured logging
+4. Use `createLogger("context")` from `apps/cli/src/infra/logger.ts` for structured logging
 5. The logger provides timestamps, log levels (debug/info/warn/error), and context tags
 
 **Example - Infrastructure returning results instead of printing:**
@@ -127,12 +150,14 @@ console.log(`Cloned ${result.repoName}`);
 
 ## Building Docs and Web
 
-When editing files in `docs/` or `web/` directories, always run `bun install` and `bun run build` in the respective directory before committing to ensure the changes compile correctly.
+When editing files in `apps/docs/` or `apps/web/` directories, run the validate command to ensure the changes compile correctly:
 
 ```bash
-# For docs changes
-cd docs && bun install && bun run build
+# From workspace root
+bun run validate:docs  # Validates docs site
+bun run validate:web   # Validates web app
 
-# For web changes
-cd web && bun install && bun run build
+# Or run directly in the app directory
+cd apps/docs && bun run validate
+cd apps/web && bun run validate
 ```
