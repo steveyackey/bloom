@@ -239,15 +239,24 @@ export function registerRepoCommands(cli: Clerc): Clerc {
         if (preview.worktreesToRemove.length > 0) {
           console.log(chalk.bold("Worktrees to remove:"));
           for (const wt of preview.worktreesToRemove) {
-            console.log(`  ${chalk.red("✗")} ${chalk.yellow(wt.branch)} ${chalk.dim(`(${wt.path})`)}`);
+            const warning = wt.hasUncommittedChanges ? chalk.yellow(" ⚠ uncommitted changes") : "";
+            console.log(`  ${chalk.red("✗")} ${chalk.yellow(wt.branch)} ${chalk.dim(`(${wt.path})`)}${warning}`);
           }
           console.log();
         }
 
         if (preview.branchesToDelete.length > 0) {
-          console.log(chalk.bold("Branches to delete:"));
+          console.log(chalk.bold("Local branches to delete:"));
           for (const branch of preview.branchesToDelete) {
             console.log(`  ${chalk.red("✗")} ${chalk.yellow(branch)}`);
+          }
+          console.log();
+        }
+
+        if (preview.remoteBranchesToDelete.length > 0) {
+          console.log(chalk.bold("Remote branches to delete:"));
+          for (const branch of preview.remoteBranchesToDelete) {
+            console.log(`  ${chalk.red("✗")} ${chalk.yellow(`origin/${branch}`)}`);
           }
           console.log();
         }
@@ -299,7 +308,10 @@ export function registerRepoCommands(cli: Clerc): Clerc {
           console.log(chalk.green(`Removed ${result.worktreesRemoved.length} worktree(s)`));
         }
         if (result.branchesDeleted.length > 0) {
-          console.log(chalk.green(`Deleted ${result.branchesDeleted.length} branch(es)`));
+          console.log(chalk.green(`Deleted ${result.branchesDeleted.length} local branch(es)`));
+        }
+        if (result.remoteBranchesDeleted.length > 0) {
+          console.log(chalk.green(`Deleted ${result.remoteBranchesDeleted.length} remote branch(es)`));
         }
         if (result.failed.length > 0) {
           console.log(chalk.yellow(`\nFailed to remove ${result.failed.length} item(s):`));
