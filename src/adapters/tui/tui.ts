@@ -61,6 +61,10 @@ export class EventDrivenTUI {
   private answerInput = "";
   private questionWatcherCleanup?: () => void;
 
+  // Interject mode state
+  private interjectMode = false;
+  private interjectInput = "";
+
   // Dashboard/tasks summary state
   private tasksFile?: string;
   private tasksWatcher?: FSWatcher;
@@ -944,6 +948,12 @@ export class EventDrivenTUI {
       return;
     }
 
+    // Handle interject mode input
+    if (this.interjectMode) {
+      this.handleInterjectModeInput(str);
+      return;
+    }
+
     // Check if questions pane is selected
     const isQuestionsPaneSelected = this.isQuestionsPaneSelected();
 
@@ -991,8 +1001,8 @@ export class EventDrivenTUI {
         break;
 
       case "i":
-        // Interject selected agent
-        this.interjectSelectedAgent();
+        // Enter interject mode for selected agent
+        this.enterInterjectMode();
         break;
 
       case "g":
@@ -1096,6 +1106,88 @@ export class EventDrivenTUI {
     this.scheduleRender();
   }
 
+  /**
+   * Enter interject mode for the selected agent pane.
+   */
+  private enterInterjectMode(): void {
+    const paneId = this.paneOrder[this.selectedIndex];
+    if (!paneId) return;
+
+    const pane = this.panes.get(paneId);
+    if (!pane) return;
+
+    // Only allow interjecting agent panes that are running
+    if (pane.paneType !== "agent" || pane.status !== "running") {
+      this.appendOutput(pane, style.warning("Cannot interject - agent not running"));
+      return;
+    }
+
+    this.interjectMode = true;
+    this.interjectInput = "";
+    this.lastRenderedOutput = ""; // Force full re-render
+    this.scheduleRender();
+  }
+
+  /**
+   * Handle input while in interject mode.
+   */
+  private handleInterjectModeInput(str: string): void {
+    if (str === "\x1b" || str === "\x1b\x1b") {
+      // Escape - exit interject mode
+      this.interjectMode = false;
+      this.interjectInput = "";
+      this.scheduleRender();
+    } else if (str === "\r" || str === "\n") {
+      // Enter - submit interject message
+      if (this.interjectInput.trim()) {
+        this.submitInterject(this.interjectInput.trim());
+      }
+    } else if (str === "\x7f" || str === "\b") {
+      // Backspace
+      this.interjectInput = this.interjectInput.slice(0, -1);
+      this.scheduleRender();
+    } else if (str.length === 1 && str >= " " && str <= "~") {
+      // Printable character
+      this.interjectInput += str;
+      this.scheduleRender();
+    }
+  }
+
+  /**
+   * Submit an interject message to the selected agent.
+   */
+  private async submitInterject(message: string): Promise<void> {
+    const paneId = this.paneOrder[this.selectedIndex];
+    if (!paneId) return;
+
+    const pane = this.panes.get(paneId);
+    if (!pane || pane.paneType !== "agent") return;
+
+    // Get the session before stopping
+    const session = interjectGenericSession(pane.name);
+
+    // Create interjection record with the user's message
+    await createInterjection(pane.name, {
+      taskId: pane.currentTaskId,
+      sessionId: session?.sessionId,
+      workingDirectory: session?.workingDirectory ?? process.cwd(),
+      reason: message,
+    });
+
+    pane.status = "idle";
+    pane.currentPid = undefined;
+    pane.stats = undefined;
+
+    this.appendOutput(pane, "");
+    this.appendOutput(pane, style.warning("━━━ INTERJECTED ━━━"));
+    this.appendOutput(pane, style.info(`Message: ${message}`));
+    this.appendOutput(pane, style.muted("Agent will resume on next poll cycle with your message."));
+
+    this.interjectMode = false;
+    this.interjectInput = "";
+    this.scheduleRender();
+  }
+
   private navigate(dir: "up" | "down" | "left" | "right"): void {
     if (this.paneOrder.length === 0) return;
 
@@ -1168,37 +1260,6 @@ export class EventDrivenTUI {
     const count = Math.max(1, this.paneOrder.length);
     const tilesPerCol = Math.ceil(count / Math.ceil(Math.sqrt(count)));
     return Math.floor(availableHeight / tilesPerCol) - 2;
-  }
-
-  private async interjectSelectedAgent(): Promise<void> {
-    const paneId = this.paneOrder[this.selectedIndex];
-    if (!paneId) return;
-
-    const pane = this.panes.get(paneId);
-    if (!pane || pane.status !== "running") {
-      this.appendOutput(pane!, style.warning("Cannot interject - agent not running"));
-      return;
-    }
-
-    // Try to interject the agent session
-    const session = interjectGenericSession(pane.name);
-
-    // Create interjection record
-    await createInterjection(pane.name, {
-      taskId: pane.currentTaskId,
-      sessionId: session?.sessionId,
-      workingDirectory: session?.workingDirectory ?? process.cwd(),
-      reason: "User interjection from TUI",
-    });
-
-    pane.status = "idle";
-    pane.currentPid = undefined;
-    pane.stats = undefined;
-
-    this.appendOutput(pane, "");
-    this.appendOutput(pane, style.warning("━━━ INTERJECTED ━━━"));
-    this.appendOutput(pane, style.info("Agent will resume on next poll cycle."));
-    this.appendOutput(pane, style.muted("Session preserved for continuation."));
   }
 
   // ===========================================================================
@@ -1409,8 +1470,10 @@ export class EventDrivenTUI {
     output += ansi.moveTo(region.y, region.x + 1);
     output += border(`╭${titleContent}${"─".repeat(Math.max(0, remainingWidth))}╮`);
 
-    // Content area
-    const contentH = region.h - 2;
+    // Content area - reserve space for interject input if active
+    const showInterjectInput = isSelected && this.interjectMode;
+    const inputLines = showInterjectInput ? 3 : 0; // Input prompt + input line + help text
+    const contentH = region.h - 2 - inputLines;
     const contentW = region.w - 2;
     const startLine = Math.max(0, pane.outputLines.length - contentH - pane.scrollOffset);
 
@@ -1436,6 +1499,42 @@ export class EventDrivenTUI {
         output += " ".repeat(linePadding);
       }
 
+      output += border("│");
+    }
+
+    // Render interject input box if active
+    if (showInterjectInput) {
+      // Separator line
+      output += ansi.moveTo(region.y + 1 + contentH, region.x + 1);
+      output += border("│");
+      output += chalk.yellow("─".repeat(contentW));
+      output += border("│");
+
+      // Input line with cursor
+      output += ansi.moveTo(region.y + 2 + contentH, region.x + 1);
+      output += border("│");
+      const inputPrefix = chalk.yellow(" Interject: ");
+      const prefixLen = 12; // " Interject: " visible length
+      const maxInputLen = contentW - prefixLen - 1; // -1 for cursor
+      const displayInput =
+        this.interjectInput.length > maxInputLen ? this.interjectInput.slice(-maxInputLen) : this.interjectInput;
+      const inputLine = `${inputPrefix}${displayInput}${chalk.inverse(" ")}`;
+      output += inputLine;
+      const inputPadding = contentW - prefixLen - displayInput.length - 1;
+      if (inputPadding > 0) {
+        output += " ".repeat(inputPadding);
+      }
+      output += border("│");
+
+      // Help text
+      output += ansi.moveTo(region.y + 3 + contentH, region.x + 1);
+      output += border("│");
+      const helpText = chalk.dim(" Enter:send  Esc:cancel");
+      output += helpText;
+      const helpPadding = contentW - 24;
+      if (helpPadding > 0) {
+        output += " ".repeat(helpPadding);
+      }
       output += border("│");
     }
 
