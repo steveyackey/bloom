@@ -89,9 +89,10 @@ export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
 
   function collectIds(taskList: Task[]) {
     for (const task of taskList) {
-      // done_pending_merge counts as completed for dependency purposes
-      // (the agent work is done, just waiting on merge)
-      if (task.status === "done" || task.status === "done_pending_merge") completedIds.add(task.id);
+      // Only fully done tasks count as completed for dependency purposes.
+      // done_pending_merge does NOT count - dependent tasks must wait for merge to complete.
+      // This ensures tasks stay blocked until their dependencies are fully merged.
+      if (task.status === "done") completedIds.add(task.id);
       collectIds(task.subtasks);
     }
   }
@@ -110,7 +111,10 @@ export function getAvailableTasks(tasks: Task[], agentName?: string): Task[] {
         continue;
       }
 
-      const depsComplete = task.depends_on.every((dep) => completedIds.has(dep));
+      // For merge-only tasks (done_pending_merge), skip dependency check.
+      // They already passed dependencies when they started - they just need to finish merging.
+      // For new/resumable tasks, check that dependencies are complete.
+      const depsComplete = needsMerge || task.depends_on.every((dep) => completedIds.has(dep));
       if (!depsComplete) {
         findAvailable(task.subtasks);
         continue;
@@ -204,8 +208,9 @@ export async function primeTasks(
 
   function collectCompleted(taskList: Task[]) {
     for (const task of taskList) {
-      // done_pending_merge counts as completed for dependency purposes
-      if (task.status === "done" || task.status === "done_pending_merge") completedIds.add(task.id);
+      // Only fully done tasks count as completed for dependency purposes.
+      // done_pending_merge does NOT count - dependent tasks must wait for merge to complete.
+      if (task.status === "done") completedIds.add(task.id);
       collectCompleted(task.subtasks);
     }
   }
