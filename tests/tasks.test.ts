@@ -487,3 +487,175 @@ describe("Step Helpers", () => {
     });
   });
 });
+
+// =============================================================================
+// Merge State Persistence Tests (done_pending_merge)
+// =============================================================================
+// These tests verify the fix for branch merge handling during restart scenarios.
+// Key behaviors tested:
+// 1. Dependent tasks stay blocked until merge completes (not just agent work)
+// 2. Merge-only tasks can resume on restart to finish their merge
+// 3. Merge-only tasks bypass dependency checks (they already passed when starting)
+
+describe("Merge State Persistence (done_pending_merge)", () => {
+  beforeEach(() => {
+    if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true });
+  });
+
+  describe("Dependency Blocking", () => {
+    test("done_pending_merge does NOT count as completed for dependency purposes", () => {
+      // Task A is in done_pending_merge (agent work done, merge in progress)
+      // Task B depends on Task A
+      // Task B should NOT be available yet - must wait for merge to complete
+      const taskA = createTask({ id: "task-a", status: "done_pending_merge", agent_name: "alice" });
+      const taskB = createTask({ id: "task-b", status: "todo", depends_on: ["task-a"] });
+      const tasks = [taskA, taskB];
+
+      const available = getAvailableTasks(tasks, "bob");
+
+      // Task B should not be available because its dependency is not fully done
+      expect(available.find((t) => t.id === "task-b")).toBeUndefined();
+    });
+
+    test("dependent task becomes available only after merge completes (status=done)", () => {
+      // Same scenario but Task A is now fully done
+      const taskA = createTask({ id: "task-a", status: "done", agent_name: "alice" });
+      const taskB = createTask({ id: "task-b", status: "todo", depends_on: ["task-a"] });
+      const tasks = [taskA, taskB];
+
+      const available = getAvailableTasks(tasks, "bob");
+
+      // Task B should now be available
+      expect(available.find((t) => t.id === "task-b")).toBeDefined();
+    });
+
+    test("priming does NOT promote tasks when dependency is done_pending_merge", async () => {
+      // When running primeTasks(), tasks with done_pending_merge dependencies should stay todo
+      const taskA = createTask({ id: "task-a", status: "done_pending_merge" });
+      const taskB = createTask({ id: "task-b", status: "todo", depends_on: ["task-a"] });
+      const tasksFile: TasksFile = { tasks: [taskA, taskB] };
+      await saveTasks(TEST_TASKS_FILE, tasksFile);
+
+      const primed = await primeTasks(TEST_TASKS_FILE, tasksFile, noOpLogger);
+
+      expect(primed).toBe(0);
+      expect(taskB.status).toBe("todo"); // Should NOT be promoted to ready_for_agent
+    });
+
+    test("priming promotes tasks once dependency changes from done_pending_merge to done", async () => {
+      // After merge completes, the task should be promotable
+      const taskA = createTask({ id: "task-a", status: "done" });
+      const taskB = createTask({ id: "task-b", status: "todo", depends_on: ["task-a"] });
+      const tasksFile: TasksFile = { tasks: [taskA, taskB] };
+      await saveTasks(TEST_TASKS_FILE, tasksFile);
+
+      const primed = await primeTasks(TEST_TASKS_FILE, tasksFile, noOpLogger);
+
+      expect(primed).toBe(1);
+      expect(taskB.status).toBe("ready_for_agent");
+    });
+  });
+
+  describe("Merge-Only Task Resumption", () => {
+    test("done_pending_merge tasks are available for merge-only processing by same agent", () => {
+      // When an agent restarts, it should pick up its done_pending_merge tasks
+      // to finish the merge operation
+      const task = createTask({ id: "merge-task", status: "done_pending_merge", agent_name: "alice" });
+      const tasks = [task];
+
+      const available = getAvailableTasks(tasks, "alice");
+
+      // Alice should see her merge-pending task
+      expect(available.find((t) => t.id === "merge-task")).toBeDefined();
+    });
+
+    test("done_pending_merge tasks are NOT available to different agents", () => {
+      // Only the original agent should resume the merge
+      const task = createTask({ id: "merge-task", status: "done_pending_merge", agent_name: "alice" });
+      const tasks = [task];
+
+      const available = getAvailableTasks(tasks, "bob");
+
+      // Bob should not see Alice's merge-pending task
+      expect(available.find((t) => t.id === "merge-task")).toBeUndefined();
+    });
+
+    test("done_pending_merge tasks bypass dependency check for resumption", () => {
+      // Scenario: Task A depends on Task B. Both were running in parallel.
+      // Task B finished agent work first -> done_pending_merge
+      // Task A finished agent work -> done_pending_merge
+      // Now on restart, Task A should be able to resume even though Task B
+      // is still done_pending_merge (not done), because Task A already passed
+      // the dependency check when it originally started.
+      const taskB = createTask({ id: "task-b", status: "done_pending_merge", agent_name: "bob" });
+      const taskA = createTask({
+        id: "task-a",
+        status: "done_pending_merge",
+        agent_name: "alice",
+        depends_on: ["task-b"],
+      });
+      const tasks = [taskA, taskB];
+
+      const available = getAvailableTasks(tasks, "alice");
+
+      // Alice should be able to resume her merge-pending task
+      // even though task-b (her dependency) is also done_pending_merge
+      expect(available.find((t) => t.id === "task-a")).toBeDefined();
+    });
+  });
+
+  describe("Restart Scenarios", () => {
+    test("interrupted merge can be resumed after restart (simulation)", () => {
+      // Simulate a restart scenario:
+      // 1. Task was running, completed agent work
+      // 2. Task status changed to done_pending_merge
+      // 3. System was interrupted during merge
+      // 4. On restart, task should be available for merge resumption
+      const task = createTask({
+        id: "interrupted-merge",
+        status: "done_pending_merge",
+        agent_name: "worker",
+        merge_into: "main", // Has merge target configured
+      });
+      const tasks = [task];
+
+      // On restart, same agent should see the task
+      const available = getAvailableTasks(tasks, "worker");
+      expect(available).toHaveLength(1);
+      expect(available[0]!.id).toBe("interrupted-merge");
+    });
+
+    test("multiple done_pending_merge tasks resume in order", () => {
+      // Multiple tasks from same agent can all resume
+      const task1 = createTask({ id: "merge-1", status: "done_pending_merge", agent_name: "worker" });
+      const task2 = createTask({ id: "merge-2", status: "done_pending_merge", agent_name: "worker" });
+      const tasks = [task1, task2];
+
+      const available = getAvailableTasks(tasks, "worker");
+
+      expect(available).toHaveLength(2);
+    });
+
+    test("chain of dependent tasks: only first can start until merges complete", () => {
+      // Task chain: task-1 -> task-2 -> task-3
+      // task-1 is done_pending_merge, task-2 and task-3 should stay blocked
+      const task1 = createTask({ id: "task-1", status: "done_pending_merge", agent_name: "alice" });
+      const task2 = createTask({ id: "task-2", status: "todo", depends_on: ["task-1"] });
+      const task3 = createTask({ id: "task-3", status: "todo", depends_on: ["task-2"] });
+      const tasks = [task1, task2, task3];
+
+      // For alice - should only see task-1 (to finish merge)
+      const aliceAvailable = getAvailableTasks(tasks, "alice");
+      expect(aliceAvailable).toHaveLength(1);
+      expect(aliceAvailable[0]!.id).toBe("task-1");
+
+      // For bob (or any other agent) - nothing should be available
+      const bobAvailable = getAvailableTasks(tasks, "bob");
+      expect(bobAvailable).toHaveLength(0);
+    });
+  });
+});
