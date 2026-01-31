@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.12](https://github.com/steveyackey/bloom/compare/bloom-v0.3.11...bloom-v0.3.12) (2026-01-31)
+
+
+### Features
+
+* **repo:** pull default branches during repo sync ([a0a01b2](https://github.com/steveyackey/bloom/commit/a0a01b2e39bba1e8a3711decb5fe0e86a42086d6))
+
+
+### Bug Fixes
+
+* **setup:** update to use new SyncResult interface ([5c8f39d](https://github.com/steveyackey/bloom/commit/5c8f39d1f8fda5d983446d97e252a42687c070a8))
+
 ## [0.3.11](https://github.com/steveyackey/bloom/compare/bloom-v0.3.10...bloom-v0.3.11) (2026-01-31)
 
 
