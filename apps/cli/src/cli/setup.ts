@@ -29,8 +29,11 @@ export function registerSetupCommand(cli: Clerc): Clerc {
       if (result.cloned.length > 0) {
         console.log(`Cloned: ${result.cloned.join(", ")}`);
       }
-      if (result.skipped.length > 0) {
-        console.log(`Updated: ${result.skipped.join(", ")}`);
+      if (result.pulled.length > 0) {
+        console.log(`Pulled: ${result.pulled.join(", ")}`);
+      }
+      if (result.upToDate.length > 0) {
+        console.log(`Up to date: ${result.upToDate.join(", ")}`);
       }
       if (result.failed.length > 0) {
         console.log(`Failed:`);
