@@ -18,6 +18,7 @@
     "validate:web": "bun --filter @bloom/web validate",
     "validate:docs": "bun --filter @bloom/docs validate",
     "package:all": "bun --filter @bloom/cli package:all",
+    "install:local": "bun --filter @bloom/cli install:local",
     "prepare": "bun scripts/install-hooks.ts"
   },
   "version": "0.3.10"
