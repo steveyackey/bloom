@@ -11,11 +11,14 @@
     "test": "bun --filter @bloom/cli test",
     "lint": "bun --filter @bloom/cli lint",
     "fix": "bun --filter @bloom/cli fix",
+    "check": "bun --filter @bloom/cli check",
     "typecheck": "bun --filter @bloom/cli typecheck",
     "validate": "bun run validate:cli && bun run validate:web && bun run validate:docs",
     "validate:cli": "bun --filter @bloom/cli validate",
     "validate:web": "bun --filter @bloom/web validate",
     "validate:docs": "bun --filter @bloom/docs validate",
+    "package:all": "bun --filter @bloom/cli package:all",
+    "install:local": "bun --filter @bloom/cli install:local",
     "prepare": "bun scripts/install-hooks.ts"
   },
   "version": "0.3.10"

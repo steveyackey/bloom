@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -47,8 +47,8 @@ jobs:
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: |
-            dist/bloom-darwin-arm64
-            dist/bloom-darwin-x64
-            dist/bloom-linux-x64
-            dist/bloom-linux-arm64
-            dist/bloom-windows-x64.exe
+            apps/cli/dist/bloom-darwin-arm64
+            apps/cli/dist/bloom-darwin-x64
+            apps/cli/dist/bloom-linux-x64
+            apps/cli/dist/bloom-linux-arm64
+            apps/cli/dist/bloom-windows-x64.exe
