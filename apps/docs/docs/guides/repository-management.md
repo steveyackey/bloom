@@ -149,7 +149,7 @@ If a task specifies a worktree that doesn't exist, Bloom creates it automaticall
 
 ### Sync All
 
-Ensure all configured repos are cloned and updated:
+Ensure all configured repos are cloned, fetched, and default branches are up to date:
 
 ```bash
 bloom repo sync
@@ -158,6 +158,11 @@ bloom repo sync
 This:
 - Clones missing repos from `bloom.config.yaml`
 - Fetches updates for existing repos
+- Pulls latest changes into default branch worktrees (fast-forward only)
+
+:::tip
+Run `bloom repo sync` before starting new work to ensure you have the latest code.
+:::
 
 ### Manual Fetch
 
@@ -169,12 +174,9 @@ git fetch --all  # All remotes
 
 ### Pulling Updates
 
-For worktrees:
+For feature worktrees (default branches are pulled automatically by `repo sync`):
 
 ```bash
-cd repos/backend/main  # main worktree
-git pull origin main
-
 cd repos/backend/feature-auth  # feature worktree
 git pull origin feature/auth
 ```

@@ -137,9 +137,9 @@ export function registerRepoCommands(cli: Clerc): Clerc {
       })
 
       // =========================================================================
-      // repo sync - Sync all configured repos (fetch updates)
+      // repo sync - Sync all configured repos and pull default branches
       // =========================================================================
-      .command("repo sync", "Sync all configured repos (fetch updates)", {
+      .command("repo sync", "Sync all configured repos and pull default branches", {
         help: { group: "repo" },
       })
       .on("repo sync", async () => {
@@ -148,8 +148,11 @@ export function registerRepoCommands(cli: Clerc): Clerc {
         if (result.cloned.length > 0) {
           console.log(`${chalk.green("Cloned:")} ${result.cloned.map((c) => chalk.cyan(c)).join(", ")}`);
         }
-        if (result.skipped.length > 0) {
-          console.log(`${chalk.blue("Updated:")} ${result.skipped.map((s) => chalk.cyan(s)).join(", ")}`);
+        if (result.pulled.length > 0) {
+          console.log(`${chalk.green("Pulled:")} ${result.pulled.map((p) => chalk.cyan(p)).join(", ")}`);
+        }
+        if (result.upToDate.length > 0) {
+          console.log(`${chalk.blue("Up to date:")} ${result.upToDate.map((u) => chalk.cyan(u)).join(", ")}`);
         }
         if (result.failed.length > 0) {
           console.log(chalk.red("Failed:"));

@@ -226,7 +226,7 @@ bloom setup                  # Sync repos according to config
 bloom repo clone <url|org/repo>  # Clone a repo (supports org/repo shorthand)
 bloom repo create <name>         # Create a new local repo with worktree setup
 bloom repo list                  # List repos in the workspace
-bloom repo sync                  # Clone/fetch all repos from bloom.repos.yaml
+bloom repo sync                  # Clone/fetch repos and pull default branches
 bloom repo remove <name>         # Remove a repo and its worktrees
 ```
 
