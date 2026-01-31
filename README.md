@@ -606,7 +606,7 @@ bloom config models opencode -d -s        # Discover and save to config
 
 ### Agent-Specific Setup
 
-Each agent has its own CLI and configuration requirements. See the [Agent Documentation](docs/docs/agents/README.md) for detailed setup instructions, configuration examples, and troubleshooting guides:
+Each agent has its own CLI and configuration requirements. See the [Agent Documentation](apps/docs/docs/agents/README.md) for detailed setup instructions, configuration examples, and troubleshooting guides:
 
 - **Claude** - Uses Anthropic API key
 - **Copilot** - Uses GitHub authentication
@@ -614,3 +614,56 @@ Each agent has its own CLI and configuration requirements. See the [Agent Docume
 - **Goose** - Extensible via MCP
 - **OpenCode** - Multi-provider support
 - **Cursor** - Uses Cursor account or API key
+
+## Development
+
+Bloom uses a Bun workspace monorepo:
+
+```
+bloom/
+├── apps/
+│   ├── cli/          # @bloom/cli - Main CLI application
+│   ├── web/          # @bloom/web - Landing page (use-bloom.dev)
+│   └── docs/         # @bloom/docs - Docusaurus site (docs.use-bloom.dev)
+├── docs/             # Internal documentation
+├── scripts/          # Build and development scripts
+└── package.json      # Workspace root
+```
+
+### Getting Started
+
+```bash
+# Install dependencies for all workspaces
+bun install
+
+# Run the CLI during development
+bun run bloom <command>
+
+# Validate all apps
+bun run validate
+
+# Validate individual apps
+bun run validate:cli   # CLI (lint, typecheck, test)
+bun run validate:web   # Web (lint, build)
+bun run validate:docs  # Docs (typecheck, build)
+```
+
+### Working on Individual Apps
+
+```bash
+# CLI development
+cd apps/cli
+bun run test           # Run tests
+bun run typecheck      # Type checking
+bun run fix            # Lint and format
+
+# Web development
+cd apps/web
+bun run dev            # Start dev server
+bun run build          # Production build
+
+# Docs development
+cd apps/docs
+bun run start          # Start dev server
+bun run build          # Production build
+```

@@ -2,50 +2,24 @@
   "name": "bloom",
   "private": true,
   "description": "Multi-agent task orchestrator with YAML-based task management",
-  "bin": {
-    "bloom": "./src/cli.ts"
-  },
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "bloom": "bun src/cli.ts",
-    "start": "bun src/cli.ts run",
-    "plan": "bun src/cli.ts plan",
-    "dashboard": "bun src/cli.ts dashboard",
-    "test": "bun test",
-    "lint": "biome lint ./src ./tests",
-    "lint:fix": "biome lint --write ./src ./tests",
-    "format": "biome format ./src ./tests",
-    "format:fix": "biome format --write ./src ./tests",
-    "check": "biome check ./src ./tests",
-    "fix": "biome check --write ./src ./tests",
-    "typecheck": "tsc --noEmit",
-    "knip": "knip",
-    "validate": "bun run fix && bun run typecheck && bun run test",
-    "prepare": "bun scripts/install-hooks.ts",
-    "package": "bun build --compile ./src/cli.ts --outfile dist/bloom",
-    "install:local": "bun run package && rm -f ~/.local/bin/bloom && mkdir -p ~/.local/bin && cp dist/bloom ~/.local/bin/bloom",
-    "package:linux-x64": "bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile dist/bloom-linux-x64",
-    "package:linux-arm64": "bun build --compile --target=bun-linux-arm64 ./src/cli.ts --outfile dist/bloom-linux-arm64",
-    "package:darwin-x64": "bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile dist/bloom-darwin-x64",
-    "package:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile dist/bloom-darwin-arm64",
-    "package:windows-x64": "bun build --compile --target=bun-windows-x64 --feature WINDOWS ./src/cli.ts --outfile dist/bloom-windows-x64.exe",
-    "package:all": "bun run package:linux-x64 && bun run package:linux-arm64 && bun run package:darwin-x64 && bun run package:darwin-arm64 && bun run package:windows-x64"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.11",
-    "@types/bun": "latest",
-    "knip": "^5.82.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "@inquirer/confirm": "^6.0.4",
-    "@inquirer/input": "^5.0.4",
-    "@inquirer/select": "^5.0.4",
-    "chalk": "^5.6.2",
-    "clerc": "^1.3.0-beta.1",
-    "yaml": "^2.8.2",
-    "zod": "^4.3.5"
+    "bloom": "bun --filter @bloom/cli bloom",
+    "start": "bun --filter @bloom/cli start",
+    "test": "bun --filter @bloom/cli test",
+    "lint": "bun --filter @bloom/cli lint",
+    "fix": "bun --filter @bloom/cli fix",
+    "check": "bun --filter @bloom/cli check",
+    "typecheck": "bun --filter @bloom/cli typecheck",
+    "validate": "bun run validate:cli && bun run validate:web && bun run validate:docs",
+    "validate:cli": "bun --filter @bloom/cli validate",
+    "validate:web": "bun --filter @bloom/web validate",
+    "validate:docs": "bun --filter @bloom/docs validate",
+    "package:all": "bun --filter @bloom/cli package:all",
+    "install:local": "bun --filter @bloom/cli install:local",
+    "prepare": "bun scripts/install-hooks.ts"
   },
   "version": "0.3.10"
 }

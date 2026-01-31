@@ -29,6 +29,7 @@ jobs:
         run: bun run typecheck
 
       - name: Unit Tests
+        working-directory: apps/cli
         run: bun test tests/ --ignore 'tests/integration/*'
 
   integration:
@@ -46,6 +47,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Integration Tests
+        working-directory: apps/cli
         run: bun test tests/integration/
         env:
           BLOOM_HOME: ${{ runner.temp }}/bloom
@@ -69,16 +71,10 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        working-directory: docs
         run: bun install --frozen-lockfile
 
-      - name: Type check
-        working-directory: docs
-        run: bun run typecheck
-
-      - name: Build docs
-        working-directory: docs
-        run: bun run build
+      - name: Validate docs
+        run: bun run validate:docs
 
   web:
     runs-on: ubuntu-latest
@@ -90,13 +86,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        working-directory: web
         run: bun install --frozen-lockfile
 
-      - name: Lint
-        working-directory: web
-        run: bun run lint
-
-      - name: Build web
-        working-directory: web
-        run: bun run build
+      - name: Validate web
+        run: bun run validate:web

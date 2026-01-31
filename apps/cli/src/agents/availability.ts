@@ -94,7 +94,7 @@ async function checkCliAvailable(command: string, args: string[]): Promise<{ ava
       stderr += data.toString();
     });
 
-    proc.on("error", (error) => {
+    proc.on("error", (error: Error) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         resolve({
           available: false,
@@ -108,7 +108,7 @@ async function checkCliAvailable(command: string, args: string[]): Promise<{ ava
       }
     });
 
-    proc.on("close", (code) => {
+    proc.on("close", (code: number | null) => {
       if (code === 0) {
         resolve({ available: true });
       } else {

@@ -152,7 +152,7 @@ export class GenericAgentProvider implements Agent {
         env: this.getEnv(),
       });
 
-      proc.on("error", (error) => {
+      proc.on("error", (error: Error) => {
         resolve({
           success: false,
           output: "",
@@ -160,7 +160,7 @@ export class GenericAgentProvider implements Agent {
         });
       });
 
-      proc.on("close", (code) => {
+      proc.on("close", (code: number | null) => {
         resolve({
           success: (code ?? 0) === 0,
           output: "",
@@ -354,7 +354,7 @@ export class GenericAgentProvider implements Agent {
         }
       });
 
-      proc.on("error", (error) => {
+      proc.on("error", (error: Error) => {
         clearInterval(heartbeatTimer);
         if (options.agentName) {
           activeSessions.delete(options.agentName);
@@ -367,7 +367,7 @@ export class GenericAgentProvider implements Agent {
         });
       });
 
-      proc.on("close", (code) => {
+      proc.on("close", (code: number | null) => {
         clearInterval(heartbeatTimer);
         if (options.agentName) {
           activeSessions.delete(options.agentName);
