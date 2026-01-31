@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.3.11](https://github.com/steveyackey/bloom/compare/bloom-v0.3.10...bloom-v0.3.11) (2026-01-31)
+
+
+### Features
+
+* add workspace validate commands ([728d883](https://github.com/steveyackey/bloom/commit/728d883221d2db0b517e16675d15c7f5bb871034))
+* migrate CLI to apps/cli ([3e35934](https://github.com/steveyackey/bloom/commit/3e3593479f85d2b407a4e5612124a2b0b4c08a48))
+* migrate docs site to apps/docs ([b7d1ae7](https://github.com/steveyackey/bloom/commit/b7d1ae72f1ace2e28c9b5a02ce01dc8b97a549c5))
+* migrate web to apps/web ([216b6d0](https://github.com/steveyackey/bloom/commit/216b6d0eab9a011c1845f43a67570f5ae9cd44bd))
+* **repo:** add repo reset command interface ([c90bc71](https://github.com/steveyackey/bloom/commit/c90bc715dab153edd7b4dfbb5dd0564a15cc3017))
+* **repo:** implement worktree and branch cleanup with remote deletion ([0817967](https://github.com/steveyackey/bloom/commit/0817967e919684f5aebd494460db9c80949cd49a))
+* set up Bun workspace structure ([590dce0](https://github.com/steveyackey/bloom/commit/590dce09713b78428e75d9dea1e4e39253688a13))
+* **tui:** add input box for interject feature ([5986bb3](https://github.com/steveyackey/bloom/commit/5986bb39ff7f6cbb99c5ffe908f2b12bfa5b735b))
+
+
+### Bug Fixes
+
+* add @types/node and explicit type annotations for strict TypeScript ([b95eb66](https://github.com/steveyackey/bloom/commit/b95eb66afc4b62a11115660d4bc9b3ba6a7f4a14))
+* add install:local script to root package.json ([82894d4](https://github.com/steveyackey/bloom/commit/82894d4c9a69fef66680672ce7633b76afd00318))
+* **orchestrator:** resume done_pending_merge tasks after restart ([f21129d](https://github.com/steveyackey/bloom/commit/f21129dd6829e4bbad62c88fee0221688dea0e96))
+* **tasks:** block dependent tasks until merge completes ([42313c0](https://github.com/steveyackey/bloom/commit/42313c02248eaf0fdaea0492e2c93c89cdbb187e))
+* update GitHub Actions for monorepo structure ([781b82d](https://github.com/steveyackey/bloom/commit/781b82d694c892538b3508a4aec64340eaa95fc0))
+
+
+### Documentation
+
+* add interrupt feature investigation ([a1590eb](https://github.com/steveyackey/bloom/commit/a1590eb72ad4083a582a64ba15eec3fbae92aa49))
+* add merge state persistence analysis ([538204d](https://github.com/steveyackey/bloom/commit/538204d6aad465fd74919760f8c8e7be02a3e91f))
+* consolidate internal documentation in /docs/ ([d015b50](https://github.com/steveyackey/bloom/commit/d015b50a7107b40234eb59449695a60d83851885))
+* update documentation for new workspace structure ([78a6143](https://github.com/steveyackey/bloom/commit/78a6143bc6f03fa466031b2715e1c293cde668ca))
+
 ## [0.3.10](https://github.com/steveyackey/bloom/compare/bloom-v0.3.9...bloom-v0.3.10) (2026-01-27)
 
 
