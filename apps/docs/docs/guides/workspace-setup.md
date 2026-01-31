@@ -177,7 +177,7 @@ If repos are defined in config, sync them all:
 bloom repo sync
 ```
 
-This clones missing repos and fetches updates for existing ones.
+This clones missing repos, fetches updates, and pulls latest changes into default branch worktrees.
 
 ### Manual Updates
 

@@ -72,7 +72,7 @@ Repositories:
 
 ### sync
 
-Clone/fetch all repositories from configuration.
+Sync all repositories: fetch updates and pull default branches.
 
 ```bash
 bloom repo sync
@@ -81,6 +81,22 @@ bloom repo sync
 This reads `bloom.config.yaml` and:
 - Clones any missing repositories
 - Fetches updates for existing repositories
+- Pulls latest changes into default branch worktrees (fast-forward only)
+
+**Output:**
+
+```
+Syncing repositories...
+
+Pulled: backend, frontend
+Up to date: shared
+
+Sync complete.
+```
+
+:::note
+Pull uses `--ff-only` to prevent merge commits. If a default branch has diverged from remote, the sync will report an error and you'll need to resolve it manually.
+:::
 
 ### remove
 

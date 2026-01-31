@@ -542,7 +542,9 @@ export async function pullAllDefaultBranches(bloomDir: string): Promise<PullAllR
 
 export interface SyncResult {
   cloned: string[];
-  skipped: string[];
+  fetched: string[];
+  pulled: string[];
+  upToDate: string[];
   failed: Array<{ name: string; error: string }>;
 }
 
@@ -550,7 +552,9 @@ export async function syncRepos(bloomDir: string): Promise<SyncResult> {
   const reposFile = await loadReposFile(bloomDir);
   const result: SyncResult = {
     cloned: [],
-    skipped: [],
+    fetched: [],
+    pulled: [],
+    upToDate: [],
     failed: [],
   };
 
@@ -558,12 +562,30 @@ export async function syncRepos(bloomDir: string): Promise<SyncResult> {
     const bareRepoPath = getBareRepoPath(bloomDir, repo.name);
 
     if (existsSync(bareRepoPath)) {
-      // Already exists, just fetch updates
+      // Already exists, fetch updates first
       const fetchResult = runGit(["fetch", "--all"], bareRepoPath);
-      if (fetchResult.success) {
-        result.skipped.push(repo.name);
-      } else {
+      if (!fetchResult.success) {
         result.failed.push({ name: repo.name, error: fetchResult.error });
+        continue;
+      }
+      result.fetched.push(repo.name);
+
+      // Skip pulling for local-only repos (no remote URL)
+      if (!repo.url) {
+        result.upToDate.push(repo.name);
+        continue;
+      }
+
+      // Pull updates into the default branch worktree
+      const pullResult = await pullDefaultBranch(bloomDir, repo.name);
+      if (pullResult.success) {
+        if (pullResult.updated) {
+          result.pulled.push(repo.name);
+        } else {
+          result.upToDate.push(repo.name);
+        }
+      } else {
+        result.failed.push({ name: repo.name, error: pullResult.error || "Failed to pull" });
       }
       continue;
     }
