@@ -3,6 +3,7 @@
 // =============================================================================
 // This module handles fetching available tasks and building prompts for agents.
 
+import { listInterjections, markInterjectionResumed } from "../../human-queue";
 import { getWorktreePath, listRepos } from "../../infra/git";
 import {
   type GitConfig,
@@ -70,6 +71,8 @@ export interface TaskGetResult {
   hasMoreSteps?: boolean;
   /** True if task is done_pending_merge and only needs merge processing (skip agent work) */
   mergeOnly?: boolean;
+  /** Message from a pending interjection, if any */
+  interjectionMessage?: string;
 }
 
 // =============================================================================
@@ -128,6 +131,18 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     }
   }
 
+  // Check for pending interjections for this task
+  let interjectionMessage: string | undefined;
+  const pendingInterjections = await listInterjections("pending");
+  const taskInterjection = pendingInterjections.find(
+    (i) => i.agentName === agentName && i.taskId === task.id && i.reason
+  );
+  if (taskInterjection) {
+    interjectionMessage = taskInterjection.reason;
+    // Mark the interjection as resumed so it's not picked up again
+    await markInterjectionResumed(taskInterjection.id);
+  }
+
   // Check if task has steps
   let stepInfo: StepInfo | undefined;
   let hasMoreSteps = false;
@@ -154,14 +169,14 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
       };
 
       hasMoreSteps = index < totalSteps - 1;
-      prompt = buildStepPrompt(task, step, index, totalSteps, gitInfo, taskCli, gitConfig);
+      prompt = buildStepPrompt(task, step, index, totalSteps, gitInfo, taskCli, gitConfig, interjectionMessage);
     } else {
       // All steps are done - build regular task completion prompt
-      prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig);
+      prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig, interjectionMessage);
     }
   } else {
     // No steps - build regular task prompt
-    prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig);
+    prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig, interjectionMessage);
   }
 
   return {
@@ -178,14 +193,33 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     stepInfo,
     hasMoreSteps,
     mergeOnly, // True if resuming from done_pending_merge (skip agent work, go to merge)
+    interjectionMessage,
   };
 }
 
 /**
  * Build the task prompt with instructions and git workflow.
  */
-function buildTaskPrompt(task: Task, gitInfo: GitTaskInfo | null, taskCli: string, gitConfig?: GitConfig): string {
-  let prompt = `# Task: ${task.title}\n\n## Task ID: ${task.id}\n\n`;
+function buildTaskPrompt(
+  task: Task,
+  gitInfo: GitTaskInfo | null,
+  taskCli: string,
+  gitConfig?: GitConfig,
+  interjectionMessage?: string
+): string {
+  let prompt = "";
+
+  // If there's an interjection message, add it prominently at the start
+  if (interjectionMessage) {
+    prompt += `## ⚠️ IMPORTANT: Human Interjection\n`;
+    prompt += `The human operator interrupted your previous session with this message:\n`;
+    prompt += `> ${interjectionMessage}\n\n`;
+    prompt += `**Do NOT mark this task as done until you have addressed this feedback.**\n`;
+    prompt += `Continue working on the task with this feedback in mind.\n\n`;
+    prompt += `---\n\n`;
+  }
+
+  prompt += `# Task: ${task.title}\n\n## Task ID: ${task.id}\n\n`;
 
   if (task.instructions) {
     prompt += `## Instructions\n${task.instructions}\n\n`;
@@ -256,13 +290,24 @@ function buildStepPrompt(
   totalSteps: number,
   gitInfo: GitTaskInfo | null,
   taskCli: string,
-  _gitConfig?: GitConfig
+  _gitConfig?: GitConfig,
+  interjectionMessage?: string
 ): string {
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === totalSteps - 1;
   const completedSteps = getCompletedSteps(task);
 
   let prompt = "";
+
+  // If there's an interjection message, add it prominently at the start
+  if (interjectionMessage) {
+    prompt += `## ⚠️ IMPORTANT: Human Interjection\n`;
+    prompt += `The human operator interrupted your previous session with this message:\n`;
+    prompt += `> ${interjectionMessage}\n\n`;
+    prompt += `**Do NOT mark this task or step as done until you have addressed this feedback.**\n`;
+    prompt += `Continue working on the task with this feedback in mind.\n\n`;
+    prompt += `---\n\n`;
+  }
 
   if (isFirstStep) {
     // First step: include full task context
