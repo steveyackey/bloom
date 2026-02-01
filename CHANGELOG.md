@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.13](https://github.com/steveyackey/bloom/compare/bloom-v0.3.12...bloom-v0.3.13) (2026-02-01)
+
+
+### Bug Fixes
+
+* **orchestrator:** include interjection message when agent resumes task ([ace3d7b](https://github.com/steveyackey/bloom/commit/ace3d7bb5c2cba9abe4defa465c847b6ddeafa93))
+
 ## [0.3.12](https://github.com/steveyackey/bloom/compare/bloom-v0.3.11...bloom-v0.3.12) (2026-01-31)
 
 
