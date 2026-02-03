@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.14](https://github.com/steveyackey/bloom/compare/bloom-v0.3.13...bloom-v0.3.14) (2026-02-03)
+
+
+### Bug Fixes
+
+* execute question actions on answer and force fresh session on interjection ([caf340d](https://github.com/steveyackey/bloom/commit/caf340dd40a2eea7c9c6fec7a336f6629e0c5eb8))
+* prevent infinite loop when merge fails for done_pending_merge tasks ([e170a3c](https://github.com/steveyackey/bloom/commit/e170a3c78d2858aaccd2beafedd7d923ae851812))
+
 ## [0.3.13](https://github.com/steveyackey/bloom/compare/bloom-v0.3.12...bloom-v0.3.13) (2026-02-01)
 
 
