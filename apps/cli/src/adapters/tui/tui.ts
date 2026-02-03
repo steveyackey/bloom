@@ -7,8 +7,9 @@
 import type { FSWatcher } from "node:fs";
 import { watch } from "node:fs";
 import { interjectGenericSession } from "../../agents";
+import { executeQuestionAction } from "../../commands/questions";
 import type { EventHandler, OrchestratorEvent } from "../../core/orchestrator";
-import { answerQuestion, createInterjection, listQuestions, watchQueue } from "../../human-queue";
+import { answerQuestion, createInterjection, getQuestion, listQuestions, watchQueue } from "../../human-queue";
 import { ansi, type BorderState, chalk, getBorderChalk, style } from "../../infra/colors";
 import { getProcessStatsBatch } from "../../infra/terminal";
 import type { Task } from "../../task-schema";
@@ -1100,7 +1101,11 @@ export class EventDrivenTUI {
 
     try {
       await answerQuestion(q.id, answer);
-      // The question will be removed via the watcher
+      // Fetch the full question (with action/taskId) to execute any associated action
+      const fullQuestion = await getQuestion(q.id);
+      if (fullQuestion) {
+        await executeQuestionAction(fullQuestion, answer);
+      }
     } catch {
       // Handle error silently - the watcher will update state
     }

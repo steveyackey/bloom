@@ -179,6 +179,11 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     prompt = buildTaskPrompt(task, gitInfo, taskCli, gitConfig, interjectionMessage);
   }
 
+  // If there's an interjection, clear the session ID to force a fresh session.
+  // Resuming the old session would let the agent continue where it left off
+  // (likely near completion), ignoring the interjection feedback.
+  const sessionId = interjectionMessage ? undefined : task.session_id;
+
   return {
     available: true,
     taskId: task.id,
@@ -188,7 +193,7 @@ export async function getTaskForAgent(agentName: string, tasksFile: string, bloo
     prompt,
     taskCli,
     gitConfig,
-    sessionId: task.session_id, // Resume existing session if available
+    sessionId,
     agent: task.agent, // Per-task agent provider override
     stepInfo,
     hasMoreSteps,

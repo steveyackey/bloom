@@ -17,9 +17,46 @@ import {
   waitForAnswer,
   watchQueue,
 } from "../human-queue";
+import { createLogger } from "../infra/logger";
 import type { TaskStatus } from "../task-schema";
 import { findTask, loadTasks, saveTasks } from "../tasks";
 import { getTasksFile } from "./context";
+
+const logger = createLogger("questions");
+
+/**
+ * Execute the action associated with a question (set_status, add_note).
+ * Called after answering a question to apply side effects to the task.
+ */
+export async function executeQuestionAction(question: Question, answer: string): Promise<void> {
+  if (!question.action || !question.taskId) return;
+
+  const result = getActionResult({ ...question, answer });
+  if (!result.shouldExecute) return;
+
+  try {
+    const tasksFile = await loadTasks(getTasksFile());
+    const task = findTask(tasksFile.tasks, question.taskId);
+    if (!task) return;
+
+    if (result.status) {
+      const oldStatus = task.status;
+      task.status = result.status as TaskStatus;
+      await saveTasks(getTasksFile(), tasksFile);
+      logger.info(`Action executed: ${question.taskId}: ${oldStatus} → ${result.status}`);
+      await markActionExecuted(question.id);
+    }
+
+    if (result.note) {
+      task.ai_notes.push(result.note);
+      await saveTasks(getTasksFile(), tasksFile);
+      logger.info(`Note added to task: ${question.taskId}`);
+      await markActionExecuted(question.id);
+    }
+  } catch (err) {
+    logger.error("Failed to execute question action:", err);
+  }
+}
 
 export async function cmdAsk(
   agentName: string,
@@ -89,6 +126,9 @@ export async function cmdAnswer(questionId: string, answer: string): Promise<voi
     console.log(`${chalk.green("Answered question")} ${chalk.yellow(questionId)}`);
     console.log(`${chalk.bold("Q:")} ${q.question}`);
     console.log(`${chalk.bold("A:")} ${chalk.green(answer)}`);
+
+    // Execute any associated action (set_status, add_note)
+    await executeQuestionAction(q, answer);
   } else {
     console.error(chalk.red("Failed to answer question"));
     process.exit(1);
@@ -163,38 +203,6 @@ export async function cmdQuestionsDashboard(): Promise<void> {
   const select = (await import("@inquirer/select")).default;
   const input = (await import("@inquirer/input")).default;
   const confirm = (await import("@inquirer/confirm")).default;
-
-  const executeAction = async (q: Question, answer: string) => {
-    if (!q.action || !q.taskId) return;
-
-    const result = getActionResult({ ...q, answer });
-    if (!result.shouldExecute) return;
-
-    try {
-      const tasksFile = await loadTasks(getTasksFile());
-      const task = findTask(tasksFile.tasks, q.taskId);
-      if (!task) return;
-
-      if (result.status) {
-        const oldStatus = task.status;
-        task.status = result.status as TaskStatus;
-        await saveTasks(getTasksFile(), tasksFile);
-        console.log(
-          `${chalk.green("Action executed:")} ${chalk.yellow(q.taskId)}: ${chalk.gray(oldStatus)} ${chalk.dim("→")} ${chalk.green(result.status)}`
-        );
-        await markActionExecuted(q.id);
-      }
-
-      if (result.note) {
-        task.ai_notes.push(result.note);
-        await saveTasks(getTasksFile(), tasksFile);
-        console.log(`${chalk.green("Note added to task:")} ${chalk.yellow(q.taskId)}`);
-        await markActionExecuted(q.id);
-      }
-    } catch (err) {
-      console.log(chalk.red(`Failed to execute action:`), err);
-    }
-  };
 
   const runLoop = async () => {
     while (true) {
@@ -321,7 +329,7 @@ export async function cmdQuestionsDashboard(): Promise<void> {
         await answerQuestion(selectedId, answer.trim());
         console.log(`\n${chalk.green("✓ Answer submitted!")}`);
 
-        await executeAction(selectedQ, answer.trim());
+        await executeQuestionAction(selectedQ, answer.trim());
 
         await Bun.sleep(1000);
       } catch (err: unknown) {
