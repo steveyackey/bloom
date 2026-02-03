@@ -251,6 +251,16 @@ export interface MergeLockTimeoutEvent {
 }
 
 /**
+ * Event emitted when a merge retry is attempted
+ */
+export interface MergeRetryEvent {
+  type: "merge:retry";
+  taskId: string;
+  attempt: number;
+  maxAttempts: number;
+}
+
+/**
  * Event emitted when starting a merge operation
  */
 export interface GitMergingEvent {
@@ -424,6 +434,7 @@ export type OrchestratorEvent =
   | MergeLockWaitingEvent
   | MergeLockAcquiredEvent
   | MergeLockTimeoutEvent
+  | MergeRetryEvent
   | GitMergingEvent
   | GitMergedEvent
   | GitMergeConflictEvent

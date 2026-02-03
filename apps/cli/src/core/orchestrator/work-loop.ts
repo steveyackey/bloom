@@ -58,6 +58,7 @@ export interface WorkLoopOptions {
 // =============================================================================
 
 const MAX_COMMIT_RETRIES = 3;
+const MAX_MERGE_RETRIES = 3;
 
 // =============================================================================
 // Work Loop
@@ -102,6 +103,9 @@ export async function runAgentWorkLoop(
 
   // Track commit retry attempts per task to prevent infinite loops
   const commitRetryCount = new Map<string, number>();
+
+  // Track merge retry attempts per task to prevent infinite loops
+  const mergeRetryCount = new Map<string, number>();
 
   async function getOrCreateAgent(provider: string) {
     if (!agentCache.has(provider)) {
@@ -280,7 +284,8 @@ export async function runAgentWorkLoop(
           message: `Resuming merge-only task ${taskResult.taskId} (was done_pending_merge)`,
         });
 
-        // Go directly to merge handling
+        let mergeCompleted = false;
+
         if (taskResult.gitInfo) {
           // Push source branch if configured (may have been interrupted before push)
           if (taskResult.gitConfig?.push_to_remote && taskResult.gitInfo.branch) {
@@ -311,23 +316,68 @@ export async function runAgentWorkLoop(
               currentSessionId,
               onEvent
             );
-          }
 
-          // Auto cleanup merged branches if configured
-          if (taskResult.gitConfig?.auto_cleanup_merged && taskResult.gitInfo.mergeInto && taskResult.repo) {
-            await cleanupMergedBranchesForTask(
-              {
-                taskId: taskResult.taskId!,
-                taskTitle: taskResult.title!,
-                repo: taskResult.repo,
-                gitInfo: taskResult.gitInfo,
-                gitConfig: taskResult.gitConfig,
-                bloomDir,
-                tasksFile,
-                agentName,
-              },
-              onEvent
-            );
+            // Check if merge succeeded by reloading task status
+            const freshData = await loadTasks(tasksFile);
+            const freshTask = findTask(freshData.tasks, taskResult.taskId!);
+            if (freshTask?.status === "done") {
+              mergeCompleted = true;
+              mergeRetryCount.delete(taskResult.taskId!);
+
+              // Auto cleanup merged branches if configured (only after successful merge)
+              if (taskResult.gitConfig?.auto_cleanup_merged) {
+                await cleanupMergedBranchesForTask(
+                  {
+                    taskId: taskResult.taskId!,
+                    taskTitle: taskResult.title!,
+                    repo: taskResult.repo,
+                    gitInfo: taskResult.gitInfo,
+                    gitConfig: taskResult.gitConfig,
+                    bloomDir,
+                    tasksFile,
+                    agentName,
+                  },
+                  onEvent
+                );
+              }
+            }
+          } else {
+            // No merge target (PR-only or no git merge configured) - task is done
+            await setTaskDone(tasksFile, taskResult.taskId!);
+            mergeCompleted = true;
+            mergeRetryCount.delete(taskResult.taskId!);
+          }
+        } else {
+          // No git info at all - nothing to merge, mark as done
+          await setTaskDone(tasksFile, taskResult.taskId!);
+          mergeCompleted = true;
+        }
+
+        // Track merge retries if merge wasn't completed
+        if (!mergeCompleted) {
+          const taskId = taskResult.taskId!;
+          const retries = (mergeRetryCount.get(taskId) || 0) + 1;
+          mergeRetryCount.set(taskId, retries);
+
+          onEvent({
+            type: "merge:retry",
+            taskId,
+            attempt: retries,
+            maxAttempts: MAX_MERGE_RETRIES,
+          });
+
+          if (retries >= MAX_MERGE_RETRIES) {
+            onEvent({
+              type: "task:blocked",
+              taskId,
+              agentName,
+              reason: `Max merge retries (${MAX_MERGE_RETRIES}) reached - merge failed`,
+            });
+
+            const blockedData = await loadTasks(tasksFile);
+            updateTaskStatus(blockedData.tasks, taskId, "blocked");
+            await saveTasks(tasksFile, blockedData);
+            mergeRetryCount.delete(taskId);
           }
         }
 
@@ -608,23 +658,25 @@ export async function runAgentWorkLoop(
               currentSessionId,
               onEvent
             );
-          }
 
-          // Auto cleanup merged branches if configured
-          if (taskResult.gitConfig?.auto_cleanup_merged && taskResult.gitInfo.mergeInto && taskResult.repo) {
-            await cleanupMergedBranchesForTask(
-              {
-                taskId: taskResult.taskId!,
-                taskTitle: taskResult.title!,
-                repo: taskResult.repo,
-                gitInfo: taskResult.gitInfo,
-                gitConfig: taskResult.gitConfig,
-                bloomDir,
-                tasksFile,
-                agentName,
-              },
-              onEvent
-            );
+            // Auto cleanup merged branches only after successful merge
+            const postMergeData = await loadTasks(tasksFile);
+            const postMergeTask = findTask(postMergeData.tasks, taskResult.taskId!);
+            if (postMergeTask?.status === "done" && taskResult.gitConfig?.auto_cleanup_merged) {
+              await cleanupMergedBranchesForTask(
+                {
+                  taskId: taskResult.taskId!,
+                  taskTitle: taskResult.title!,
+                  repo: taskResult.repo,
+                  gitInfo: taskResult.gitInfo,
+                  gitConfig: taskResult.gitConfig,
+                  bloomDir,
+                  tasksFile,
+                  agentName,
+                },
+                onEvent
+              );
+            }
           }
         }
       } else {

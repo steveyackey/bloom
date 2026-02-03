@@ -283,6 +283,10 @@ export function resetStuckTasks(tasks: TasksFile, logger: { info: (msg: string) 
         logger.info(`${task.id} (was in_progress)`);
         task.status = "ready_for_agent";
         resetCount++;
+      } else if (task.status === "done_pending_merge") {
+        logger.info(`${task.id} (was done_pending_merge)`);
+        task.status = "ready_for_agent";
+        resetCount++;
       }
       reset(task.subtasks);
     }

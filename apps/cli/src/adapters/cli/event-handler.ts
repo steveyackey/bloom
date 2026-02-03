@@ -145,6 +145,11 @@ function handleEvent(event: OrchestratorEvent, log: Logger): void {
       }
       break;
 
+    // Merge retries
+    case "merge:retry":
+      log.warn(`Merge failed for task ${event.taskId} (attempt ${event.attempt}/${event.maxAttempts})`);
+      break;
+
     // Push operations
     case "git:pushing":
       log.info(`Pushing branch ${event.branch} to ${event.remote}...`);

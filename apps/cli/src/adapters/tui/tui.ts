@@ -506,6 +506,10 @@ export class EventDrivenTUI {
         }
         break;
 
+      case "merge:retry":
+        this.broadcastMessage(style.warning(`Merge retry ${event.attempt}/${event.maxAttempts} for ${event.taskId}`));
+        break;
+
       case "error":
         this.broadcastMessage(style.error(`Error: ${event.message}`));
         break;
