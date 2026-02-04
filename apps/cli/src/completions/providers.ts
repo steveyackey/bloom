@@ -2,9 +2,11 @@
 // Dynamic Completion Providers - Live data readers for CLI argument completion
 // =============================================================================
 
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import YAML from "yaml";
+import { getBareRepoPath } from "../infra/git";
 import { type Task, TaskStatusSchema, validateTasksFile } from "../task-schema";
 import { getAllAgents } from "../tasks";
 
@@ -146,6 +148,47 @@ export function getInterjectionIdsSync(tasksFilePath: string): CompletionItem[] 
     }
     const files = readdirSync(interjectionsDir).filter((f) => f.endsWith(".json"));
     return files.map((f) => f.replace(".json", ""));
+  } catch {
+    return [];
+  }
+}
+
+// =============================================================================
+// Branch Name Provider
+// =============================================================================
+
+/**
+ * Reads branch names from a bare repo (synchronous version for shell completions).
+ * Returns local and remote branch names, deduped, without origin/ prefix.
+ * @param bloomDir - Path to the bloom workspace directory
+ * @param repoName - Name of the repository
+ */
+export function getBranchNamesSync(bloomDir: string, repoName: string): CompletionItem[] {
+  try {
+    const bareRepoPath = getBareRepoPath(bloomDir, repoName);
+    if (!existsSync(bareRepoPath)) {
+      return [];
+    }
+
+    const result = spawnSync("git", ["branch", "-a", "--format=%(refname:short)"], {
+      cwd: bareRepoPath,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    if (result.status !== 0) {
+      return [];
+    }
+
+    const output = result.stdout?.toString() || "";
+    const branches = output
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((branch) => branch.replace(/^origin\//, ""))
+      .filter((branch) => branch !== "HEAD");
+
+    return [...new Set(branches)];
   } catch {
     return [];
   }
