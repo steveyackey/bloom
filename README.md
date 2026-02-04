@@ -615,6 +615,60 @@ Each agent has its own CLI and configuration requirements. See the [Agent Docume
 - **OpenCode** - Multi-provider support
 - **Cursor** - Uses Cursor account or API key
 
+## Agent Sandbox
+
+Bloom can run agents inside a security sandbox that isolates them from the rest of your system. The sandbox provides:
+
+- **Filesystem isolation** - Agents can only write to their workspace directory
+- **Network filtering** - Agents can only access domains you explicitly allow
+- **Process isolation** - Agents cannot see or interact with other processes
+
+### Quick Setup
+
+```bash
+# Install the sandbox runtime
+npm install -g @anthropic-ai/sandbox-runtime
+
+# Linux/WSL2: Install dependencies
+sudo apt-get install bubblewrap socat  # Ubuntu/Debian
+sudo dnf install bubblewrap socat      # Fedora
+
+# Verify installation
+srt --version
+bloom agent check
+```
+
+### Enable Sandbox
+
+Add to `~/.bloom/config.yaml`:
+
+```yaml
+agent:
+  claude:
+    sandbox:
+      enabled: true
+      networkPolicy: allow-list
+      allowedDomains:
+        - github.com
+        - api.anthropic.com
+        - registry.npmjs.org
+```
+
+### Platform Support
+
+| Platform | Status | Technology |
+|----------|--------|------------|
+| **Linux** | Fully supported | bubblewrap + socat |
+| **macOS** | Fully supported | sandbox-exec (built-in) |
+| **WSL2** | Fully supported | Same as Linux |
+| **Windows** | Via WSL2 only | — |
+
+### Learn More
+
+- **[Sandbox Setup Guide](https://docs.use-bloom.dev/guides/sandbox-setup)** - Platform-specific installation
+- **[Policy Configuration](https://docs.use-bloom.dev/reference/sandbox-policy)** - All configuration options
+- **[Troubleshooting](https://docs.use-bloom.dev/guides/sandbox-troubleshooting)** - Common issues and solutions
+
 ## Development
 
 Bloom uses a Bun workspace monorepo:
