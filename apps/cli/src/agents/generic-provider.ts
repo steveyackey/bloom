@@ -5,10 +5,11 @@
  * Handles the common patterns for CLI interaction, output parsing, and session management.
  */
 
-import { type ChildProcess, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import chalk from "chalk";
 import { createLogger } from "../infra/logger";
-import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSession } from "./core";
+import { createSandboxedSpawn, resolveConfig, type SandboxedSpawnFn } from "../sandbox";
+import type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentSandboxConfig, AgentSession } from "./core";
 import type { AgentDefinition, PromptStyle } from "./schema";
 
 const logger = createLogger("generic-provider");
@@ -104,6 +105,7 @@ export class GenericAgentProvider implements Agent {
   private onTimeout?: () => void;
   private currentAgentName?: string;
   private model?: string;
+  private sandboxConfig?: AgentSandboxConfig;
 
   constructor(options: GenericProviderOptions) {
     this.definition = options.definition;
@@ -115,6 +117,7 @@ export class GenericAgentProvider implements Agent {
     this.onHeartbeat = options.onHeartbeat;
     this.onTimeout = options.onTimeout;
     this.model = options.model;
+    this.sandboxConfig = options.sandbox;
   }
 
   getActiveSession(): AgentSession | undefined {
@@ -122,6 +125,19 @@ export class GenericAgentProvider implements Agent {
       return activeSessions.get(this.currentAgentName);
     }
     return undefined;
+  }
+
+  /**
+   * Create a sandboxed spawn function for the given workspace directory.
+   * Uses the agent's sandbox config merged with sandbox module defaults.
+   */
+  private createSpawn(workspacePath: string): SandboxedSpawnFn {
+    const config = resolveConfig(workspacePath, this.sandboxConfig);
+    const { spawn, sandboxed } = createSandboxedSpawn(config);
+    if (sandboxed) {
+      logger.info(`Agent sandboxed: workspace=${workspacePath}`);
+    }
+    return spawn;
   }
 
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
@@ -145,8 +161,9 @@ export class GenericAgentProvider implements Agent {
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
       const args = this.buildArgs(options, "interactive");
+      const spawnFn = this.createSpawn(options.startingDirectory);
 
-      const proc = spawn(this.definition.command, args, {
+      const proc = spawnFn(this.definition.command, args, {
         cwd: options.startingDirectory,
         stdio: "inherit",
         env: this.getEnv(),
@@ -172,12 +189,13 @@ export class GenericAgentProvider implements Agent {
   private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
     return new Promise((resolve) => {
       const args = this.buildArgs(options, "streaming");
+      const spawnFn = this.createSpawn(options.startingDirectory);
 
       // Log the command being run for debugging
       const commandString = `${this.definition.command} ${args.join(" ")}`;
       logger.debug(`Running: ${commandString}`);
 
-      const proc = spawn(this.definition.command, args, {
+      const proc = spawnFn(this.definition.command, args, {
         cwd: options.startingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
         env: this.getEnv(),
