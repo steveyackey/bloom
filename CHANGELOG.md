@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.15](https://github.com/steveyackey/bloom/compare/bloom-v0.3.14...bloom-v0.3.15) (2026-02-04)
+
+
+### Features
+
+* add getBranchNamesSync completion provider ([176990d](https://github.com/steveyackey/bloom/commit/176990d70360780f22cbff26d0fd22c4dfdd2c24))
+* add repo/branch navigation to bloom enter command ([bca62c8](https://github.com/steveyackey/bloom/commit/bca62c880638cf556479198246fc8fe1e7aedf84))
+* enhance bloom enter with repo/branch navigation and tab completion ([e6fcc22](https://github.com/steveyackey/bloom/commit/e6fcc22b0293fc39f376a24ad2f99b1c3d78f838))
+
 ## [0.3.14](https://github.com/steveyackey/bloom/compare/bloom-v0.3.13...bloom-v0.3.14) (2026-02-03)
 
 
