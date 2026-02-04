@@ -21,6 +21,28 @@ export { getDefaultConfig, resolveConfig, toSrtSettings } from "./config";
 // Executor
 export type { SandboxedSpawnFn, SandboxedSpawnOptions } from "./executor";
 export { createSandboxedSpawn } from "./executor";
+// Lifecycle logging
+export type {
+  FilesystemViolation,
+  NetworkViolation,
+  PolicyViolation,
+  PolicyViolationEvent,
+  PolicyViolationType,
+  SandboxStartEvent,
+  SandboxStopEvent,
+} from "./logger";
+export {
+  createStartEvent,
+  createStopEvent,
+  getAgentSandboxLogger,
+  logPolicyViolation,
+  logSandboxCommand,
+  logSandboxStart,
+  logSandboxStop,
+  parseViolationsFromOutput,
+  sandboxLogger,
+  sandboxLoggers,
+} from "./logger";
 // Sandbox manager for multi-agent lifecycle
 export type { SandboxInstance, SandboxManagerStats } from "./manager";
 export { cleanupSandboxTempFiles, getDefaultSandboxManager, SandboxManager } from "./manager";
