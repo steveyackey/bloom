@@ -26,6 +26,18 @@ const configLogger = createLogger("user-config");
 const ToolPermissionSchema = z.union([z.literal("all"), z.array(z.string())]);
 
 /**
+ * Sandbox configuration for per-agent isolation settings.
+ * Maps to AgentSandboxConfig in agents/core.ts.
+ */
+const SandboxConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  networkPolicy: z.enum(["deny-all", "allow-list", "monitor", "disabled"]).optional(),
+  allowedDomains: z.array(z.string()).optional(),
+  writablePaths: z.array(z.string()).optional(),
+  denyReadPaths: z.array(z.string()).optional(),
+});
+
+/**
  * Base per-agent configuration shared by all agents.
  * Uses `defaultModel` as the active model and `models` as available options.
  */
@@ -34,6 +46,7 @@ const BaseAgentConfigSchema = z.object({
   models: z.array(z.string()).optional(),
   allowedTools: ToolPermissionSchema.optional(),
   deniedTools: z.array(z.string()).optional(),
+  sandbox: SandboxConfigSchema.optional(),
 });
 
 /**

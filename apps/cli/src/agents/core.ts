@@ -89,6 +89,24 @@ export interface AgentSession {
  * These are common options supported by all providers.
  * Provider-specific options should be defined in provider option interfaces.
  */
+/**
+ * Per-agent sandbox configuration overrides.
+ * These are passed through to the sandbox module's resolveConfig().
+ * Fields not specified here fall back to sandbox defaults.
+ */
+export interface AgentSandboxConfig {
+  /** Whether sandboxing is enabled for this agent. Default: false */
+  enabled?: boolean;
+  /** Network policy override. Default: "deny-all" */
+  networkPolicy?: "deny-all" | "allow-list" | "monitor" | "disabled";
+  /** Domains to allow when networkPolicy is "allow-list" */
+  allowedDomains?: string[];
+  /** Additional filesystem paths to mount as writable */
+  writablePaths?: string[];
+  /** Filesystem paths to deny read access to */
+  denyReadPaths?: string[];
+}
+
 export interface AgentConfig {
   /**
    * Execution mode:
@@ -106,6 +124,12 @@ export interface AgentConfig {
    * Only applies in streaming mode. Defaults to true for most providers.
    */
   streamOutput?: boolean;
+  /**
+   * Per-agent sandbox configuration.
+   * Controls process isolation when running this agent.
+   * If not specified, sandbox defaults apply (disabled).
+   */
+  sandbox?: AgentSandboxConfig;
 }
 
 /**

@@ -2,8 +2,8 @@
 // Agent Factory - Creates agents based on user configuration
 // =============================================================================
 
-import { getDefaultAgentName, getDefaultModel, loadUserConfig } from "../infra/config";
-import type { Agent } from "./core";
+import { getAgentConfig, getDefaultAgentName, getDefaultModel, loadUserConfig } from "../infra/config";
+import type { Agent, AgentSandboxConfig } from "./core";
 import { GenericAgentProvider } from "./generic-provider";
 import { getAgentDefinition, getRegisteredAgentNames, isValidAgentName } from "./loader";
 
@@ -23,6 +23,8 @@ export interface CreateAgentOptions {
   model?: string;
   /** Whether to stream output to stdout (default: true). Set false for TUI mode. */
   streamOutput?: boolean;
+  /** Override sandbox configuration (ignores per-agent config) */
+  sandbox?: AgentSandboxConfig;
 }
 
 // =============================================================================
@@ -50,7 +52,8 @@ export function createAgentByName(
   agentName: string,
   isInteractive: boolean,
   model?: string,
-  streamOutput = true
+  streamOutput = true,
+  sandbox?: AgentSandboxConfig
 ): Agent {
   // Validate agent name
   if (!isValidAgentName(agentName)) {
@@ -58,7 +61,7 @@ export function createAgentByName(
     throw new Error(`Unknown agent '${agentName}'. Available: ${available}`);
   }
 
-  return createGenericAgent(agentName, isInteractive, model, streamOutput);
+  return createGenericAgent(agentName, isInteractive, model, streamOutput, sandbox);
 }
 
 /**
@@ -105,10 +108,13 @@ export async function createAgent(mode: AgentMode, options: CreateAgentOptions =
     model = getDefaultModel(userConfig, agentName);
   }
 
+  // Resolve sandbox config: options override > per-agent config > defaults
+  const sandbox = options.sandbox ?? getAgentConfig(userConfig, agentName)?.sandbox;
+
   const isInteractive = mode === "interactive";
   const streamOutput = options.streamOutput ?? true;
 
-  return createAgentByName(agentName, isInteractive, model, streamOutput);
+  return createAgentByName(agentName, isInteractive, model, streamOutput, sandbox);
 }
 
 // =============================================================================
@@ -160,7 +166,8 @@ function createGenericAgent(
   agentName: string,
   interactive: boolean,
   model?: string,
-  streamOutput = true
+  streamOutput = true,
+  sandbox?: AgentSandboxConfig
 ): GenericAgentProvider {
   const definition = getAgentDefinition(agentName);
   if (!definition) {
@@ -172,5 +179,6 @@ function createGenericAgent(
     mode: interactive ? "interactive" : "streaming",
     streamOutput,
     model,
+    sandbox,
   });
 }
