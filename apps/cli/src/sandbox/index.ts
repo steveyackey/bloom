@@ -21,7 +21,9 @@ export { getDefaultConfig, resolveConfig, toSrtSettings } from "./config";
 // Executor
 export type { SandboxedSpawnFn, SandboxedSpawnOptions } from "./executor";
 export { createSandboxedSpawn } from "./executor";
-
+// Sandbox manager for multi-agent lifecycle
+export type { SandboxInstance, SandboxManagerStats } from "./manager";
+export { cleanupSandboxTempFiles, getDefaultSandboxManager, SandboxManager } from "./manager";
 // Platform detection
 export type { PlatformBackend, PlatformInfo } from "./platforms";
 export { detectPlatform, getPlatformBackend } from "./platforms";
