@@ -26,6 +26,9 @@
         "@types/node": "^25.1.0",
         "knip": "^5.82.1",
       },
+      "optionalDependencies": {
+        "@anthropic-ai/sandbox-runtime": "^0.0.35",
+      },
       "peerDependencies": {
         "typescript": "^5",
       },

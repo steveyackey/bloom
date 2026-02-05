@@ -23,6 +23,8 @@ const sidebars: SidebarsConfig = {
         'guides/project-workflow',
         'guides/task-management',
         'guides/multi-agent-orchestration',
+        'guides/sandbox-setup',
+        'guides/sandbox-troubleshooting',
       ],
     },
     {
@@ -74,6 +76,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'reference/task-schema',
         'reference/configuration',
+        'reference/sandbox-policy',
         'reference/tui-controls',
       ],
     },
