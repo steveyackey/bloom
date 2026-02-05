@@ -626,17 +626,15 @@ Bloom can run agents inside a security sandbox that isolates them from the rest 
 ### Quick Setup
 
 ```bash
-# Install the sandbox runtime
-npm install -g @anthropic-ai/sandbox-runtime
-
 # Linux/WSL2: Install dependencies
 sudo apt-get install bubblewrap socat  # Ubuntu/Debian
 sudo dnf install bubblewrap socat      # Fedora
 
-# Verify installation
-srt --version
+# Verify sandbox readiness
 bloom agent check
 ```
+
+The `@anthropic-ai/sandbox-runtime` library is included as an optional dependency and is loaded automatically when sandbox is enabled.
 
 ### Enable Sandbox
 

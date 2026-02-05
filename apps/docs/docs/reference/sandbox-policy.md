@@ -274,23 +274,25 @@ agent:
 
 Bloom's orchestrator automatically manages these deny-lists when running parallel agents through `bloom run`.
 
-## Settings File Format
+## Runtime Configuration
 
-When sandbox is enabled, Bloom generates a settings file for the srt runtime:
+When sandbox is enabled, Bloom passes a configuration object to the `@anthropic-ai/sandbox-runtime` library's `SandboxManager.initialize()` method:
 
 ```json
 {
   "filesystem": {
     "denyRead": ["~/.ssh", "~/.aws", "~/.gnupg"],
-    "allowWrite": ["/home/user/workspace", "/tmp/build"]
+    "allowWrite": ["/home/user/workspace", "/tmp/build"],
+    "denyWrite": ["/"]
   },
   "network": {
-    "allowedDomains": ["github.com", "registry.npmjs.org"]
+    "allowedDomains": ["github.com", "registry.npmjs.org"],
+    "deniedDomains": ["*"]
   }
 }
 ```
 
-This file is written to `/tmp/bloom-sandbox/` and passed to srt via `--settings <path>`.
+The library handles all platform-specific isolation (bubblewrap on Linux, sandbox-exec on macOS). Each agent command is wrapped via `SandboxManager.wrapWithSandbox()` before execution.
 
 ## Task-Level Overrides
 

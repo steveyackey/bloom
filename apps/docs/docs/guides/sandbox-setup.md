@@ -15,7 +15,7 @@ The sandbox provides three layers of protection:
 2. **Network filtering** - Agents can only access domains you explicitly allow
 3. **Process isolation** - Agents cannot see or interact with other processes on your system
 
-Bloom uses [Anthropic's sandbox-runtime (srt)](https://github.com/anthropics/sandbox-runtime) for isolation, which uses platform-native sandboxing technologies:
+Bloom uses the [`@anthropic-ai/sandbox-runtime`](https://github.com/anthropics/sandbox-runtime) library for isolation, which uses platform-native sandboxing technologies:
 
 | Platform | Isolation Technology | Dependencies |
 |----------|---------------------|--------------|
@@ -28,49 +28,27 @@ Bloom uses [Anthropic's sandbox-runtime (srt)](https://github.com/anthropics/san
 ### Prerequisites
 
 - macOS 10.15 (Catalina) or later
-- Node.js 18+ (for srt runtime)
 - Apple Silicon (M1/M2/M3) or Intel processor
 
 ### Installation
 
-macOS includes `sandbox-exec` by default, so you only need to install the srt runtime:
-
-```bash
-# Install srt globally
-npm install -g @anthropic-ai/sandbox-runtime
-
-# Verify installation
-srt --version
-```
+macOS includes `sandbox-exec` by default, so no additional system dependencies are required. The `@anthropic-ai/sandbox-runtime` library is included as an optional dependency of Bloom and is loaded automatically when sandbox is enabled.
 
 ### Verify Sandbox Works
 
-Test that the sandbox is functioning correctly:
+Run Bloom's built-in sandbox check to verify everything is working:
 
 ```bash
-# Create a test directory
-mkdir /tmp/sandbox-test
-
-# Run a simple command in the sandbox
-srt --settings <(echo '{"filesystem":{"allowWrite":["/tmp/sandbox-test"]}}') \
-  -- touch /tmp/sandbox-test/hello.txt
-
-# Verify the file was created
-ls /tmp/sandbox-test/hello.txt
-
-# Try writing outside the sandbox (should fail)
-srt --settings <(echo '{"filesystem":{"allowWrite":["/tmp/sandbox-test"]}}') \
-  -- touch /tmp/outside-sandbox.txt
-# Expected: "Operation not permitted"
+bloom agent check
 ```
 
 ### Apple Silicon vs Intel
 
-The sandbox works identically on both Apple Silicon (M1/M2/M3) and Intel Macs. srt automatically detects your architecture.
+The sandbox works identically on both Apple Silicon (M1/M2/M3) and Intel Macs. The runtime automatically detects your architecture.
 
 ### Enabling in Bloom
 
-Once srt is installed, enable sandboxing in your Bloom config:
+Enable sandboxing in your Bloom config:
 
 ```yaml
 # ~/.bloom/config.yaml
@@ -87,11 +65,10 @@ agent:
 
 - Modern Linux distribution (kernel 4.x+)
 - Unprivileged user namespaces enabled (default on most distributions)
-- Node.js 18+ (for srt runtime)
 
 ### Installation
 
-Install the required dependencies and srt:
+Install the required system dependencies:
 
 ```bash
 # Ubuntu/Debian
@@ -102,13 +79,9 @@ sudo dnf install bubblewrap socat
 
 # Arch Linux
 sudo pacman -S bubblewrap socat
-
-# Install srt
-npm install -g @anthropic-ai/sandbox-runtime
-
-# Verify installation
-srt --version
 ```
+
+The `@anthropic-ai/sandbox-runtime` library is included as an optional dependency of Bloom and is loaded automatically when sandbox is enabled.
 
 ### Check User Namespaces
 
@@ -130,27 +103,10 @@ sudo sysctl kernel.unprivileged_userns_clone=1
 
 ### Verify Sandbox Works
 
-Test the sandbox:
+Run Bloom's built-in sandbox check to verify your system dependencies:
 
 ```bash
-# Create a test directory
-mkdir /tmp/sandbox-test
-
-# Run a command in the sandbox
-srt --settings <(echo '{"filesystem":{"allowWrite":["/tmp/sandbox-test"]}}') \
-  -- touch /tmp/sandbox-test/hello.txt
-
-# Verify filesystem isolation
-ls /tmp/sandbox-test/hello.txt
-
-# Test network isolation (should fail)
-srt --settings <(echo '{"network":{"allowedDomains":[]}}') \
-  -- curl https://example.com
-# Expected: Network error (no connectivity)
-
-# Test with allowed domain (should succeed)
-srt --settings <(echo '{"network":{"allowedDomains":["example.com"]}}') \
-  -- curl https://example.com
+bloom agent check
 ```
 
 ### Enabling in Bloom
@@ -191,16 +147,12 @@ wsl --set-version <distro-name> 2
 ```bash
 # Inside your WSL2 terminal
 
-# Install dependencies
+# Install system dependencies
 sudo apt-get update
 sudo apt-get install bubblewrap socat
-
-# Install srt
-npm install -g @anthropic-ai/sandbox-runtime
-
-# Verify installation
-srt --version
 ```
+
+The `@anthropic-ai/sandbox-runtime` library is included as an optional dependency of Bloom and is loaded automatically.
 
 ### Known Limitations
 
@@ -224,15 +176,7 @@ srt --version
 ### Verify Sandbox Works
 
 ```bash
-# Create test directory in Linux filesystem (not /mnt/c/)
-mkdir ~/sandbox-test
-
-# Test sandbox
-srt --settings <(echo '{"filesystem":{"allowWrite":["'"$HOME"'/sandbox-test"]}}') \
-  -- touch ~/sandbox-test/hello.txt
-
-# Verify
-ls ~/sandbox-test/hello.txt
+bloom agent check
 ```
 
 ### Enabling in Bloom
@@ -257,7 +201,7 @@ After installation, run Bloom's built-in sandbox check:
 bloom agent check
 
 # Output will show sandbox status:
-# Sandbox: Available (srt v1.0.0, bubblewrap, socat)
+# Sandbox: Available (bubblewrap, socat)
 ```
 
 You can also validate a specific agent with sandbox enabled:
@@ -272,7 +216,7 @@ The sandbox has minimal overhead:
 
 | Resource | Per-Agent Overhead |
 |----------|-------------------|
-| Startup time | ~1.1 seconds (one-time) |
+| Startup time | &lt;1 second (one-time) |
 | Memory | ~80-90 MB per agent |
 | CPU | Negligible after startup |
 

@@ -12,9 +12,6 @@ This guide covers common sandbox issues and how to resolve them.
 Run these commands to check your sandbox setup:
 
 ```bash
-# Check if srt is installed
-srt --version
-
 # Check if bubblewrap is available (Linux/WSL2)
 which bwrap
 
@@ -27,32 +24,21 @@ bloom agent check
 
 ## Common Issues
 
-### "srt not found" or "command not found: srt"
+### "Sandbox enabled but @anthropic-ai/sandbox-runtime is not installed"
 
-**Cause:** The sandbox runtime isn't installed or isn't in your PATH.
+**Cause:** The sandbox runtime library is not available. It is an optional dependency that may not have been installed on your system.
 
 **Solution:**
 
 ```bash
-# Install srt globally
-npm install -g @anthropic-ai/sandbox-runtime
-
-# Verify it's in PATH
-which srt
-
-# If not found, check npm global bin directory
-npm config get prefix
-# Add <prefix>/bin to your PATH
+# Install or reinstall Bloom's dependencies
+cd /path/to/bloom && bun install
 ```
 
-If you installed with a non-standard prefix:
+If the library still isn't available, you can install it directly:
 
 ```bash
-# Check where npm installs global packages
-ls $(npm config get prefix)/bin/
-
-# Add to PATH in your shell config
-export PATH="$(npm config get prefix)/bin:$PATH"
+npm install @anthropic-ai/sandbox-runtime
 ```
 
 ### "bubblewrap (bwrap) not found" (Linux/WSL2)
@@ -128,11 +114,10 @@ sandbox:
     - github.com        # Matches exact domain
 ```
 
-Test with curl inside the sandbox:
+Verify by running an agent with verbose logging enabled:
 
 ```bash
-srt --settings <(echo '{"network":{"allowedDomains":["github.com"]}}') \
-  -- curl -v https://github.com
+BLOOM_SANDBOX_VERBOSE=1 bloom run
 ```
 
 ### "Read-only file system" when writing to workspace
@@ -185,7 +170,7 @@ bloom agent validate claude
 
 This occurs when:
 - Running Bloom inside a Docker container that's already sandboxed
-- Running srt inside another srt instance
+- Running a sandbox inside another sandbox instance
 
 For Docker environments, you have two options:
 
@@ -204,12 +189,11 @@ For Docker environments, you have two options:
 
 ### Sandbox works but agent is slow
 
-**Cause:** The 1.1-second startup overhead is expected for the Node.js srt runtime.
+**Cause:** There is a small startup overhead when initializing the sandbox.
 
 **Explanation:**
 
-- srt uses Node.js, which has inherent startup time (~1.1s)
-- This is a one-time cost per agent spawn
+- Sandbox initialization has a small one-time cost per agent spawn
 - Long-running agents amortize this cost
 - This is acceptable for agents that run for minutes/hours
 
@@ -295,9 +279,18 @@ journalctl -k | grep -i seccomp
 
 ### Manual Testing
 
-Test specific operations outside of Bloom:
+Test sandbox behavior by running an agent with sandbox enabled and verbose logging:
 
 ```bash
+# Enable verbose sandbox logging for debugging
+BLOOM_SANDBOX_VERBOSE=1 bloom agent validate claude
+```
+
+You can also install the `srt` CLI tool for manual testing outside of Bloom:
+
+```bash
+npm install -g @anthropic-ai/sandbox-runtime
+
 # Test filesystem access
 srt --settings <(echo '{"filesystem":{"allowWrite":["/tmp/test"]}}') \
   -- ls -la ~/sensitive-dir
@@ -305,10 +298,6 @@ srt --settings <(echo '{"filesystem":{"allowWrite":["/tmp/test"]}}') \
 # Test network access
 srt --settings <(echo '{"network":{"allowedDomains":["example.com"]}}') \
   -- curl https://blocked-domain.com
-
-# Test with your actual config
-srt --settings ~/.bloom/sandbox-settings.json \
-  -- your-command-here
 ```
 
 ## Platform-Specific Issues
@@ -321,7 +310,7 @@ Apple has deprecated `sandbox-exec` but it still works. These warnings can be ig
 warning: sandbox-exec is deprecated
 ```
 
-srt uses sandbox-exec for macOS isolation; there's no alternative until Apple provides one.
+The sandbox runtime uses sandbox-exec for macOS isolation; there's no alternative until Apple provides one.
 
 ### WSL2: Slow File Access on /mnt/c
 
@@ -357,7 +346,6 @@ If you're still having issues:
 2. Run diagnostics and include output in your issue:
    ```bash
    bloom agent check
-   srt --version
    cat ~/.bloom/config.yaml
    ```
 3. Include your platform details:
