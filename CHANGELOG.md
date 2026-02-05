@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.17](https://github.com/steveyackey/bloom/compare/bloom-v0.3.16...bloom-v0.3.17) (2026-02-05)
+
+
+### Bug Fixes
+
+* launch agent to commit target worktree changes before merge ([6eb457a](https://github.com/steveyackey/bloom/commit/6eb457a84fe87d7773cf06442ff2bc21683701b3))
+
 ## [0.3.16](https://github.com/steveyackey/bloom/compare/bloom-v0.3.15...bloom-v0.3.16) (2026-02-05)
 
 
