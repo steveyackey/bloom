@@ -31,8 +31,8 @@ describe("SandboxManager", () => {
   // ===========================================================================
 
   describe("createInstance", () => {
-    test("creates a sandbox instance for an agent", () => {
-      const instance = manager.createInstance("agent-1", join(testDir, "agent-1"));
+    test("creates a sandbox instance for an agent", async () => {
+      const instance = await manager.createInstance("agent-1", join(testDir, "agent-1"));
 
       expect(instance.agentName).toBe("agent-1");
       expect(instance.config.workspacePath).toBe(join(testDir, "agent-1"));
@@ -41,12 +41,12 @@ describe("SandboxManager", () => {
       expect(instance.createdAt).toBeGreaterThan(0);
     });
 
-    test("each agent gets its own isolated instance", () => {
+    test("each agent gets its own isolated instance", async () => {
       const workspace1 = join(testDir, "agent-1");
       const workspace2 = join(testDir, "agent-2");
 
-      const instance1 = manager.createInstance("agent-1", workspace1);
-      const instance2 = manager.createInstance("agent-2", workspace2);
+      const instance1 = await manager.createInstance("agent-1", workspace1);
+      const instance2 = await manager.createInstance("agent-2", workspace2);
 
       expect(instance1.agentName).toBe("agent-1");
       expect(instance2.agentName).toBe("agent-2");
@@ -55,19 +55,19 @@ describe("SandboxManager", () => {
       expect(instance1).not.toBe(instance2);
     });
 
-    test("replaces existing instance for same agent", () => {
+    test("replaces existing instance for same agent", async () => {
       const workspace1 = join(testDir, "ws1");
       const workspace2 = join(testDir, "ws2");
 
-      manager.createInstance("agent-1", workspace1);
-      const instance2 = manager.createInstance("agent-1", workspace2);
+      await manager.createInstance("agent-1", workspace1);
+      const instance2 = await manager.createInstance("agent-1", workspace2);
 
       expect(manager.getInstance("agent-1")).toBe(instance2);
       expect(instance2.config.workspacePath).toBe(workspace2);
     });
 
-    test("applies sandbox config overrides", () => {
-      const instance = manager.createInstance("agent-1", join(testDir, "agent-1"), {
+    test("applies sandbox config overrides", async () => {
+      const instance = await manager.createInstance("agent-1", join(testDir, "agent-1"), {
         enabled: true,
         networkPolicy: "allow-list",
         allowedDomains: ["github.com"],
@@ -84,8 +84,8 @@ describe("SandboxManager", () => {
   // ===========================================================================
 
   describe("getInstance", () => {
-    test("returns instance for existing agent", () => {
-      const created = manager.createInstance("agent-1", join(testDir, "agent-1"));
+    test("returns instance for existing agent", async () => {
+      const created = await manager.createInstance("agent-1", join(testDir, "agent-1"));
       const retrieved = manager.getInstance("agent-1");
 
       expect(retrieved).toBe(created);
@@ -97,8 +97,8 @@ describe("SandboxManager", () => {
   });
 
   describe("hasInstance", () => {
-    test("returns true for existing agent", () => {
-      manager.createInstance("agent-1", join(testDir, "agent-1"));
+    test("returns true for existing agent", async () => {
+      await manager.createInstance("agent-1", join(testDir, "agent-1"));
       expect(manager.hasInstance("agent-1")).toBe(true);
     });
 
@@ -112,8 +112,8 @@ describe("SandboxManager", () => {
   // ===========================================================================
 
   describe("destroyInstance", () => {
-    test("removes instance for agent", () => {
-      manager.createInstance("agent-1", join(testDir, "agent-1"));
+    test("removes instance for agent", async () => {
+      await manager.createInstance("agent-1", join(testDir, "agent-1"));
       const result = manager.destroyInstance("agent-1");
 
       expect(result).toBe(true);
@@ -127,10 +127,10 @@ describe("SandboxManager", () => {
   });
 
   describe("destroyAll", () => {
-    test("removes all instances", () => {
-      manager.createInstance("agent-1", join(testDir, "agent-1"));
-      manager.createInstance("agent-2", join(testDir, "agent-2"));
-      manager.createInstance("agent-3", join(testDir, "agent-3"));
+    test("removes all instances", async () => {
+      await manager.createInstance("agent-1", join(testDir, "agent-1"));
+      await manager.createInstance("agent-2", join(testDir, "agent-2"));
+      await manager.createInstance("agent-3", join(testDir, "agent-3"));
 
       manager.destroyAll();
 
@@ -159,10 +159,10 @@ describe("SandboxManager", () => {
       expect(stats.agents).toEqual([]);
     });
 
-    test("reports correct instance count", () => {
-      manager.createInstance("agent-1", join(testDir, "agent-1"));
-      manager.createInstance("agent-2", join(testDir, "agent-2"));
-      manager.createInstance("agent-3", join(testDir, "agent-3"));
+    test("reports correct instance count", async () => {
+      await manager.createInstance("agent-1", join(testDir, "agent-1"));
+      await manager.createInstance("agent-2", join(testDir, "agent-2"));
+      await manager.createInstance("agent-3", join(testDir, "agent-3"));
 
       const stats = manager.getStats();
 
@@ -179,11 +179,11 @@ describe("SandboxManager", () => {
   // ===========================================================================
 
   describe("concurrent instances", () => {
-    test("supports 10 concurrent sandbox instances", () => {
+    test("supports 10 concurrent sandbox instances", async () => {
       const agents = Array.from({ length: 10 }, (_, i) => `agent-${i}`);
 
       for (const agent of agents) {
-        manager.createInstance(agent, join(testDir, agent));
+        await manager.createInstance(agent, join(testDir, agent));
       }
 
       const stats = manager.getStats();
@@ -196,12 +196,12 @@ describe("SandboxManager", () => {
       expect(uniqueInstances.size).toBe(10);
     });
 
-    test("each instance has isolated workspace path", () => {
+    test("each instance has isolated workspace path", async () => {
       const agents = Array.from({ length: 5 }, (_, i) => `agent-${i}`);
       const workspaces = agents.map((a) => join(testDir, a));
 
       for (let i = 0; i < agents.length; i++) {
-        manager.createInstance(agents[i]!, workspaces[i]!);
+        await manager.createInstance(agents[i]!, workspaces[i]!);
       }
 
       for (let i = 0; i < agents.length; i++) {
@@ -210,9 +210,9 @@ describe("SandboxManager", () => {
       }
     });
 
-    test("destroying one instance does not affect others", () => {
+    test("destroying one instance does not affect others", async () => {
       for (let i = 0; i < 5; i++) {
-        manager.createInstance(`agent-${i}`, join(testDir, `agent-${i}`));
+        await manager.createInstance(`agent-${i}`, join(testDir, `agent-${i}`));
       }
 
       manager.destroyInstance("agent-2");
@@ -231,11 +231,11 @@ describe("SandboxManager", () => {
   // ===========================================================================
 
   describe("process tracking", () => {
-    test("spawn function tracks child processes", () => {
-      const instance = manager.createInstance("agent-1", join(testDir, "agent-1"));
+    test("spawn function tracks child processes", async () => {
+      const instance = await manager.createInstance("agent-1", join(testDir, "agent-1"));
 
       // Spawn a simple process (sandbox disabled, so passthrough spawn)
-      const proc = instance.spawn("echo", ["hello"], {
+      const proc = await instance.spawn("echo", ["hello"], {
         cwd: testDir,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -244,9 +244,9 @@ describe("SandboxManager", () => {
     });
 
     test("process removed from tracking on exit", async () => {
-      const instance = manager.createInstance("agent-1", join(testDir, "agent-1"));
+      const instance = await manager.createInstance("agent-1", join(testDir, "agent-1"));
 
-      const proc = instance.spawn("echo", ["hello"], {
+      const proc = await instance.spawn("echo", ["hello"], {
         cwd: testDir,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -260,14 +260,14 @@ describe("SandboxManager", () => {
     });
 
     test("tracks processes per-instance independently", async () => {
-      const instance1 = manager.createInstance("agent-1", join(testDir, "agent-1"));
-      const instance2 = manager.createInstance("agent-2", join(testDir, "agent-2"));
+      const instance1 = await manager.createInstance("agent-1", join(testDir, "agent-1"));
+      const instance2 = await manager.createInstance("agent-2", join(testDir, "agent-2"));
 
-      const proc1 = instance1.spawn("sleep", ["0.1"], {
+      const proc1 = await instance1.spawn("sleep", ["0.1"], {
         cwd: testDir,
         stdio: ["pipe", "pipe", "pipe"],
       });
-      const proc2 = instance2.spawn("sleep", ["0.1"], {
+      const proc2 = await instance2.spawn("sleep", ["0.1"], {
         cwd: testDir,
         stdio: ["pipe", "pipe", "pipe"],
       });

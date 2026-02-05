@@ -13,9 +13,6 @@
 // =============================================================================
 
 import type { ChildProcess } from "node:child_process";
-import { rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { resolveConfig, type SandboxConfig } from "./config";
 import { createSandboxedSpawn, type SandboxedSpawnFn } from "./executor";
 import { sandboxLoggers } from "./logger";
@@ -33,7 +30,7 @@ export interface SandboxInstance {
   config: SandboxConfig;
   /** The sandboxed spawn function */
   spawn: SandboxedSpawnFn;
-  /** Whether the sandbox is actually active (srt available) */
+  /** Whether the sandbox is actually active (library available) */
   sandboxed: boolean;
   /** Tracked child processes spawned through this instance */
   processes: Set<ChildProcess>;
@@ -64,7 +61,11 @@ export class SandboxManager {
    *
    * If an instance already exists for this agent, it is cleaned up first.
    */
-  createInstance(agentName: string, workspacePath: string, overrides?: Partial<SandboxConfig>): SandboxInstance {
+  async createInstance(
+    agentName: string,
+    workspacePath: string,
+    overrides?: Partial<SandboxConfig>
+  ): Promise<SandboxInstance> {
     // Clean up existing instance for this agent if present
     if (this.instances.has(agentName)) {
       log.debug(`Replacing existing sandbox instance for agent: ${agentName}`);
@@ -72,13 +73,13 @@ export class SandboxManager {
     }
 
     const config = resolveConfig(workspacePath, overrides);
-    const { spawn: rawSpawn, sandboxed } = createSandboxedSpawn(config);
+    const { spawn: rawSpawn, sandboxed } = await createSandboxedSpawn(config);
 
     // Wrap spawn to track child processes for cleanup
     const instance: SandboxInstance = {
       agentName,
       config,
-      spawn: () => {
+      spawn: async () => {
         throw new Error("not initialized");
       },
       sandboxed,
@@ -86,8 +87,8 @@ export class SandboxManager {
       createdAt: Date.now(),
     };
 
-    const trackedSpawn: SandboxedSpawnFn = (command, args, options) => {
-      const proc = rawSpawn(command, args, options);
+    const trackedSpawn: SandboxedSpawnFn = async (command, args, options) => {
+      const proc = await rawSpawn(command, args, options);
       instance.processes.add(proc);
 
       // Auto-remove from tracking when process exits
@@ -261,18 +262,4 @@ export function getDefaultSandboxManager(): SandboxManager {
     defaultManager = new SandboxManager();
   }
   return defaultManager;
-}
-
-/**
- * Clean up sandbox temp files from /tmp/bloom-sandbox/.
- * Called during graceful shutdown.
- */
-export function cleanupSandboxTempFiles(): void {
-  try {
-    const dir = join(tmpdir(), "bloom-sandbox");
-    rmSync(dir, { recursive: true, force: true });
-    log.debug("Cleaned up sandbox temp directory");
-  } catch {
-    // Temp dir may not exist or be already cleaned
-  }
 }

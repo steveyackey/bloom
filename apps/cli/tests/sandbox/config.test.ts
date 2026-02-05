@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getDefaultConfig, resolveConfig, type SandboxConfig, toSrtSettings } from "../../src/sandbox/config";
+import { getDefaultConfig, resolveConfig, type SandboxConfig, toSandboxRuntimeConfig } from "../../src/sandbox/config";
 
 describe("Sandbox Config", () => {
   describe("getDefaultConfig", () => {
@@ -92,8 +92,8 @@ describe("Sandbox Config", () => {
     });
   });
 
-  describe("toSrtSettings", () => {
-    test("generates srt settings with workspace in allowWrite", () => {
+  describe("toSandboxRuntimeConfig", () => {
+    test("generates runtime config with workspace in allowWrite", () => {
       const config: SandboxConfig = {
         enabled: true,
         workspacePath: "/workspace/agent-1",
@@ -104,11 +104,11 @@ describe("Sandbox Config", () => {
         processLimit: 0,
       };
 
-      const settings = toSrtSettings(config);
+      const runtimeConfig = toSandboxRuntimeConfig(config);
 
-      expect(settings.filesystem.allowWrite).toEqual(["/workspace/agent-1"]);
-      expect(settings.filesystem.denyRead).toEqual(["~/.ssh"]);
-      expect(settings.network.allowedDomains).toEqual([]);
+      expect(runtimeConfig.filesystem?.allowWrite).toEqual(["/workspace/agent-1"]);
+      expect(runtimeConfig.filesystem?.denyRead).toEqual(["~/.ssh"]);
+      expect(runtimeConfig.network?.allowedDomains).toEqual([]);
     });
 
     test("includes additional writable paths in allowWrite", () => {
@@ -122,9 +122,9 @@ describe("Sandbox Config", () => {
         processLimit: 0,
       };
 
-      const settings = toSrtSettings(config);
+      const runtimeConfig = toSandboxRuntimeConfig(config);
 
-      expect(settings.filesystem.allowWrite).toEqual(["/workspace", "/tmp/cache", "/var/log"]);
+      expect(runtimeConfig.filesystem?.allowWrite).toEqual(["/workspace", "/tmp/cache", "/var/log"]);
     });
 
     test("populates allowedDomains for allow-list network policy", () => {
@@ -138,9 +138,9 @@ describe("Sandbox Config", () => {
         processLimit: 0,
       };
 
-      const settings = toSrtSettings(config);
+      const runtimeConfig = toSandboxRuntimeConfig(config);
 
-      expect(settings.network.allowedDomains).toEqual(["github.com", "*.githubusercontent.com"]);
+      expect(runtimeConfig.network?.allowedDomains).toEqual(["github.com", "*.githubusercontent.com"]);
     });
 
     test("uses empty allowedDomains for deny-all network policy", () => {
@@ -154,12 +154,12 @@ describe("Sandbox Config", () => {
         processLimit: 0,
       };
 
-      const settings = toSrtSettings(config);
+      const runtimeConfig = toSandboxRuntimeConfig(config);
 
-      expect(settings.network.allowedDomains).toEqual([]);
+      expect(runtimeConfig.network?.allowedDomains).toEqual([]);
     });
 
-    test("uses empty allowedDomains for disabled network policy", () => {
+    test("omits network config for disabled network policy", () => {
       const config: SandboxConfig = {
         enabled: true,
         workspacePath: "/workspace",
@@ -170,9 +170,27 @@ describe("Sandbox Config", () => {
         processLimit: 0,
       };
 
-      const settings = toSrtSettings(config);
+      const runtimeConfig = toSandboxRuntimeConfig(config);
 
-      expect(settings.network.allowedDomains).toEqual([]);
+      // Disabled network policy should omit network config entirely
+      expect(runtimeConfig.network).toBeUndefined();
+    });
+
+    test("includes deniedDomains and denyWrite fields", () => {
+      const config: SandboxConfig = {
+        enabled: true,
+        workspacePath: "/workspace",
+        networkPolicy: "deny-all",
+        allowedDomains: [],
+        writablePaths: [],
+        denyReadPaths: [],
+        processLimit: 0,
+      };
+
+      const runtimeConfig = toSandboxRuntimeConfig(config);
+
+      expect(runtimeConfig.network?.deniedDomains).toEqual([]);
+      expect(runtimeConfig.filesystem?.denyWrite).toEqual([]);
     });
   });
 });

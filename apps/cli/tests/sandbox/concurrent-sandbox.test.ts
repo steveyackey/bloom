@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveConfig } from "../../src/sandbox/config";
+import type { SandboxInstance } from "../../src/sandbox/manager";
 import { SandboxManager } from "../../src/sandbox/manager";
 
 // =============================================================================
@@ -37,20 +38,20 @@ function createAgentWorkspace(baseDir: string, agentName: string): string {
  * Returns the output and exit code.
  */
 async function spawnAndWait(
-  instance: ReturnType<SandboxManager["createInstance"]>,
+  instance: SandboxInstance,
   command: string,
   args: string[],
   cwd: string
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+  let stdout = "";
+  let stderr = "";
+
+  const proc = await instance.spawn(command, args, {
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
   return new Promise((resolve) => {
-    let stdout = "";
-    let stderr = "";
-
-    const proc = instance.spawn(command, args, {
-      cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
     proc.stdout?.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
@@ -94,13 +95,13 @@ describe("Concurrent Sandbox Integration", () => {
   // ===========================================================================
 
   describe("per-agent sandbox isolation", () => {
-    test("each agent gets its own sandbox instance with unique workspace", () => {
+    test("each agent gets its own sandbox instance with unique workspace", async () => {
       const agentCount = 8;
-      const instances: ReturnType<SandboxManager["createInstance"]>[] = [];
+      const instances: SandboxInstance[] = [];
 
       for (let i = 0; i < agentCount; i++) {
         const workspace = createAgentWorkspace(testDir, `agent-${i}`);
-        instances.push(manager.createInstance(`agent-${i}`, workspace));
+        instances.push(await manager.createInstance(`agent-${i}`, workspace));
       }
 
       // Verify each instance is unique with its own workspace
@@ -112,12 +113,12 @@ describe("Concurrent Sandbox Integration", () => {
       expect(stats.activeInstances).toBe(agentCount);
     });
 
-    test("agents cannot access each other's workspaces via config", () => {
+    test("agents cannot access each other's workspaces via config", async () => {
       const workspace1 = createAgentWorkspace(testDir, "agent-alpha");
       const workspace2 = createAgentWorkspace(testDir, "agent-beta");
 
-      const instance1 = manager.createInstance("agent-alpha", workspace1, { enabled: true });
-      const instance2 = manager.createInstance("agent-beta", workspace2, { enabled: true });
+      const instance1 = await manager.createInstance("agent-alpha", workspace1, { enabled: true });
+      const instance2 = await manager.createInstance("agent-beta", workspace2, { enabled: true });
 
       // Each sandbox config only allows writing to its own workspace
       const config1 = instance1.config;
@@ -127,27 +128,27 @@ describe("Concurrent Sandbox Integration", () => {
       expect(config2.workspacePath).toBe(workspace2);
       expect(config1.workspacePath).not.toBe(config2.workspacePath);
 
-      // When srt settings are generated, each agent's allowWrite is limited to its workspace
-      const { toSrtSettings } = require("../../src/sandbox/config");
-      const settings1 = toSrtSettings(config1);
-      const settings2 = toSrtSettings(config2);
+      // When runtime config is generated, each agent's allowWrite is limited to its workspace
+      const { toSandboxRuntimeConfig } = require("../../src/sandbox/config");
+      const runtimeConfig1 = toSandboxRuntimeConfig(config1);
+      const runtimeConfig2 = toSandboxRuntimeConfig(config2);
 
-      expect(settings1.filesystem.allowWrite).toContain(workspace1);
-      expect(settings1.filesystem.allowWrite).not.toContain(workspace2);
-      expect(settings2.filesystem.allowWrite).toContain(workspace2);
-      expect(settings2.filesystem.allowWrite).not.toContain(workspace1);
+      expect(runtimeConfig1.filesystem.allowWrite).toContain(workspace1);
+      expect(runtimeConfig1.filesystem.allowWrite).not.toContain(workspace2);
+      expect(runtimeConfig2.filesystem.allowWrite).toContain(workspace2);
+      expect(runtimeConfig2.filesystem.allowWrite).not.toContain(workspace1);
     });
 
-    test("sandbox config is independently configurable per agent", () => {
+    test("sandbox config is independently configurable per agent", async () => {
       const workspace1 = createAgentWorkspace(testDir, "agent-1");
       const workspace2 = createAgentWorkspace(testDir, "agent-2");
 
-      const instance1 = manager.createInstance("agent-1", workspace1, {
+      const instance1 = await manager.createInstance("agent-1", workspace1, {
         enabled: true,
         networkPolicy: "deny-all",
       });
 
-      const instance2 = manager.createInstance("agent-2", workspace2, {
+      const instance2 = await manager.createInstance("agent-2", workspace2, {
         enabled: true,
         networkPolicy: "allow-list",
         allowedDomains: ["api.example.com"],
@@ -172,7 +173,7 @@ describe("Concurrent Sandbox Integration", () => {
       const promises = Array.from({ length: agentCount }, async (_, i) => {
         const agentName = `concurrent-agent-${i}`;
         const workspace = createAgentWorkspace(testDir, agentName);
-        const instance = manager.createInstance(agentName, workspace);
+        const instance = await manager.createInstance(agentName, workspace);
 
         // Each agent writes to its own workspace to prove isolation
         writeFileSync(join(workspace, "input.txt"), `agent-${i}-data`);
@@ -199,15 +200,16 @@ describe("Concurrent Sandbox Integration", () => {
       const startTime = Date.now();
 
       // Create all instances first
-      const instances = Array.from({ length: agentCount }, (_, i) => {
+      const instances = [];
+      for (let i = 0; i < agentCount; i++) {
         const agentName = `scale-agent-${i}`;
         const workspace = createAgentWorkspace(testDir, agentName);
-        return {
+        instances.push({
           name: agentName,
           workspace,
-          instance: manager.createInstance(agentName, workspace),
-        };
-      });
+          instance: await manager.createInstance(agentName, workspace),
+        });
+      }
 
       expect(manager.getStats().activeInstances).toBe(agentCount);
 
@@ -245,15 +247,16 @@ describe("Concurrent Sandbox Integration", () => {
     test("agents produce independent output streams", async () => {
       const agentCount = 7;
 
-      const instances = Array.from({ length: agentCount }, (_, i) => {
+      const instances = [];
+      for (let i = 0; i < agentCount; i++) {
         const agentName = `output-agent-${i}`;
         const workspace = createAgentWorkspace(testDir, agentName);
-        return {
+        instances.push({
           name: agentName,
           workspace,
-          instance: manager.createInstance(agentName, workspace),
-        };
-      });
+          instance: await manager.createInstance(agentName, workspace),
+        });
+      }
 
       // Each agent writes a unique marker to stdout
       const promises = instances.map(({ name, workspace, instance }) => {
@@ -285,7 +288,7 @@ describe("Concurrent Sandbox Integration", () => {
   describe("sandbox cleanup", () => {
     test("normal exit: processes cleaned up after completion", async () => {
       const workspace = createAgentWorkspace(testDir, "cleanup-agent");
-      const instance = manager.createInstance("cleanup-agent", workspace);
+      const instance = await manager.createInstance("cleanup-agent", workspace);
 
       // Spawn a process and wait for it to finish
       const result = await spawnAndWait(instance, "echo", ["done"], workspace);
@@ -297,7 +300,7 @@ describe("Concurrent Sandbox Integration", () => {
 
     test("normal exit: multiple processes cleaned up", async () => {
       const workspace = createAgentWorkspace(testDir, "multi-proc-agent");
-      const instance = manager.createInstance("multi-proc-agent", workspace);
+      const instance = await manager.createInstance("multi-proc-agent", workspace);
 
       // Spawn multiple sequential processes
       for (let i = 0; i < 5; i++) {
@@ -311,7 +314,7 @@ describe("Concurrent Sandbox Integration", () => {
 
     test("abnormal exit (error): process tracked until exit", async () => {
       const workspace = createAgentWorkspace(testDir, "error-agent");
-      const instance = manager.createInstance("error-agent", workspace);
+      const instance = await manager.createInstance("error-agent", workspace);
 
       // Spawn a process that will fail
       const result = await spawnAndWait(instance, "sh", ["-c", "exit 1"], workspace);
@@ -323,10 +326,10 @@ describe("Concurrent Sandbox Integration", () => {
 
     test("destroyInstance kills running processes", async () => {
       const workspace = createAgentWorkspace(testDir, "destroy-agent");
-      const instance = manager.createInstance("destroy-agent", workspace);
+      const instance = await manager.createInstance("destroy-agent", workspace);
 
       // Spawn a long-running process
-      const proc = instance.spawn("sleep", ["60"], {
+      const proc = await instance.spawn("sleep", ["60"], {
         cwd: workspace,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -351,8 +354,8 @@ describe("Concurrent Sandbox Integration", () => {
       // Spawn long-running processes for multiple agents
       for (let i = 0; i < 5; i++) {
         const workspace = createAgentWorkspace(testDir, `killall-agent-${i}`);
-        const instance = manager.createInstance(`killall-agent-${i}`, workspace);
-        const proc = instance.spawn("sleep", ["60"], {
+        const instance = await manager.createInstance(`killall-agent-${i}`, workspace);
+        const proc = await instance.spawn("sleep", ["60"], {
           cwd: workspace,
           stdio: ["pipe", "pipe", "pipe"],
         });
@@ -384,13 +387,13 @@ describe("Concurrent Sandbox Integration", () => {
 
     test("no orphaned processes after cleanup", async () => {
       const workspace = createAgentWorkspace(testDir, "orphan-check");
-      const instance = manager.createInstance("orphan-check", workspace);
+      const instance = await manager.createInstance("orphan-check", workspace);
 
       // Spawn several processes
       const procs: ChildProcess[] = [];
       for (let i = 0; i < 3; i++) {
         procs.push(
-          instance.spawn("sleep", ["0.1"], {
+          await instance.spawn("sleep", ["0.1"], {
             cwd: workspace,
             stdio: ["pipe", "pipe", "pipe"],
           })
@@ -413,13 +416,13 @@ describe("Concurrent Sandbox Integration", () => {
   // ===========================================================================
 
   describe("resource usage", () => {
-    test("memory usage stays reasonable with 10 instances", () => {
+    test("memory usage stays reasonable with 10 instances", async () => {
       const baselineMemory = process.memoryUsage().heapUsed;
 
       // Create 10 sandbox instances
       for (let i = 0; i < 10; i++) {
         const workspace = createAgentWorkspace(testDir, `mem-agent-${i}`);
-        manager.createInstance(`mem-agent-${i}`, workspace);
+        await manager.createInstance(`mem-agent-${i}`, workspace);
       }
 
       const afterMemory = process.memoryUsage().heapUsed;
@@ -434,7 +437,7 @@ describe("Concurrent Sandbox Integration", () => {
       // Create instances
       for (let i = 0; i < 5; i++) {
         const workspace = createAgentWorkspace(testDir, `stats-agent-${i}`);
-        manager.createInstance(`stats-agent-${i}`, workspace);
+        await manager.createInstance(`stats-agent-${i}`, workspace);
       }
 
       let stats = manager.getStats();
@@ -443,7 +446,7 @@ describe("Concurrent Sandbox Integration", () => {
 
       // Spawn a process in one instance
       const instance = manager.getInstance("stats-agent-0")!;
-      const proc = instance.spawn("sleep", ["0.5"], {
+      const proc = await instance.spawn("sleep", ["0.5"], {
         cwd: testDir,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -472,7 +475,7 @@ describe("Concurrent Sandbox Integration", () => {
       for (let i = 0; i < agentCount; i++) {
         const workspace = createAgentWorkspace(testDir, `iso-agent-${i}`);
         workspaces.push(workspace);
-        manager.createInstance(`iso-agent-${i}`, workspace);
+        await manager.createInstance(`iso-agent-${i}`, workspace);
       }
 
       // Each agent writes a unique file to its workspace
@@ -499,14 +502,15 @@ describe("Concurrent Sandbox Integration", () => {
       const agentCount = 8;
 
       // Create workspace and instances
-      const agents = Array.from({ length: agentCount }, (_, i) => {
+      const agents = [];
+      for (let i = 0; i < agentCount; i++) {
         const workspace = createAgentWorkspace(testDir, `interference-agent-${i}`);
-        return {
+        agents.push({
           name: `interference-agent-${i}`,
           workspace,
-          instance: manager.createInstance(`interference-agent-${i}`, workspace),
-        };
-      });
+          instance: await manager.createInstance(`interference-agent-${i}`, workspace),
+        });
+      }
 
       // All agents write concurrently - each writes multiple files
       const promises = agents.map(async ({ name, workspace, instance }) => {
@@ -564,15 +568,15 @@ describe("Concurrent Sandbox Integration", () => {
       }
     });
 
-    test("GenericAgentProvider creates per-agent spawn functions", () => {
+    test("GenericAgentProvider creates per-agent spawn functions", async () => {
       // Verify that each agent gets its own createSandboxedSpawn call
       // This mirrors GenericAgentProvider.createSpawn()
       const agents = Array.from({ length: 5 }, (_, i) => `provider-agent-${i}`);
-      const spawnFunctions: Array<ReturnType<SandboxManager["createInstance"]>["spawn"]> = [];
+      const spawnFunctions: Array<SandboxInstance["spawn"]> = [];
 
       for (const agent of agents) {
         const workspace = createAgentWorkspace(testDir, agent);
-        const instance = manager.createInstance(agent, workspace);
+        const instance = await manager.createInstance(agent, workspace);
         spawnFunctions.push(instance.spawn);
       }
 

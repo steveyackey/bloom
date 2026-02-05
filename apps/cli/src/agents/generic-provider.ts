@@ -131,9 +131,9 @@ export class GenericAgentProvider implements Agent {
    * Create a sandboxed spawn function for the given workspace directory.
    * Uses the agent's sandbox config merged with sandbox module defaults.
    */
-  private createSpawn(workspacePath: string): SandboxedSpawnFn {
+  private async createSpawn(workspacePath: string): Promise<SandboxedSpawnFn> {
     const config = resolveConfig(workspacePath, this.sandboxConfig);
-    const { spawn, sandboxed } = createSandboxedSpawn(config);
+    const { spawn, sandboxed } = await createSandboxedSpawn(config);
     if (sandboxed) {
       logger.info(`Agent sandboxed: workspace=${workspacePath}`);
     }
@@ -159,16 +159,16 @@ export class GenericAgentProvider implements Agent {
   }
 
   private async runInteractive(options: AgentRunOptions): Promise<AgentRunResult> {
+    const args = this.buildArgs(options, "interactive");
+    const spawnFn = await this.createSpawn(options.startingDirectory);
+
+    const proc = await spawnFn(this.definition.command, args, {
+      cwd: options.startingDirectory,
+      stdio: "inherit",
+      env: this.getEnv(),
+    });
+
     return new Promise((resolve) => {
-      const args = this.buildArgs(options, "interactive");
-      const spawnFn = this.createSpawn(options.startingDirectory);
-
-      const proc = spawnFn(this.definition.command, args, {
-        cwd: options.startingDirectory,
-        stdio: "inherit",
-        env: this.getEnv(),
-      });
-
       proc.on("error", (error: Error) => {
         resolve({
           success: false,
@@ -187,20 +187,20 @@ export class GenericAgentProvider implements Agent {
   }
 
   private async runStreaming(options: AgentRunOptions): Promise<AgentRunResult> {
+    const args = this.buildArgs(options, "streaming");
+    const spawnFn = await this.createSpawn(options.startingDirectory);
+
+    // Log the command being run for debugging
+    const commandString = `${this.definition.command} ${args.join(" ")}`;
+    logger.debug(`Running: ${commandString}`);
+
+    const proc = await spawnFn(this.definition.command, args, {
+      cwd: options.startingDirectory,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: this.getEnv(),
+    });
+
     return new Promise((resolve) => {
-      const args = this.buildArgs(options, "streaming");
-      const spawnFn = this.createSpawn(options.startingDirectory);
-
-      // Log the command being run for debugging
-      const commandString = `${this.definition.command} ${args.join(" ")}`;
-      logger.debug(`Running: ${commandString}`);
-
-      const proc = spawnFn(this.definition.command, args, {
-        cwd: options.startingDirectory,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: this.getEnv(),
-      });
-
       const now = Date.now();
       let lastActivity = now;
       let sessionId: string | undefined;

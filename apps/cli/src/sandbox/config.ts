@@ -26,10 +26,12 @@ export type NetworkPolicy = "deny-all" | "allow-list" | "monitor" | "disabled";
 /**
  * Sandbox configuration controlling isolation behavior.
  *
- * Maps to srt's JSON settings format:
- * - filesystem.allowWrite → writablePaths
- * - filesystem.denyRead → denyReadPaths
- * - network.allowedDomains → allowedDomains (when networkPolicy is "allow-list")
+ * Maps to @anthropic-ai/sandbox-runtime's SandboxRuntimeConfig:
+ * - filesystem.allowWrite -> writablePaths + workspacePath
+ * - filesystem.denyRead -> denyReadPaths
+ * - network.allowedDomains -> allowedDomains (when networkPolicy is "allow-list")
+ * - network.deniedDomains -> [] (reserved for future use)
+ * - filesystem.denyWrite -> [] (reserved for future use)
  */
 export interface SandboxConfig {
   /** Whether sandboxing is active. Default: false */
@@ -109,16 +111,34 @@ export function resolveConfig(workspacePath: string, overrides?: Partial<Sandbox
   return resolved;
 }
 
+// =============================================================================
+// Library-Compatible Config
+// =============================================================================
+
 /**
- * Generate the srt settings JSON object from a SandboxConfig.
- *
- * srt expects a settings file with this structure:
- * {
- *   "filesystem": { "denyRead": [...], "allowWrite": [...] },
- *   "network": { "allowedDomains": [...] }
- * }
+ * Shape-compatible with @anthropic-ai/sandbox-runtime's SandboxRuntimeConfig.
+ * Defined locally to avoid requiring the library at type-check time.
  */
-export function toSrtSettings(config: SandboxConfig): SrtSettings {
+export interface SandboxRuntimeConfigCompat {
+  filesystem?: {
+    denyRead?: string[];
+    allowWrite?: string[];
+    denyWrite?: string[];
+  };
+  network?: {
+    allowedDomains?: string[];
+    deniedDomains?: string[];
+  };
+}
+
+/**
+ * Convert a SandboxConfig to the library's SandboxRuntimeConfig shape.
+ *
+ * This replaces the old toSrtSettings() function. Instead of writing
+ * JSON to a temp file for the CLI, we pass this config object directly
+ * to SandboxManager.initialize().
+ */
+export function toSandboxRuntimeConfig(config: SandboxConfig): SandboxRuntimeConfigCompat {
   const allowWrite = [config.workspacePath, ...config.writablePaths];
 
   let allowedDomains: string[];
@@ -130,10 +150,8 @@ export function toSrtSettings(config: SandboxConfig): SrtSettings {
       allowedDomains = [...config.allowedDomains];
       break;
     case "disabled":
-      // srt doesn't have a "disable network filtering" mode,
-      // but an empty config with no --unshare-net flag would work.
-      // For now, allow everything by using a wildcard-like approach.
-      // The platform backend handles this case.
+      // Empty allowedDomains with no network restrictions.
+      // The library treats undefined network config as unrestricted.
       allowedDomains = [];
       break;
     case "monitor":
@@ -142,27 +160,23 @@ export function toSrtSettings(config: SandboxConfig): SrtSettings {
       break;
   }
 
-  return {
+  const result: SandboxRuntimeConfigCompat = {
     filesystem: {
       denyRead: [...config.denyReadPaths],
       allowWrite,
+      denyWrite: [],
     },
     network: {
       allowedDomains,
+      deniedDomains: [],
     },
   };
-}
 
-// =============================================================================
-// srt Settings Type
-// =============================================================================
+  // For "disabled" network policy, omit network config entirely
+  // so the library doesn't apply any network restrictions
+  if (config.networkPolicy === "disabled" || config.networkPolicy === "monitor") {
+    result.network = undefined;
+  }
 
-export interface SrtSettings {
-  filesystem: {
-    denyRead: string[];
-    allowWrite: string[];
-  };
-  network: {
-    allowedDomains: string[];
-  };
+  return result;
 }

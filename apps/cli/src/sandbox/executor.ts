@@ -2,18 +2,15 @@
 // Sandbox Executor
 // =============================================================================
 //
-// Wraps spawn() with sandbox command prefixing. When sandbox is enabled and
-// available, the agent command is prefixed with `srt --settings <path>`.
-// When sandbox is not available, falls back to unsandboxed execution with a warning.
+// Wraps spawn() with sandbox isolation using @anthropic-ai/sandbox-runtime.
+// When sandbox is enabled and the library is available, the agent command is
+// wrapped via SandboxManager.wrapWithSandbox(). When the library is not
+// available, falls back to unsandboxed execution with a warning.
 // =============================================================================
 
 import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { type SandboxConfig, toSrtSettings } from "./config";
+import { type SandboxConfig, toSandboxRuntimeConfig } from "./config";
 import { sandboxLoggers } from "./logger";
-import { detectPlatform, getPlatformBackend, type PlatformInfo } from "./platforms";
 
 const log = sandboxLoggers.executor;
 
@@ -21,45 +18,23 @@ const log = sandboxLoggers.executor;
 // Types
 // =============================================================================
 
-export interface SandboxedSpawnOptions extends SpawnOptions {
-  /** Override platform detection (for testing) */
-  platformOverride?: PlatformInfo;
-}
-
 /**
  * A spawn function that wraps the command with sandbox isolation.
- * Has the same signature as node:child_process spawn, but prefixes
- * the command with srt when sandboxing is active.
+ * Returns a Promise<ChildProcess> because sandbox wrapping is async.
  */
-export type SandboxedSpawnFn = (command: string, args: string[], options?: SandboxedSpawnOptions) => ChildProcess;
+export type SandboxedSpawnFn = (command: string, args: string[], options?: SpawnOptions) => Promise<ChildProcess>;
 
 // =============================================================================
-// Settings File Management
+// Shell Escaping
 // =============================================================================
-
-let settingsCounter = 0;
 
 /**
- * Write srt settings to a temporary file and return the path.
+ * Escape a string for safe inclusion in a shell command.
+ * Wraps in single quotes and escapes any embedded single quotes.
  */
-function writeSettingsFile(config: SandboxConfig): string {
-  const settings = toSrtSettings(config);
-  const dir = join(tmpdir(), "bloom-sandbox");
-  mkdirSync(dir, { recursive: true });
-
-  const filename = `sandbox-${process.pid}-${++settingsCounter}.json`;
-  const settingsPath = join(dir, filename);
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-
-  log.debug(`Settings written to ${settingsPath}`);
-  return settingsPath;
+function shellEscape(arg: string): string {
+  return `'${arg.replace(/'/g, "'\\''")}'`;
 }
-
-// =============================================================================
-// Platform Detection Re-export
-// =============================================================================
-
-export { detectPlatform, type PlatformInfo } from "./platforms";
 
 // =============================================================================
 // Helpers
@@ -67,8 +42,9 @@ export { detectPlatform, type PlatformInfo } from "./platforms";
 
 /**
  * Passthrough spawn that delegates directly to node:child_process.spawn.
+ * Wrapped in a Promise for type compatibility with SandboxedSpawnFn.
  */
-const passthroughSpawn: SandboxedSpawnFn = (command, args, options) => spawn(command, args, options ?? {});
+const passthroughSpawn: SandboxedSpawnFn = async (command, args, options) => spawn(command, args, options ?? {});
 
 // =============================================================================
 // Sandboxed Spawn Factory
@@ -77,79 +53,91 @@ const passthroughSpawn: SandboxedSpawnFn = (command, args, options) => spawn(com
 /**
  * Create a spawn function that wraps commands with sandbox isolation.
  *
- * When sandbox is enabled and srt is available, the returned function will:
- * 1. Write the sandbox config as an srt settings file
- * 2. Prefix the command with `srt --settings <path>`
- * 3. Spawn the wrapped command
+ * When sandbox is enabled and @anthropic-ai/sandbox-runtime is available,
+ * the returned function will:
+ * 1. Initialize the SandboxManager with the resolved config
+ * 2. Per-spawn: build a command string and call SandboxManager.wrapWithSandbox()
+ * 3. Spawn the wrapped command via `sh -c`
  *
- * When sandbox is not enabled or srt is not available, the returned function
- * spawns the command directly (unsandboxed).
+ * When sandbox is not enabled or the library is not available, the returned
+ * function spawns the command directly (unsandboxed).
  *
  * @returns An object with the spawn function and whether sandboxing is active
  */
-export function createSandboxedSpawn(config: SandboxConfig): {
+export async function createSandboxedSpawn(config: SandboxConfig): Promise<{
   spawn: SandboxedSpawnFn;
   sandboxed: boolean;
-} {
+}> {
   if (!config.enabled) {
-    const platform = detectPlatform();
-    const backend = getPlatformBackend(platform);
-    const srtAvailable = backend ? backend.checkAvailability() !== null : false;
-
-    if (srtAvailable) {
-      log.debug("Sandbox is available but not enabled. Set sandbox.enabled=true in ~/.bloom/config.yaml to activate.");
-    }
-
+    log.debug("Sandbox not enabled, using passthrough spawn");
     return {
       spawn: passthroughSpawn,
       sandboxed: false,
     };
   }
 
-  // Sandbox is enabled — check platform and availability
-  const platform = detectPlatform();
-  const backend = getPlatformBackend(platform);
+  // Sandbox is enabled — try to load the library
+  let SandboxManager: typeof import("@anthropic-ai/sandbox-runtime").SandboxManager;
 
-  if (!backend) {
-    log.warn(`Sandbox not supported on platform: ${platform.os}/${platform.arch}. Running unsandboxed.`);
+  try {
+    const lib = await import("@anthropic-ai/sandbox-runtime");
+    SandboxManager = lib.SandboxManager;
+  } catch {
+    log.warn("Sandbox enabled but @anthropic-ai/sandbox-runtime is not installed. Running unsandboxed.");
+    log.warn("Install: npm install -g @anthropic-ai/sandbox-runtime");
     return {
       spawn: passthroughSpawn,
       sandboxed: false,
     };
   }
 
-  // Check srt availability
-  const srtPath = backend.checkAvailability();
-  if (!srtPath) {
-    log.warn("Sandbox enabled but srt is not installed. Running unsandboxed.");
-    log.warn("Install srt: npm install -g @anthropic-ai/sandbox-runtime");
+  // Check platform support
+  if (!SandboxManager.isSupportedPlatform()) {
+    log.warn("Sandbox not supported on this platform. Running unsandboxed.");
     return {
       spawn: passthroughSpawn,
       sandboxed: false,
     };
   }
 
-  // Check platform-specific dependencies
-  const deps = backend.checkDependencies();
-  if (!deps.available) {
-    log.warn(`Sandbox dependencies missing: ${deps.missing.join(", ")}. Running unsandboxed.`);
+  // Check dependencies (bubblewrap, socat on Linux; sandbox-exec on macOS)
+  try {
+    await SandboxManager.checkDependencies();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn(`Sandbox dependencies missing: ${msg}. Running unsandboxed.`);
     return {
       spawn: passthroughSpawn,
       sandboxed: false,
     };
   }
 
-  // Write settings file once (reused for all spawns from this factory)
-  const settingsPath = writeSettingsFile(config);
+  // Initialize the sandbox manager with our config
+  const runtimeConfig = toSandboxRuntimeConfig(config);
+  try {
+    await SandboxManager.initialize(runtimeConfig);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn(`Sandbox initialization failed: ${msg}. Running unsandboxed.`);
+    return {
+      spawn: passthroughSpawn,
+      sandboxed: false,
+    };
+  }
 
-  log.info(`Sandbox active: platform=${platform.os}, settings=${settingsPath}`);
+  log.info(`Sandbox active: workspace=${config.workspacePath}`);
 
-  const sandboxedSpawn: SandboxedSpawnFn = (command, args, options) => {
-    const { cmd, args: sandboxArgs } = backend.buildCommand(config, settingsPath, command, args);
+  const sandboxedSpawn: SandboxedSpawnFn = async (command, args, options) => {
+    // Build the full command string with proper escaping
+    const fullCmd = [command, ...args].map(shellEscape).join(" ");
 
-    log.debug(`Spawning sandboxed: ${cmd} ${sandboxArgs.join(" ")}`);
+    log.debug(`Wrapping command: ${fullCmd}`);
 
-    return spawn(cmd, sandboxArgs, options ?? {});
+    const wrappedCmd = await SandboxManager.wrapWithSandbox(fullCmd);
+
+    log.debug(`Spawning sandboxed: sh -c ${wrappedCmd}`);
+
+    return spawn("sh", ["-c", wrappedCmd], options ?? {});
   };
 
   return {
