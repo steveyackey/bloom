@@ -9,7 +9,14 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type AgentName, createAgent } from "../../agents";
 import { getDefaultAgentName, loadUserConfig } from "../../infra/config";
-import { addWorktree, getWorktreePath, listRepos, listWorktrees, pullDefaultBranch } from "../../infra/git";
+import {
+  addWorktree,
+  getWorktreePath,
+  getWorktreeStatus,
+  listRepos,
+  listWorktrees,
+  pullDefaultBranch,
+} from "../../infra/git";
 import { PromptCompiler } from "../../prompts/compiler";
 import { allStepsComplete, findTask, getCurrentStep, loadTasks, saveTasks, updateTaskStatus } from "../../tasks";
 import type { EventHandler } from "./events";
@@ -30,6 +37,7 @@ import {
   buildCommitResumePrompt,
   buildMergeConflictPrompt,
   buildNextStepPrompt,
+  buildTargetWorktreeCommitPrompt,
   getTaskForAgent,
   saveTaskSessionId,
 } from "./task-prompt";
@@ -741,12 +749,56 @@ async function handleMerge(
     }
 
     if (!worktreeResult.clean) {
+      const targetWorktreePath = getWorktreePath(ctx.bloomDir, ctx.repo, targetBranch);
+      const targetStatus = getWorktreeStatus(targetWorktreePath);
+
       onEvent({
         type: "log",
         level: "warn",
-        message: `Cannot merge: target worktree (${targetBranch}) has uncommitted changes`,
+        message: `Target worktree (${targetBranch}) has uncommitted changes — launching agent to commit`,
       });
-      return;
+
+      const commitPrompt = buildTargetWorktreeCommitPrompt(
+        targetBranch,
+        targetWorktreePath,
+        targetStatus,
+        ctx.gitConfig
+      );
+
+      await agent.run({
+        systemPrompt,
+        prompt: commitPrompt,
+        startingDirectory: targetWorktreePath,
+        agentName: ctx.agentName,
+        taskId: ctx.taskId,
+        sessionId: undefined, // Fresh session for target worktree work
+        onOutput: (data) => {
+          onEvent({ type: "agent:output", agentName: ctx.agentName, data });
+        },
+        onProcessStart: (pid, command) => {
+          onEvent({ type: "agent:process_started", agentName: ctx.agentName, pid, command });
+        },
+        onProcessEnd: (pid, exitCode) => {
+          onEvent({ type: "agent:process_ended", agentName: ctx.agentName, pid, exitCode });
+        },
+      });
+
+      // Re-check target worktree status after agent run
+      const postCommitStatus = getWorktreeStatus(targetWorktreePath);
+      if (!postCommitStatus.clean) {
+        onEvent({
+          type: "log",
+          level: "warn",
+          message: `Target worktree (${targetBranch}) still has uncommitted changes after agent commit attempt`,
+        });
+        return;
+      }
+
+      onEvent({
+        type: "log",
+        level: "info",
+        message: `Target worktree (${targetBranch}) is now clean — proceeding with merge`,
+      });
     }
 
     // Perform the merge

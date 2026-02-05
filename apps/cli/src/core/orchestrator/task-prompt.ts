@@ -440,6 +440,36 @@ Please commit all changes and ${gitConfig?.push_to_remote ? "push to remote" : "
 }
 
 /**
+ * Build a prompt for committing uncommitted changes on the target worktree before merge.
+ */
+export function buildTargetWorktreeCommitPrompt(
+  targetBranch: string,
+  targetWorktreePath: string,
+  status: { modifiedFiles: string[]; untrackedFiles: string[]; stagedFiles: string[] },
+  gitConfig?: GitConfig
+): string {
+  return `## Target Worktree Has Uncommitted Changes
+
+The target branch \`${targetBranch}\` has uncommitted changes that must be committed before a merge can proceed.
+
+**Working directory**: \`${targetWorktreePath}\`
+
+### Uncommitted Changes
+${status.modifiedFiles.length > 0 ? `- Modified files: ${status.modifiedFiles.join(", ")}` : ""}
+${status.untrackedFiles.length > 0 ? `- Untracked files: ${status.untrackedFiles.join(", ")}` : ""}
+${status.stagedFiles.length > 0 ? `- Staged files: ${status.stagedFiles.join(", ")}` : ""}
+
+### Instructions
+1. Review the uncommitted changes
+2. Stage and commit all changes with a descriptive commit message
+${gitConfig?.push_to_remote ? `3. Push to remote: \`git push origin ${targetBranch}\`` : ""}
+${gitConfig?.push_to_remote ? "4" : "3"}. Run \`git status\` and confirm zero uncommitted changes
+
+**Do NOT switch branches** - stay on \`${targetBranch}\`.
+Uncommitted changes will delay the merge pipeline. Commit everything and leave the worktree clean.`;
+}
+
+/**
  * Build a continuation prompt for the next step in a task.
  * This is used when resuming the agent session with the next step.
  */

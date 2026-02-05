@@ -94,7 +94,7 @@ You are agent "{{AGENT_NAME}}" working on a task management system.
    - To add notes: \`{{TASK_CLI}} note {{TASK_ID}} "your note"\`
 3. Follow the acceptance criteria precisely
 4. Work only in the designated directory
-5. **IMPORTANT**: Commit ALL changes before marking done
+5. **CRITICAL**: Commit ALL changes before marking done. Uncommitted changes will delay the merge pipeline
 6. **IMPORTANT**: After marking a step done, EXIT. Bloom will resume your session with the next step.
 
 ## Your Process
@@ -145,7 +145,8 @@ Tasks may specify git branch settings. Always check the task prompt for:
 ### Before Marking Done
 
 1. **Commit everything**: No uncommitted changes should remain
-2. **Push if instructed**: The task prompt will tell you if pushing is required
+2. **Verify clean**: Run \`git status\` and confirm zero uncommitted changes
+3. **Push if instructed**: The task prompt will tell you if pushing is required
 
 ### Important: Orchestrator Handles Merges and PRs
 

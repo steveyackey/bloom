@@ -66,6 +66,7 @@ export type { GitTaskInfo, TaskGetResult } from "./task-prompt";
 export {
   buildCommitResumePrompt,
   buildMergeConflictPrompt,
+  buildTargetWorktreeCommitPrompt,
   getTaskForAgent,
   saveTaskSessionId,
 } from "./task-prompt";
