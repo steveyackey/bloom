@@ -1,6 +1,6 @@
 {
   "name": "@bloom/cli",
-  "version": "0.3.10",
+  "version": "0.3.17",
   "private": true,
   "description": "Multi-agent task orchestrator with YAML-based task management",
   "bin": {
