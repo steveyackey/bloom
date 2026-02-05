@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.16](https://github.com/steveyackey/bloom/compare/bloom-v0.3.15...bloom-v0.3.16) (2026-02-05)
+
+
+### Features
+
+* add sandbox lifecycle logging with structured events ([7ced4e6](https://github.com/steveyackey/bloom/commit/7ced4e6b5bfe907103f3ff8898e53a33a4d65ed6))
+* add sandbox module with srt-based agent isolation ([0dfa88a](https://github.com/steveyackey/bloom/commit/0dfa88ad1d4706dfecb8e56dbbad107ca02ef8f3))
+* add sandbox-specific integration tests ([9ddcc74](https://github.com/steveyackey/bloom/commit/9ddcc74a0d7195e9a71ae17a31d411fa02a6565d))
+* add SandboxManager for multi-agent concurrent sandbox isolation ([f43dce0](https://github.com/steveyackey/bloom/commit/f43dce03eafd73602c29ae42916a2358ee4cc669))
+* integrate sandbox module with GenericAgentProvider ([bd8f4ce](https://github.com/steveyackey/bloom/commit/bd8f4cedac485ae5d782581823a411d8c2d57b34))
+
+
+### Bug Fixes
+
+* add timeout-minutes to validate CI job ([65de7c8](https://github.com/steveyackey/bloom/commit/65de7c89019e680176ebd0523e55b59dc100ea0f))
+
+
+### Documentation
+
+* add comprehensive sandbox documentation ([7fff5a0](https://github.com/steveyackey/bloom/commit/7fff5a00a95eb7827aee37f980f1902d5f37a352))
+* update sandbox docs for library-based architecture ([0df0950](https://github.com/steveyackey/bloom/commit/0df09509e38eab0fda92c67ef4ac1183f5190830))
+
 ## [0.3.15](https://github.com/steveyackey/bloom/compare/bloom-v0.3.14...bloom-v0.3.15) (2026-02-04)
 
 
