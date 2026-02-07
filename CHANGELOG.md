@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.18](https://github.com/steveyackey/bloom/compare/bloom-v0.3.17...bloom-v0.3.18) (2026-02-07)
+
+
+### Bug Fixes
+
+* sync CLI version with root package.json via release-please ([f577e60](https://github.com/steveyackey/bloom/commit/f577e603b14c0470e8fdd94d3501c41fb4b3d9aa))
+
 ## [0.3.17](https://github.com/steveyackey/bloom/compare/bloom-v0.3.16...bloom-v0.3.17) (2026-02-05)
 
 
