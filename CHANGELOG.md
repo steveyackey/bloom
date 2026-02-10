@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.19](https://github.com/steveyackey/bloom/compare/bloom-v0.3.18...bloom-v0.3.19) (2026-02-10)
+
+
+### Features
+
+* add Forgejo CLI (fj) support for PR creation ([640c3c1](https://github.com/steveyackey/bloom/commit/640c3c1f6df8f7ae221fd16d3b0b2479711e7d8a))
+
+
+### Bug Fixes
+
+* add npm override for eslint-scope to fix Cloudflare docs build ([3850e84](https://github.com/steveyackey/bloom/commit/3850e84435fd0053d08e5ffa422c67416264e8f8))
+
+
+### Documentation
+
+* mention Forgejo in project workflow PR guide ([3ce87ef](https://github.com/steveyackey/bloom/commit/3ce87efd4e4d8757348fa7c405767ff65047c023))
+
 ## [0.3.18](https://github.com/steveyackey/bloom/compare/bloom-v0.3.17...bloom-v0.3.18) (2026-02-07)
 
 
