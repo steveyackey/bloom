@@ -427,7 +427,7 @@ tasks:
     branch: feature/proj/task       # Working branch (pattern: feature/<project>/<task>)
     base_branch: feature/proj       # Branch to create from (integration branch)
     merge_into: feature/proj        # Merge into integration branch when done
-    open_pr: true                   # Create GitHub PR (only for final PR to main)
+    open_pr: true                   # Create PR via gh or fj CLI (only for final PR to main)
     agent_name: backend-agent       # Group tasks by agent (same = sequential, different = parallel)
     checkpoint: true                # Requires human approval before downstream tasks
     instructions: |                 # Detailed instructions

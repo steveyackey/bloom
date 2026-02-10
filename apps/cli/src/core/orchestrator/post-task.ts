@@ -18,7 +18,7 @@ import {
   releaseMergeLock,
   waitForMergeLock,
 } from "../../infra/git";
-import { createPullRequest as ghCreatePullRequest } from "../../infra/github";
+import { createPullRequest as hostingCreatePullRequest } from "../../infra/git-hosting";
 import type { GitConfig } from "../../task-schema";
 import { loadTasks, saveTasks, updateTaskStatus } from "../../tasks";
 import type { EventHandler } from "./events";
@@ -105,7 +105,7 @@ export interface CreatePRResult {
 }
 
 /**
- * Create a pull request using the GitHub CLI.
+ * Create a pull request using the appropriate hosting CLI (gh or fj).
  */
 export function createPullRequest(
   gitInfo: GitTaskInfo,
@@ -142,7 +142,7 @@ export function createPullRequest(
     targetBranch,
   });
 
-  const result = ghCreatePullRequest({
+  const result = hostingCreatePullRequest({
     title: taskTitle || `Task: ${taskId}`,
     body: prBody || `Automated PR for task ${taskId}`,
     baseBranch: targetBranch,

@@ -152,7 +152,7 @@ Tasks may specify git branch settings. Always check the task prompt for:
 
 **Do NOT manually merge branches or create PRs.** The orchestrator handles this automatically:
 - If the task has \`merge_into\`: Orchestrator auto-merges after task completion
-- If the task has \`open_pr: true\`: Orchestrator creates a GitHub PR automatically
+- If the task has \`open_pr: true\`: Orchestrator creates a PR automatically (GitHub or Forgejo)
 
 Your job is just to:
 1. Complete the work on your branch

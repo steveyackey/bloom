@@ -82,7 +82,7 @@ export type Task = {
   base_branch?: string;
   /** Branch to merge working branch into when task completes. Same as `branch` means no merge needed */
   merge_into?: string;
-  /** If true, create a GitHub PR instead of auto-merging. PR targets merge_into branch (or repo default). Requires git.push_to_remote: true to push branch to remote. */
+  /** If true, create a PR instead of auto-merging. PR targets merge_into branch (or repo default). Requires git.push_to_remote: true to push branch to remote. Supports GitHub (gh) and Forgejo (fj) CLIs. */
   open_pr?: boolean;
   /** Agent group name for this task (used for parallel execution grouping) */
   agent_name?: string;
