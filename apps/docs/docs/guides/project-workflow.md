@@ -427,7 +427,7 @@ Push and create PRs:
 
 ```bash
 git push origin feature/auth
-# Create PR via GitHub/GitLab
+# Create PR via GitHub/GitLab/Forgejo
 ```
 
 ### Clean Up
