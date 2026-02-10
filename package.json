@@ -21,7 +21,7 @@
     "install:local": "bun --filter @bloom/cli install:local",
     "prepare": "bun scripts/install-hooks.ts"
   },
-  "version": "0.3.18",
+  "version": "0.3.19",
   "overrides": {
     "webpack": {
       "eslint-scope": "5.1.1"
